@@ -1,0 +1,21 @@
+name: Linux
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: "${{ matrix.os }}-latest"
+    strategy:
+      matrix:
+        os:
+          - ubuntu
+        perl:
+          - 5.38
+          - 5.36
+    name: ${{ matrix.os }}/${{ matrix.perl }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: ${{ matrix.perl }}
+      - name: Run tests
+        run: cpanm --test-only -v .

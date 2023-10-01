@@ -1,0 +1,27 @@
+name: Windows
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: "${{ matrix.os }}-latest"
+    strategy:
+      matrix:
+        os:
+          - windows
+        perl:
+          - 5.38
+          - 5.36
+        flavor:
+          - strawberry
+          - default
+    name: ${{ matrix.os }}/${{ matrix.perl }}/${{ matrix.flavor }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: ${{ matrix.perl }}
+          distribution: ${{ matrix.flavor }}
+      - name: Install prereqs
+        run: cpanm --installdeps -n -v .
+      - name: Run tests
+        run: cpanm --test-only -v .
