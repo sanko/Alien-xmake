@@ -12,7 +12,7 @@ use Alien::xmake;
     chdir $dir;
     unshift @PATH, Alien::xmake->bin_dir;
     my $exe = Alien::xmake->exe;
-    warn $exe;
+    note $exe;
     system $exe, qw[create --quiet --project=test_cpp --language=c++ --template=console];
     ok( ( -d 'test_cpp' ), 'project created' );
     chdir 'test_cpp';
