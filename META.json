@@ -29,6 +29,7 @@
    "prereqs" : {
       "configure" : {
          "requires" : {
+            "Archive::Tar" : "0",
             "CPAN::Meta" : "0",
             "File::Basename" : "0",
             "File::Spec::Functions" : "0",

@@ -7,6 +7,7 @@ on 'test' => sub {
     requires 'File::Temp';
 };
 on 'configure' => sub {
+    requires 'Archive::Tar';
     requires 'CPAN::Meta';
     requires 'Module::Build';
     requires 'HTTP::Tiny';
