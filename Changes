@@ -2,6 +2,8 @@ Revision history for Perl extension Alien::xmake
 
 {{$NEXT}}
 
+0.02 2024-03-17T00:38:59Z
+
     - Minor documentation changes
     - Move to Test2::V0
 
