@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 use lib 'lib', '../blib/lib', '../lib';
-use Test::More 0.98;
+use Test2::V0;
 use File::Temp qw[tempdir];
 use Env        qw[@PATH];
 #
@@ -16,8 +16,8 @@ use Alien::xmake;
     system $exe, qw[create --quiet --project=test_cpp --language=c++ --template=console];
     ok( ( -d 'test_cpp' ), 'project created' );
     chdir 'test_cpp';
-TODO: {
-        local $TODO = 'Require a working compiler';    # outside the scope of Alien::xmake
+    subtest compile => sub {
+        my $todo = todo 'Require a working compiler';    # outside the scope of Alien::xmake
         diag 'Building project..';
         ok !system( $exe, '--quiet' ), 'project built';
         my $greeting = `$exe run`;

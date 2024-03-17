@@ -35,3 +35,5 @@ temp
 t/test_cpp
 t/.xmake/
 test_cpp
+share/share
+share/bin

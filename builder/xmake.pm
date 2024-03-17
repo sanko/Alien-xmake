@@ -109,7 +109,7 @@ package builder::xmake {
             my $dest      = File::Spec->rel2abs(
                 File::Spec->catdir( $s->base_dir, @{ $s->share_dir->{dist} } ) );
             $s->log_info(qq[Running installer [$installer]...\n]);
-            warn $s->do_system( $installer, '/NOADMIN', '/S', '/D=' . $dest );
+            $s->do_system( $installer, '/NOADMIN', '/S', '/D=' . $dest );
             $s->log_info(qq[Installer complete\n]);
             push @PATH, $dest;
             my $xmake = $s->locate_xmake();
@@ -288,7 +288,8 @@ package builder::xmake {
         chdir $projectdir;
         `./configure` unless -f "$projectdir/makefile";
         chdir $cwd;    # I really should go to dist base dir
-        warn 'Building with ' . $make;
+
+        #~ warn 'Building with ' . $make;
         `$make -C $projectdir`;
         `$make -C $projectdir install PREFIX=$share`;
         return $share;
