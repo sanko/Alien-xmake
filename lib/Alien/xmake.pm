@@ -267,7 +267,7 @@ Build from source using gmake instead of make.
 
 =head1 See Also
 
-https://xmake.io/
+L<https://xmake.io/>
 
 =head1 LICENSE
 

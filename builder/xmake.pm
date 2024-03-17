@@ -14,7 +14,7 @@ package builder::xmake {
     #
     #~ use Data::Dump;
     #
-    my $version = 'v2.8.3';    # Target install version
+    my $version = 'v2.8.8';    # Target install version
     my $branch  = 'master';
 
     #~ my $installer_sh = 'https://xmake.io/shget.text';
@@ -110,11 +110,12 @@ package builder::xmake {
                 File::Spec->catdir( $s->base_dir, @{ $s->share_dir->{dist} } ) );
             $s->log_info(qq[Running installer [$installer]...\n]);
             $s->do_system( $installer, '/NOADMIN', '/S', '/D=' . $dest );
-            $s->log_info(qq[Installer complete\n]);
+            $s->log_info(qq[Installed to $dest\n]);
             push @PATH, $dest;
             my $xmake = $s->locate_xmake();
             $s->config_data( xmake_type => 'share' );
             $s->gather_info($xmake);
+            $s->config_data( xmake_install => $dest );
 
 # D:\a\_temp\1aa1c77c-ff7b-41bc-8899-98e4cd421618.exe /NOADMIN /S /D=C:\Users\RUNNER~1\AppData\Local\Temp\xmake-15e5f277191e8a088998d0f797dd1f44b5491e17
 #~ $s->warn_info('Windows is on the todo list');
@@ -132,6 +133,7 @@ package builder::xmake {
                 #
                 $s->config_data( xmake_type => 'share' );
             }
+            $s->config_data( xmake_install => $xmake );
             $s->gather_info($xmake);
             return File::Spec->rel2abs($xmake);
         }
@@ -186,7 +188,7 @@ package builder::xmake {
         my $make;
         {
             for (qw[make gmake]) {
-                if ( system( $_, '--version' ) == 0 ) {
+                if ( `$_ --version` =~ /GNU Make/ ) {
                     $make = $_;
                     last;
                 }
@@ -197,7 +199,6 @@ package builder::xmake {
         {
             my ( $fh, $filename ) = tempfile();
             syswrite $fh, "#include <stdio.h>\nint main(){return 0;}";
-            die 'Please install git' if system 'git', '--version';
             for (qw[gcc cc clang]) {
                 if ( !system $_, qw'-x c', $filename,
                     qw'-o /dev/null -I/usr/include -I/usr/local/include' ) {
