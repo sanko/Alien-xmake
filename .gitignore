@@ -37,3 +37,4 @@ t/.xmake/
 test_cpp
 share/share
 share/bin
+*.session

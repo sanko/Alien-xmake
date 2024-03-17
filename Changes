@@ -2,6 +2,8 @@ Revision history for Perl extension Alien::xmake
 
 {{$NEXT}}
 
+0.03 2024-03-17T16:31:16Z
+
     - Install v2.8.8 on Windows
 
 0.02 2024-03-17T00:38:59Z
