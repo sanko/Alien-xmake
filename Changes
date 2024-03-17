@@ -2,6 +2,11 @@ Revision history for Perl extension Alien::xmake
 
 {{$NEXT}}
 
+0.04 2024-03-17T17:47:37Z
+
+    - Install v2.8.8 on platforms that build from source
+    - Pull tarball instead of git clone on platforms that build from source
+
 0.03 2024-03-17T16:31:16Z
 
     - Install v2.8.8 on Windows
