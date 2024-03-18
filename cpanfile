@@ -1,7 +1,5 @@
 requires 'perl', '5.020000';
-requires 'File::ShareDir';
-requires 'File::Which';
-requires 'Module::Build';
+requires 'Path::Tiny';
 on 'test' => sub {
     requires 'Test2::V0';
     requires 'File::Temp';
@@ -15,6 +13,7 @@ on 'configure' => sub {
     requires 'File::Basename';
     requires 'File::Which';
     requires 'File::Temp';
+    requires 'Path::Tiny';
 };
 on 'develop' => sub {
     requires 'CPAN::Uploader';

@@ -10,14 +10,10 @@ package builder::xmake {
     use File::Spec::Functions qw[rel2abs];
     use File::Which           qw[which];
     use Archive::Tar          qw[];
-
-    #~ use File::ShareDir qw[];
+    use Path::Tiny            qw[path];
     #
-    my $version = '2.8.8';    # Target install version
-
-    # If false, a complete archive is downloaded (quickly) via http
-    #~ my $installer_sh = 'https://xmake.io/shget.text';
-    my $installer_exe
+    my $version = '2.8.8';                            # Target install version
+    my $installer_exe                                 # Pretend we're 64bit
         = "https://github.com/xmake-io/xmake/releases/download/v${version}/xmake-v${version}.win64.exe";
     my $installer_tar
         = "https://github.com/xmake-io/xmake/releases/download/v${version}/xmake-v${version}.tar.gz";
@@ -73,6 +69,8 @@ package builder::xmake {
     #~ }
     sub gather_info {
         my ( $s, $xmake, $xrepo ) = @_;
+        warn $xmake;
+        warn $xrepo;
         $s->config_data( xmake_exe => $xmake );
         $s->config_data( xrepo_exe => $xrepo );
         $s->config_data( xmake_dir => File::Basename::dirname($xmake) );
@@ -82,21 +80,12 @@ package builder::xmake {
         $s->config_data( xmake_installed => 1 );
     }
 
-    sub slurp {
-        my ( $s, $file ) = @_;
-        open my $fh, '<', $file or die;
-        local $/ = undef;
-        my $cont = <$fh>;
-        close $fh;
-        return $cont;
-    }
-
     # Module::Build subclass
     sub ACTION_xmake_install {
         my ($s) = @_;
 
         #~ ddx $s->config_data;
-        return 1 if $s->config_data('xmake_install');
+        return $s->config_data('xmake_type') if $s->config_data('xmake_type');
         #
         my $os = $s->os_type;    # based on Perl::OSType
         if ( !defined $os ) {
@@ -107,25 +96,32 @@ package builder::xmake {
         }
         elsif ( $os eq 'Windows' ) {
             $s->config_data( xmake_type => 'share' );
+            $s->log_info(qq[Downloading $installer_exe...\n]);
             my $installer = $s->download( $installer_exe, 'xmake_installer.exe' );
-            my $dest      = File::Spec->rel2abs(
-                File::Spec->catdir( $s->base_dir, @{ $s->share_dir->{dist} } ) );
-            $s->log_info(qq[Running installer [$installer]...\n]);
-            $s->do_system( $installer, '/NOADMIN', '/S', '/D=' . $dest );
+            my $dest      = path( $s->base_dir )->child('share');
+            $dest->mkdir;
+            my $cmd = join ' ', $installer, '/NOADMIN', '/S', '/D=' . $dest->canonpath;
+            $s->log_info(qq[Running $cmd\n]);
+            $s->do_system($cmd);
             $s->log_info(qq[Installed to $dest\n]);
-            push @PATH, $dest;
-            my $xmake = $s->locate_exe('xmake');
-            my $xrepo = $s->locate_exe('xrepo');
+            push @PATH, $dest->realpath;
+            path('.')->visit( sub { print "$_\n" }, { recurse => 1 } );
+            system 'dir', $dest;
+
+            #~ my $xmake = $s->locate_exe('xmake');
+            #~ my $xrepo = $s->locate_exe('xrepo');
             $s->config_data( xmake_type => 'share' );
-            $s->gather_info( $xmake, $xrepo );
-            $s->config_data( xmake_install => $dest );
+
+            #~ $s->gather_info( $xmake, $xrepo );
+            #~ $s->config_data( xmake_install => $dest );
+            return 'share'
 
 # D:\a\_temp\1aa1c77c-ff7b-41bc-8899-98e4cd421618.exe /NOADMIN /S /D=C:\Users\RUNNER~1\AppData\Local\Temp\xmake-15e5f277191e8a088998d0f797dd1f44b5491e17
 #~ $s->warn_info('Windows is on the todo list');
 #~ exit 1;
         }
         else {
-            unshift @PATH, 'share/bin';
+            #~ unshift @PATH, 'share/bin';
             my $xmake = $s->locate_exe('xmake');
             my $xrepo = $s->locate_exe('xrepo');
             if ($xmake) {
@@ -133,15 +129,20 @@ package builder::xmake {
             }
             else {
                 $s->build_from_source();
-                $xmake = $s->locate_exe('xmake');
-                $xrepo = $s->locate_exe('xrepo');
+                unshift @PATH, 'share';
                 #
                 $s->config_data( xmake_type => 'share' );
+                return 'share';
             }
-            $s->config_data( xmake_install => $xmake );
+            $xmake = $s->locate_exe('xmake');
+            $xrepo = $s->locate_exe('xrepo');
             $s->gather_info( $xmake, $xrepo );
-            return File::Spec->rel2abs($xmake);
+
+            #~ $s->config_data( xmake_install => $xmake );
+            #~ return File::Spec->rel2abs($xmake);
+            return;
         }
+        return $s->config_data('xmake_type');
     }
 
     sub ACTION_code {
@@ -241,10 +242,11 @@ package builder::xmake {
                 #brew   => 'brew --version',                                       # MacOS
                 #dnf    => 'dnf --help',    # Fedora, RHEL, OpenSUSE, CentOS
             );
-            warn 'You should probably try running ' . $options{$installer}
+            $s->log_info( 'You should probably try running ' . $options{$installer} . "\n" )
                 if defined $options{$installer};
             my $prebuilt = install_prebuilt();
-            warn 'You could also install a prebuilt version of xmake with ' . $prebuilt
+            $s->log_info(
+                'You could also install a prebuilt version of xmake with ' . $prebuilt . "\n" )
                 if defined $prebuilt;
         }
 
@@ -273,7 +275,7 @@ package builder::xmake {
         my $workdir;
         my $archive = $s->download( $installer_tar, 'xmake.tar.gz' );
         if ( !$archive ) {
-            warn 'Failed to download source snapshot... Looking for git...';
+            $s->log_info('Failed to download source snapshot... Looking for git...');
             my $git;
             for (qw[git]) {
                 if ( system( $_, '--version' ) == 0 ) {
@@ -281,9 +283,9 @@ package builder::xmake {
                     last;
                 }
             }
-            if ( !$git ) { warn 'Cannot locate git. Giving up'; exit 1; }
+            if ( !$git ) { $s->log_info('Cannot locate git. Giving up'); exit 1; }
             my $mirror = get_fast_host();
-            CORE::say "Using $mirror mirror...";
+            $s->log_info("Using $mirror mirror...");
             my ( $gitrepo, $gitrepo_raw );
             if ( $mirror eq 'github.com' ) {
                 $gitrepo = 'https://github.com/xmake-io/xmake.git';

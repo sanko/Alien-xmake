@@ -23,9 +23,7 @@ my %args = (
     },
 
     requires => {
-        'File::ShareDir' => '0',
-        'File::Which' => '0',
-        'Module::Build' => '0',
+        'Path::Tiny' => '0',
         'perl' => '5.020000',
     },
 

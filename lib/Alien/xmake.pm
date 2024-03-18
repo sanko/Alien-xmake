@@ -1,9 +1,18 @@
 package Alien::xmake 0.05 {
     use strict;
     use warnings;
-    use File::Which qw[which];
-    use File::ShareDir;
-    use File::Spec::Functions qw[rel2abs catdir catfile];
+    use Path::Tiny qw[path];
+    #
+    my $Windows = $^O eq 'MSWin32';
+    my ($dir) =
+
+    my @dirs =
+    grep {defined} map {
+        my $path = path($_)->child( grep {defined} qw[auto share dist Alien-xmake], $Windows ? () : 'bin' );
+        $path->is_dir ? $path : ()
+    } @INC;
+
+warn $_ for @dirs;
     #
     sub config {
         CORE::state $config //= sub {
@@ -13,7 +22,7 @@ package Alien::xmake 0.05 {
             }
 
             # TODO: die if running xmake fails... we obviously don't have it installed
-            { xmake_type => 'system' };
+            { xmake_type => 'shared' };
             }
             ->();
         $config;
@@ -25,57 +34,26 @@ package Alien::xmake 0.05 {
     sub dynamic_libs { }
 
     # Valuable
-    sub install_type {
-        CORE::state $type
-            //= eval { -d rel2abs( catdir( File::ShareDir::dist_dir('Affix-xmake'), 'bin' ) ) }
-            ? 'share' :
-            'system';
-
-        #config()->{xmake_type}
-        return $type;
-    }
-
-    sub bin_dir {
-        CORE::state $dir
-            //= eval { rel2abs( catdir( File::ShareDir::dist_dir('Affix-xmake'), 'bin' ) ) };
-        return $dir // config()->{xmake_dir};
-    }
+    sub install_type { config()->{xmake_type} }
+    sub bin_dir      { $dir // return; $dir->child('bin')->canonpath; }
 
     sub exe {
-        CORE::state $exe //= eval {
-            rel2abs(
-                catfile(
-                    File::ShareDir::dist_dir('Affix-xmake'), 'bin',
-                    'xmake' . ( $^O eq 'MSWin32' ? '.exe' : '' )
-                )
-            );
-        };
-        return $exe // config()->{xmake_exe};
+        $dir // return;
+        $dir->child( 'bin', 'xmake' . ( $Windows ? '.exe' : '' )->canonpath );
     }
 
     sub xrepo {
-        CORE::state $exe //= eval {
-            rel2abs(
-                catfile(
-                    File::ShareDir::dist_dir('Affix-xmake'), 'bin',
-                    'xmake' . ( $^O eq 'MSWin32' ? '.exe' : '' )
-                )
-            );
-        };
-        return $exe // config()->{xrepo_exe};
+        $dir // return;
+        $dir->child( 'bin', 'xrepo' . ( $Windows ? '.bat' : '' )->canonpath );
     }
 
     sub version {
+        $dir // return;
         CORE::state $ver;
         if ( !defined $ver ) {
-            if ( config->{xmake_type} eq 'system' ) {
-                my $xmake = exe();
-                my $run   = `$xmake --version`;
-                ($ver) = $run =~ m[xmake (v.+?), A cross-platform build utility based on Lua];
-            }
-            else {
-                $ver = config()->{xmake_ver};
-            }
+            my $xmake = exe();
+            my $run   = `$xmake --version`;
+            ($ver) = $run =~ m[xmake (v.+?), A cross-platform build utility based on Lua];
         }
         $ver;
     }
