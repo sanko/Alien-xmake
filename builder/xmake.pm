@@ -31,9 +31,9 @@ package builder::xmake {
         $http;
     }
     #
-    sub locate_xmake {
-        my ($s) = @_;
-        my $path = which('xmake');
+    sub locate_exe {
+        my ( $s, $exe ) = @_;
+        my $path = which($exe);
         $path ? rel2abs($path) : ();
     }
     sub install_with_exe { my ($s) = @_; }
@@ -72,8 +72,9 @@ package builder::xmake {
     #~ exit 1;
     #~ }
     sub gather_info {
-        my ( $s, $xmake ) = @_;
+        my ( $s, $xmake, $xrepo ) = @_;
         $s->config_data( xmake_exe => $xmake );
+        $s->config_data( xrepo_exe => $xrepo );
         $s->config_data( xmake_dir => File::Basename::dirname($xmake) );
         my $run = `$xmake --version`;
         my ($ver) = $run =~ m[xmake (v.+?), A cross-platform build utility based on Lua];
@@ -113,9 +114,10 @@ package builder::xmake {
             $s->do_system( $installer, '/NOADMIN', '/S', '/D=' . $dest );
             $s->log_info(qq[Installed to $dest\n]);
             push @PATH, $dest;
-            my $xmake = $s->locate_xmake();
+            my $xmake = $s->locate_exe('xmake');
+            my $xrepo = $s->locate_exe('xrepo');
             $s->config_data( xmake_type => 'share' );
-            $s->gather_info($xmake);
+            $s->gather_info( $xmake, $xrepo );
             $s->config_data( xmake_install => $dest );
 
 # D:\a\_temp\1aa1c77c-ff7b-41bc-8899-98e4cd421618.exe /NOADMIN /S /D=C:\Users\RUNNER~1\AppData\Local\Temp\xmake-15e5f277191e8a088998d0f797dd1f44b5491e17
@@ -124,18 +126,20 @@ package builder::xmake {
         }
         else {
             unshift @PATH, 'share/bin';
-            my $xmake = $s->locate_xmake();
+            my $xmake = $s->locate_exe('xmake');
+            my $xrepo = $s->locate_exe('xrepo');
             if ($xmake) {
                 $s->config_data( xmake_type => 'system' );
             }
             else {
                 $s->build_from_source();
-                $xmake = $s->locate_xmake();
+                $xmake = $s->locate_exe('xmake');
+                $xrepo = $s->locate_exe('xrepo');
                 #
                 $s->config_data( xmake_type => 'share' );
             }
             $s->config_data( xmake_install => $xmake );
-            $s->gather_info($xmake);
+            $s->gather_info( $xmake, $xrepo );
             return File::Spec->rel2abs($xmake);
         }
     }

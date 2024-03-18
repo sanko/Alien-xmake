@@ -2,6 +2,8 @@ Revision history for Perl extension Alien::xmake
 
 {{$NEXT}}
 
+    - Expose xrepo
+
 0.05 2024-03-18T17:19:34Z
 
     - Resort to git when we fail to download snapshot with HTTP::Tiny (kinda pointless but the code was already there)

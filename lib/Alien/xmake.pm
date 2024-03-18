@@ -53,6 +53,18 @@ package Alien::xmake 0.05 {
         return $exe // config()->{xmake_exe};
     }
 
+    sub xrepo {
+        CORE::state $exe //= eval {
+            rel2abs(
+                catfile(
+                    File::ShareDir::dist_dir('Affix-xmake'), 'bin',
+                    'xmake' . ( $^O eq 'MSWin32' ? '.exe' : '' )
+                )
+            );
+        };
+        return $exe // config()->{xrepo_exe};
+    }
+
     sub version {
         CORE::state $ver;
         if ( !defined $ver ) {
@@ -69,7 +81,7 @@ package Alien::xmake 0.05 {
     }
 
     sub alien_helper {
-        { xmake => sub { __PACKAGE__->exe } }
+        { xmake => sub { __PACKAGE__->exe }, xrepo => sub { __PACKAGE__->xrepo } }
     }
 }
 1;
@@ -114,6 +126,13 @@ Returns 'system' or 'shared'.
 
 Returns the full path to the xmake executable.
 
+=head2 C<xrepo()>
+
+    system Alien::xmake->xrepo;
+
+Returns the full path to the L<xrepo|https://github.com/xmake-io/xmake-repo>
+executable.
+
 =head2 C<bin_dir()>
 
     use Env qw[@PATH];
@@ -134,11 +153,13 @@ is cached.
 
 =head1 Alien::Base Helper
 
-To use xmake in your C<alienfile>s, require this module and use C<%{xmake}>.
+To use xmake in your C<alienfile>s, require this module and use C<%{xmake}> and
+C<%{xrepo}>.
 
     use alienfile;
     # ...
         [ '%{xmake}', 'install' ],
+        [ '%{xrepo}', 'install ...' ]
     # ...
 
 =head1 xmake Cookbook

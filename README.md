@@ -40,6 +40,15 @@ system Alien::xmake->exe;
 
 Returns the full path to the xmake executable.
 
+## `xrepo()`
+
+```
+system Alien::xmake->xrepo;
+```
+
+Returns the full path to the [xrepo](https://github.com/xmake-io/xmake-repo)
+executable.
+
 ## `bin_dir()`
 
 ```perl
@@ -64,12 +73,14 @@ is cached.
 
 # Alien::Base Helper
 
-To use xmake in your `alienfile`s, require this module and use `%{xmake}`.
+To use xmake in your `alienfile`s, require this module and use `%{xmake}` and
+`%{xrepo}`.
 
 ```perl
 use alienfile;
 # ...
     [ '%{xmake}', 'install' ],
+    [ '%{xrepo}', 'install ...' ]
 # ...
 ```
 
