@@ -14,7 +14,6 @@ package builder::xmake {
     #~ use File::ShareDir qw[];
     #
     my $version = '2.8.8';    # Target install version
-    my $try_git = !1;         # If true, source will be pulled (slowly) from git repos
 
     # If false, a complete archive is downloaded (quickly) via http
     #~ my $installer_sh = 'https://xmake.io/shget.text';
@@ -55,8 +54,8 @@ package builder::xmake {
             return $local;
         }
         $s->log_debug( 'Status: [' . $response->{status} . '] ' . $response->{content} );
-        $s->log_warn( 'Failed to download installer from ' . $response->{url} );
-        exit 1;
+        $s->log_warn( 'Failed to download ' . $response->{url} );
+        return ();
     }
 
     #~ sub download_shget {
@@ -210,16 +209,6 @@ package builder::xmake {
             }
             $compiler // warn 'Please install a C compiler';
         }
-        my $git;
-        if ($try_git) {
-            for (qw[git]) {
-                if ( system( $_, '--version' ) == 0 ) {
-                    $git = $_;
-                    last;
-                }
-            }
-            $git // warn 'Please install git';
-        }
         if ( !defined $make || !defined $compiler ) {
             my $sudo      = sudo();
             my $installer = package_installer();
@@ -273,7 +262,17 @@ package builder::xmake {
         my $cwd        = rel2abs('.');
         my $projectdir = tempdir( CLEANUP => 1 );
         my $workdir;
-        if ( defined $git ) {
+        my $archive = $s->download( $installer_tar, 'xmake.tar.gz' );
+        if ( !$archive ) {
+            warn 'Failed to download source snapshot... Looking for git...';
+            my $git;
+            for (qw[git]) {
+                if ( system( $_, '--version' ) == 0 ) {
+                    $git = $_;
+                    last;
+                }
+            }
+            if ( !$git ) { warn 'Cannot locate git. Giving up'; exit 1; }
             my $mirror = get_fast_host();
             CORE::say "Using $mirror mirror...";
             my ( $gitrepo, $gitrepo_raw );
@@ -293,14 +292,11 @@ package builder::xmake {
             chdir $projectdir;
             $workdir = $projectdir;
         }
-        else {
-            my $archive = $s->download( $installer_tar, 'xmake.tar.gz' );
-            my $tar     = Archive::Tar->new;
-            $tar->read($archive);
-            chdir $projectdir;
-            $tar->extract();
-            $workdir = $projectdir . '/xmake-' . $version;
-        }
+        my $tar = Archive::Tar->new;
+        $tar->read($archive);
+        chdir $projectdir;
+        $tar->extract();
+        $workdir = $projectdir . '/xmake-' . $version;
         chdir $workdir;
         system './configure' unless -f 'makefile';
         system $make, '--jobs=5';
