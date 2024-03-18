@@ -1,4 +1,4 @@
-package Alien::xmake 0.04 {
+package Alien::xmake 0.05 {
     use strict;
     use warnings;
     use File::Which qw[which];

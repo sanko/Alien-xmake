@@ -195,7 +195,7 @@ package builder::xmake {
                     last;
                 }
             }
-            $make // warn 'Please install make/gmake';
+            $make // warn 'Please install gmake';
         }
         my $compiler;
         {
@@ -207,7 +207,8 @@ package builder::xmake {
                     $compiler = $_;
                 }
             }
-            $compiler // warn 'Please install a C compiler';
+
+            #~ $compiler // warn 'Please install a C compiler';
         }
         if ( !defined $make || !defined $compiler ) {
             my $sudo      = sudo();
@@ -236,7 +237,11 @@ package builder::xmake {
                 #brew   => 'brew --version',                                       # MacOS
                 #dnf    => 'dnf --help',    # Fedora, RHEL, OpenSUSE, CentOS
             );
-            system $options{$installer} if defined $options{$installer};
+            warn 'You should probably try running ' . $options{$installer}
+                if defined $options{$installer};
+            my $prebuilt = install_prebuilt();
+            warn 'You could also install a prebuilt version of xmake with ' . $prebuilt
+                if defined $prebuilt;
         }
 
         sub get_host_speed {
