@@ -12,7 +12,7 @@ package builder::xmake {
     use Archive::Tar          qw[];
     use Path::Tiny            qw[path];
     #
-    my $version = '2.8.8';                            # Target install version
+    my $version = '2.9.5';                            # Target install version
     my $installer_exe                                 # Pretend we're 64bit
         = "https://github.com/xmake-io/xmake/releases/download/v${version}/xmake-v${version}.win64.exe";
     my $installer_tar
@@ -75,6 +75,7 @@ package builder::xmake {
         $s->config_data( xrepo_exe => $xrepo );
         $s->config_data( xmake_dir => File::Basename::dirname($xmake) );
         my $run = `$xmake --version`;
+        warn $run;
         my ($ver) = $run =~ m[xmake (v.+?), A cross-platform build utility based on Lua];
         $s->config_data( xmake_ver       => $ver );
         $s->config_data( xmake_installed => 1 );
@@ -84,8 +85,7 @@ package builder::xmake {
     sub ACTION_xmake_install {
         my ($s) = @_;
 
-        #~ ddx $s->config_data;
-        return $s->config_data('xmake_type') if $s->config_data('xmake_type');
+        #~ return $s->config_data('xmake_type') if $s->config_data('xmake_type');
         #
         my $os = $s->os_type;    # based on Perl::OSType
         if ( !defined $os ) {
@@ -147,6 +147,7 @@ package builder::xmake {
 
     sub ACTION_code {
         my ($s) = @_;
+        warn 'CODE';
         $s->depends_on('xmake_install');
         $s->SUPER::ACTION_code;
     }

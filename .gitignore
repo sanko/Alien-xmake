@@ -39,3 +39,4 @@ share/share
 share/bin
 *.session
 xmake.*
+.xmake/*

@@ -4,15 +4,12 @@ package Alien::xmake 0.05 {
     use Path::Tiny qw[path];
     #
     my $Windows = $^O eq 'MSWin32';
-    my ($dir) =
-
-    my @dirs =
-    grep {defined} map {
-        my $path = path($_)->child( grep {defined} qw[auto share dist Alien-xmake], $Windows ? () : 'bin' );
+    my ($dir) = my @dirs = grep {defined} map {
+        my $path = path($_)
+            ->child( grep {defined} qw[auto share dist Alien-xmake], $Windows ? () : 'bin' );
         $path->is_dir ? $path : ()
-    } @INC;
-
-warn $_ for @dirs;
+    } grep {defined} @INC, config()->{xmake_dir};
+    warn $_ for @dirs;
     #
     sub config {
         CORE::state $config //= sub {
@@ -38,17 +35,16 @@ warn $_ for @dirs;
     sub bin_dir      { $dir // return; $dir->child('bin')->canonpath; }
 
     sub exe {
-        $dir // return;
-        $dir->child( 'bin', 'xmake' . ( $Windows ? '.exe' : '' )->canonpath );
+        config()->{xmake_exe}
+            // $dir->child( 'bin', 'xmake' . ( $Windows ? '.exe' : '' )->canonpath );
     }
 
     sub xrepo {
-        $dir // return;
-        $dir->child( 'bin', 'xrepo' . ( $Windows ? '.bat' : '' )->canonpath );
+        config()->{xrepo_exe}
+            // $dir->child( 'bin', 'xrepo' . ( $Windows ? '.bat' : '' )->canonpath );
     }
 
     sub version {
-        $dir // return;
         CORE::state $ver;
         if ( !defined $ver ) {
             my $xmake = exe();
