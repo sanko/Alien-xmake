@@ -1,4 +1,4 @@
 use v5.40;
-use lib 'builder';
+use lib 'builder', 'lib';
 use Alien::Xmake::Builder;
 Alien::Xmake::Builder->new->Build_PL();

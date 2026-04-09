@@ -2,7 +2,6 @@
 jobs:
   etc:
     name: 'FreeBSD/v${{matrix.perl}}'
-    if: false
     needs:
       - setup
     strategy:
@@ -13,14 +12,12 @@ jobs:
             host: ubuntu-latest
             name: freebsd
             pkg: pkg install -y
-            setup: sudo pkg install -y xmake-io git
-            version: '15.0'
+            version: 14.1
           - architecture: arm64
             host: ubuntu-latest
             name: freebsd
             pkg: pkg install -y
-            setup: sudo pkg install -y xmake-io git
-            version: '15.0'
+            version: 14.1
         perl:
           - "5.40"
       max-parallel: 5
@@ -31,8 +28,8 @@ jobs:
       os: '${{ matrix.os.name }}'
       perl: '${{ matrix.perl }}'
       pkg: '${{ matrix.os.pkg }}'
-      version: '${{ matrix.os.version }}'
       setup: '${{ matrix.os.setup }}'
+      version: '${{ matrix.os.version }}'
   linux:
     name: 'Linux/v${{matrix.perl}}'
     needs:
@@ -40,13 +37,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flags:
-          - ''
-          - -Dusethreads
-          - -Duselongdouble
-          - -Dusequadmath
+        flags: '${{ fromJSON(needs.setup.outputs.matrix).flags }}'
         os:
-          - ubuntu-22.04
+          - ubuntu-24.04
         perl: '${{ fromJSON(needs.setup.outputs.matrix).perl }}'
       max-parallel: 25
     uses: ./.github/workflows/unix.yml
@@ -55,7 +48,7 @@ jobs:
       os: '${{ matrix.os }}'
       perl: '${{ matrix.perl }}'
   macos:
-    name: "[${{ matrix.os == 'macos-14' && 'M1' || 'Intel' }}] macOS/v${{matrix.perl}}"
+    name: "[${{ matrix.os == 'macos-15-intel' && 'Intel' || 'M1' }}] macOS/v${{matrix.perl}}"
     needs:
       - setup
     strategy:
@@ -66,8 +59,8 @@ jobs:
           - flags: -Dusethreads
         flags: '${{ fromJSON(needs.setup.outputs.matrix).flags }}'
         os:
-          - macos-14
-          - macos-latest
+          - macos-15-intel
+          - macos-15
         perl: '${{ fromJSON(needs.setup.outputs.matrix).perl }}'
       max-parallel: 25
     uses: ./.github/workflows/unix.yml
@@ -121,8 +114,8 @@ jobs:
       - env:
           DATA: |
             {
-              "perl":  ["5.40.0"],
-              "flags": ["", "-Dusethreads", "-Duselongdouble", "-Dusequadmath"]
+              "perl":  ["5.40.2", "5.42.0"],
+              "flags": ["", "-Dusethreads", "-Duselongdouble", "-Dusequadmath", "--debug", "-DDEBUGGING=both", "-DDEBUGGING=-g", "-Doptimize=-g", "-DDEBUGGING=none", "-UDEBUGGING"]
             }
         id: matrix
         run: "jq -rn 'env.DATA | fromjson | @json \"matrix=\\(.)\"' > $GITHUB_OUTPUT\n"
@@ -148,18 +141,13 @@ jobs:
       flags: '${{ matrix.flags }}'
       os: '${{ matrix.os }}'
       perl: '${{ matrix.perl }}'
-
 name: CI Matrix
-
 on:
   pull_request: ~
   push: ~
   schedule:
     - cron: 42 5 * * 0
   workflow_dispatch: ~
-
 permissions:
-  contents: read
-  # actions: read is required to list artifacts via the API
   actions: read
-
+  contents: read

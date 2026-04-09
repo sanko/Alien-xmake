@@ -60,10 +60,7 @@ class Alien::Xmake 0.08 {
     }
 
     method exe () {
-
-        # Return a potentially quoted path for execution
-        my $path = $self->_resolve_path;
-        return $self->_quote_path($path);
+        return $self->_quote_path( $self->_resolve_path );
     }
 
     method xrepo () {
@@ -83,7 +80,7 @@ class Alien::Xmake 0.08 {
         if ( $config->{bin} ) {
             my $conf_parent = dirname( $config->{bin} );
             my $target      = File::Spec->catfile( $conf_parent, $xrepo_name );
-            return $self->_quote_path($target);
+            return $self->_quote_path( File::Spec->rel2abs($target) );
         }
 
         # Last resort: return bare command
@@ -138,7 +135,7 @@ class Alien::Xmake 0.08 {
 
     # Quote path if on Windows and spaces exist
     method _quote_path ($path) {
-        return qq{"$path"} if $windows && $path =~ /\s/;
+        return qq{"$path"} if $windows && $path =~ /\s/ && $path !~ /^"/;
         $path;
     }
 } 1;
