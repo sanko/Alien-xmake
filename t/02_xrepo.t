@@ -10,9 +10,9 @@ ok $Alien::Xrepo::VERSION, 'Alien::Xrepo::VERSION';
 my $repo  = Alien::Xrepo->new( verbose => 0 );
 my $xmake = Alien::Xmake->new;
 my $exe   = $xmake->exe;
-diag `$exe --help`;
-diag $exe;
 
+#~ diag `$exe --help`;
+#~ diag $exe;
 #~ diag `$exe update`;
 #~ xmake.exe lua private.xrepo install -y -k shared libpng
 diag `$exe lua private.xrepo install -y -k shared libpng`;

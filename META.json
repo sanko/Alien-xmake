@@ -110,6 +110,12 @@
          "file" : "lib/Alien/Xrepo.pm",
          "version" : "0.08"
       },
+      "Alien::Xrepo::Base" : {
+         "file" : "lib/Alien/Xrepo/Base.pm"
+      },
+      "Alien::Xrepo::Base::Builder" : {
+         "file" : "lib/Alien/Xrepo/Base.pm"
+      },
       "Alien::Xrepo::PackageInfo" : {
          "file" : "lib/Alien/Xrepo.pm"
       }

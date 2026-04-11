@@ -45,8 +45,8 @@ class Alien::Xmake::Builder {
         # We must capture the current INC to ensure the builder finds itself
         # when running the generated script.
         my $inc_str = join( ' ', map {"-I$_"} @INC );
-        $self->write_file( 'Build', sprintf <<'', $^X, $inc_str, __PACKAGE__, __PACKAGE__ );
-#!%s %s
+        $self->write_file( 'Build', sprintf <<'', $^X, __PACKAGE__, __PACKAGE__ );
+#!%s
 use lib 'builder';
 use %s;
 %s->new( @ARGV && $ARGV[0] =~ /\A\w+\z/ ? ( action => shift @ARGV ) : (),
@@ -54,6 +54,7 @@ use %s;
 
         make_executable('Build');
         my @env = defined $ENV{PERL_MB_OPT} ? split_like_shell( $ENV{PERL_MB_OPT} ) : ();
+        $ENV{PERL5LIB} = join( $Config{path_sep}, @INC );    # Ensure sub-builds find libraries
         $self->write_file( '_build_params', encode_json( [ \@env, \@ARGV ] ) );
         if ( my $dynamic = $meta->custom('x_dynamic_prereqs') ) {
             my %meta_struct = ( %{ $meta->as_struct }, dynamic_config => 1 );
@@ -90,7 +91,7 @@ use %s;
     method ACTION_install ( ) {
         say 'Installing...';
         require ExtUtils::Install;
-        ExtUtils::Install::install( { 'blib/lib' => $Config{installprivlib}, 'blib/arch' => $Config{installarchlib} }, 1, 0, 0 );
+        ExtUtils::Install::install( $install_paths->install_map, 1, 0, 0 );
     }
 
     method ACTION_clean () {

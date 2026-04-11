@@ -11,12 +11,14 @@ jobs:
           - architecture: x86-64
             host: ubuntu-latest
             name: freebsd
-            pkg: pkg install -y
+            pkg: pkg install -y git gmake curl bash perl5
+            setup: export PATH=/usr/local/bin:$PATH
             version: 14.1
           - architecture: arm64
             host: ubuntu-latest
             name: freebsd
-            pkg: pkg install -y
+            pkg: pkg install -y git gmake curl bash perl5
+            setup: export PATH=/usr/local/bin:$PATH
             version: 14.1
         perl:
           - "5.40"

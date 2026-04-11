@@ -208,8 +208,7 @@ class Alien::Xrepo 0.08 {
         }
         else {
             # Unix-like logic
-            ($runtime_lib) = grep {/\.so(\.|-|\d|$)/} @$libfiles;
-            ($runtime_lib) //= grep {/\.dylib$/i} @$libfiles;
+            ($runtime_lib) = grep { /\.so(\.|-|\d|$)/ || /\.dylib$/i } @$libfiles;
         }
 
         # Fallback to the first lib file found (likely a static .a or .lib)

@@ -48,3 +48,7 @@ eg/inst.pl
 eg/xmake-inst/
 
 eg/test/
+eg/eg/
+eg/lib/
+eg/alien*
+t/test_alien_*
