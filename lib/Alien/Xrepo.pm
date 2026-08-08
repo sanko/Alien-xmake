@@ -1,6 +1,7 @@
 use v5.40;
 use feature 'class';
 no warnings 'experimental::class';
+#
 class Alien::Xrepo 0.08 {
     use Alien::Xmake;
     use JSON::PP;
@@ -72,17 +73,16 @@ class Alien::Xrepo 0.08 {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
         my @args      = $self->_build_args( \%opts );
         say "[*] xrepo: ensuring $full_spec is installed..." if $verbose;
-
-        # 1. Install
+        #
         my @install_cmd = ( $xmake->xrepo, 'install', '-y', '-q', @args, $full_spec );
         system(@install_cmd) == 0 or die "xrepo install failed for $full_spec";
 
-        # 2. Fetch (Added -q here as well to stop the xmake.lua warnings)
+        # Fetch quietly
         my @fetch_cmd = ( $xmake->xrepo, 'fetch', '--json', '-q', @args, $full_spec );
         my ( $json_out, $json_err, $json_exit ) = capture { system @fetch_cmd };
         die "xrepo fetch failed: $json_err" if $json_exit != 0;
 
-        # 3. Robust JSON Cleanup
+        # JSON Cleanup so we can use core JSON::PP
         $json_out =~ s/\x1b\[[0-9;]*[a-zA-Z]//g;    # Clean ANSI
         $json_out =~ s/\x1b\(B//g;
         if ( $json_out =~ m/(\[.*\]|\{.*\})/s ) { $json_out = $1; }
@@ -182,10 +182,10 @@ class Alien::Xrepo 0.08 {
         my $runtime_lib;
         if ( $^O eq 'MSWin32' ) {
 
-            # 1. Look for a DLL in the libfiles
+            # Look for a DLL in the libfiles
             ($runtime_lib) = grep {/\.dll$/i} @$libfiles;
 
-            # 2. If not found, and we have a .lib, look for a sibling DLL in 'bin'
+            # If not found, and we have a .lib, look for a sibling DLL in 'bin'
             unless ($runtime_lib) {
                 my ($imp_lib) = grep {/\.lib$/i} @$libfiles;
                 if ($imp_lib) {
@@ -229,4 +229,5 @@ class Alien::Xrepo 0.08 {
         );
     }
 };
+#
 1;
