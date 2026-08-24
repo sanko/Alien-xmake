@@ -30,9 +30,7 @@
    },
    "prereqs" : {
       "build" : {
-         "recommends" : {
-            "IO::Socket::SSL" : "0"
-         },
+         "recommends" : {},
          "requires" : {
             "Exporter" : "5.57",
             "ExtUtils::Helpers" : "0.028",
@@ -41,10 +39,13 @@
             "File::Basename" : "0",
             "File::Find" : "0",
             "File::Path" : "0",
+            "File::ShareDir" : "0",
             "File::Spec::Functions" : "0",
             "Getopt::Long" : "2.36",
             "HTTP::Tiny" : "0",
+            "IO::Socket::SSL" : "0",
             "JSON::PP" : "2",
+            "Module::Build" : "0",
             "Path::Tiny" : "0",
             "perl" : "v5.40.0"
          }
@@ -120,7 +121,7 @@
          "file" : "lib/Alien/Xrepo.pm"
       }
    },
-   "release_status" : "stable",
+   "release_status" : "testing",
    "resources" : {
       "bugtracker" : {
          "web" : "https://github.com/sanko/Alien-Xmake/issues"

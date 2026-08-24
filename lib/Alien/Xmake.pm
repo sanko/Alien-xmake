@@ -4,22 +4,23 @@ class Alien::Xmake 0.08 {
     use File::Spec;
     use File::Basename qw[dirname];
     use JSON::PP       qw[decode_json];
+    use File::ShareDir qw[dist_dir];
     #
     field $windows = $^O eq 'MSWin32';
     field $config : param //= sub {
         my $conf;
         try {
-            require Alien::Xmake::ConfigData;    # Try to load the ConfigData module generated during install
-            $conf = { map { $_ => Alien::Xmake::ConfigData->config($_) } Alien::Xmake::ConfigData->config_names };
+            #~ require Alien::Xmake::ConfigData;    # Try to load the ConfigData module generated during install
+            #~ $conf = { map { $_ => Alien::Xmake::ConfigData->config($_) } Alien::Xmake::ConfigData->config_names };
 
-            # The raw 'bin' value in config is a relative path string.
-            # We must call the generated helper method to get the absolute path.
-            if ( Alien::Xmake::ConfigData->can('bin') ) {
-                $conf->{bin} = Alien::Xmake::ConfigData->bin;
-            }
+            #~ # The raw 'bin' value in config is a relative path string.
+            #~ # We must call the generated helper method to get the absolute path.
+            #~ if ( Alien::Xmake::ConfigData->can('bin') ) {
+                #~ $conf->{bin} = Alien::Xmake::ConfigData->bin;
+            #~ }
         }
         catch ($e) {    # Fallback / manual install detection
-            $conf = { install_type => 'system' };
+             $conf = { install_type => 'system' };
         }
         return $conf;
         }
@@ -27,22 +28,7 @@ class Alien::Xmake 0.08 {
 
     # We don't really need $dir detection if ConfigData is working,
     # but we keep it for fallback scenarios (running from blib/lib, etc).
-    field $dir;
-    ADJUST {
-        if ( !$config->{bin} || !-e $config->{bin} ) {
-            my @parts = qw[auto share dist Alien-Xmake];
-            push @parts, 'bin' unless $windows;
-
-            # Look through @INC for the share directory
-            foreach my $inc (@INC) {
-                my $d = File::Spec->catdir( $inc, @parts );
-                if ( -d $d ) {
-                    $dir = $d;
-                    last;
-                }
-            }
-        }
-    }
+    field $dir = dist_dir('Alien-Xmake');
 
     # Pointless stubs required by some Alien::Base consumers
     method cflags ()       {''}

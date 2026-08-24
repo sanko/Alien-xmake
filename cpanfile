@@ -25,13 +25,15 @@ on build => sub {
     requires 'File::Basename';
     requires 'File::Find';
     requires 'File::Path';
+    requires 'File::ShareDir';
     requires 'File::Spec::Functions';
     requires 'Getopt::Long', '2.36';
     requires 'HTTP::Tiny';
+    requires 'IO::Socket::SSL';
     requires 'JSON::PP', '2';
+    requires 'Module::Build';
     requires 'Path::Tiny';
     requires 'perl', 'v5.40.0';
-    recommends 'IO::Socket::SSL';
 };
 on test => sub {
     requires 'Capture::Tiny';
