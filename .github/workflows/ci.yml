@@ -22,10 +22,18 @@ jobs:
         #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
         #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
         #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
-        #~ found"). Download the self-installer to a file instead: curl failures
-        #~ surface, and `--self` installs `cpanm` into the active perl's bin dir
-        #~ (already on PATH). `command -v cpanm` is a hard fail point.
-        curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        #~ found"; FreeBSD VMs lack curl entirely, so the download must try
+        #~ curl -> wget -> fetch). Download the self-installer to a file
+        #~ instead so failures surface, then `--self` installs `cpanm` into the
+        #~ active perl's bin dir (already on PATH). `command -v cpanm` is a hard
+        #~ fail point.
+        if command -v curl >/dev/null 2>&1; then
+          curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        elif command -v wget >/dev/null 2>&1; then
+          wget -qO /tmp/cpanm https://cpanmin.us
+        else
+          fetch -o /tmp/cpanm https://cpanmin.us
+        fi
         perl /tmp/cpanm --self --notest --verbose
         command -v cpanm
         cpanm -v .
@@ -45,10 +53,18 @@ jobs:
         #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
         #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
         #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
-        #~ found"). Download the self-installer to a file instead: curl failures
-        #~ surface, and `--self` installs `cpanm` into the active perl's bin dir
-        #~ (already on PATH). `command -v cpanm` is a hard fail point.
-        curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        #~ found"; FreeBSD VMs lack curl entirely, so the download must try
+        #~ curl -> wget -> fetch). Download the self-installer to a file
+        #~ instead so failures surface, then `--self` installs `cpanm` into the
+        #~ active perl's bin dir (already on PATH). `command -v cpanm` is a hard
+        #~ fail point.
+        if command -v curl >/dev/null 2>&1; then
+          curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        elif command -v wget >/dev/null 2>&1; then
+          wget -qO /tmp/cpanm https://cpanmin.us
+        else
+          fetch -o /tmp/cpanm https://cpanmin.us
+        fi
         perl /tmp/cpanm --self --notest --verbose
         command -v cpanm
         cpanm -v .
@@ -67,10 +83,18 @@ jobs:
         #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
         #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
         #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
-        #~ found"). Download the self-installer to a file instead: curl failures
-        #~ surface, and `--self` installs `cpanm` into the active perl's bin dir
-        #~ (already on PATH). `command -v cpanm` is a hard fail point.
-        curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        #~ found"; FreeBSD VMs lack curl entirely, so the download must try
+        #~ curl -> wget -> fetch). Download the self-installer to a file
+        #~ instead so failures surface, then `--self` installs `cpanm` into the
+        #~ active perl's bin dir (already on PATH). `command -v cpanm` is a hard
+        #~ fail point.
+        if command -v curl >/dev/null 2>&1; then
+          curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        elif command -v wget >/dev/null 2>&1; then
+          wget -qO /tmp/cpanm https://cpanmin.us
+        else
+          fetch -o /tmp/cpanm https://cpanmin.us
+        fi
         perl /tmp/cpanm --self --notest --verbose
         command -v cpanm
         cpanm -v .
@@ -90,10 +114,18 @@ jobs:
         #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
         #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
         #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
-        #~ found"). Download the self-installer to a file instead: curl failures
-        #~ surface, and `--self` installs `cpanm` into the active perl's bin dir
-        #~ (already on PATH). `command -v cpanm` is a hard fail point.
-        curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        #~ found"; FreeBSD VMs lack curl entirely, so the download must try
+        #~ curl -> wget -> fetch). Download the self-installer to a file
+        #~ instead so failures surface, then `--self` installs `cpanm` into the
+        #~ active perl's bin dir (already on PATH). `command -v cpanm` is a hard
+        #~ fail point.
+        if command -v curl >/dev/null 2>&1; then
+          curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        elif command -v wget >/dev/null 2>&1; then
+          wget -qO /tmp/cpanm https://cpanmin.us
+        else
+          fetch -o /tmp/cpanm https://cpanmin.us
+        fi
         perl /tmp/cpanm --self --notest --verbose
         command -v cpanm
         cpanm -v .
