@@ -12,15 +12,14 @@ class Alien::Xmake 0.08 {
         try {
             #~ require Alien::Xmake::ConfigData;    # Try to load the ConfigData module generated during install
             #~ $conf = { map { $_ => Alien::Xmake::ConfigData->config($_) } Alien::Xmake::ConfigData->config_names };
-
             #~ # The raw 'bin' value in config is a relative path string.
             #~ # We must call the generated helper method to get the absolute path.
             #~ if ( Alien::Xmake::ConfigData->can('bin') ) {
-                #~ $conf->{bin} = Alien::Xmake::ConfigData->bin;
+            #~ $conf->{bin} = Alien::Xmake::ConfigData->bin;
             #~ }
         }
         catch ($e) {    # Fallback / manual install detection
-             $conf = { install_type => 'system' };
+            $conf = { install_type => 'system' };
         }
         return $conf;
         }
@@ -127,13 +126,9 @@ class Alien::Xmake 0.08 {
         my @candidates;
         if ($dir) {
             my $ext = $windows ? '.exe' : '';
-            push @candidates,
-                File::Spec->catfile( $dir, 'xmake', 'xmake' . $ext ),
-                File::Spec->catfile( $dir, 'xmake' . $ext ),
-                File::Spec->catfile( $dir, 'xmake' ),
-                File::Spec->catfile( $dir, 'bin', 'xmake' . $ext );
+            push @candidates, File::Spec->catfile( $dir, 'xmake', 'xmake' . $ext ), File::Spec->catfile( $dir, 'xmake' . $ext ),
+                File::Spec->catfile( $dir, 'xmake' ), File::Spec->catfile( $dir, 'bin', 'xmake' . $ext );
         }
-
         $bin = $first_existing->(@candidates) if defined $dir;
         $bin //= File::Spec->catfile( $dir, 'xmake' . ( $windows ? '.exe' : '' ) ) if $dir;
         $bin //= 'xmake';

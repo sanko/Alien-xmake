@@ -6,6 +6,7 @@ author:
 build_requires:
   Capture::Tiny: '0'
   Exporter: '5.57'
+  ExtUtils::Config: '0.003'
   ExtUtils::Helpers: '0.028'
   ExtUtils::Install: '0'
   ExtUtils::InstallPaths: '0.002'
@@ -19,7 +20,6 @@ build_requires:
   HTTP::Tiny: '0'
   IO::Socket::SSL: '0'
   JSON::PP: '2'
-  Module::Build: '0'
   Path::Tiny: '0'
   Test2::V0: '0'
   perl: v5.40.0
@@ -28,9 +28,11 @@ configure_requires:
   CPAN::Meta: '0'
   Data::Dumper: '0'
   Exporter: '5.57'
+  ExtUtils::Config: '0.003'
   ExtUtils::Helpers: '0.028'
   ExtUtils::Install: '0'
   ExtUtils::InstallPaths: '0.002'
+  ExtUtils::MakeMaker: '0'
   File::Basename: '0'
   File::Find: '0'
   File::Path: '0'
@@ -72,6 +74,10 @@ provides:
   Alien::Xrepo::PackageInfo:
     file: lib/Alien/Xrepo.pm
 requires:
+  Capture::Tiny: '0'
+  File::ShareDir: '0'
+  JSON::PP: '2'
+  Path::Tiny: '0'
   perl: v5.40.0
 resources:
   bugtracker: https://github.com/sanko/Alien-Xmake/issues

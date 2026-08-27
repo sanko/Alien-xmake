@@ -1,12 +1,18 @@
+requires 'Capture::Tiny';
+requires 'File::ShareDir';
+requires 'JSON::PP', '2';
+requires 'Path::Tiny';
 requires 'perl', 'v5.40.0';
 on configure => sub {
     requires 'Archive::Tar';
     requires 'CPAN::Meta';
     requires 'Data::Dumper';
     requires 'Exporter',          '5.57';
+    requires 'ExtUtils::Config',  '0.003';
     requires 'ExtUtils::Helpers', '0.028';
     requires 'ExtUtils::Install';
     requires 'ExtUtils::InstallPaths', '0.002';
+    requires 'ExtUtils::MakeMaker';
     requires 'File::Basename';
     requires 'File::Find';
     requires 'File::Path';
@@ -19,6 +25,7 @@ on configure => sub {
 };
 on build => sub {
     requires 'Exporter',          '5.57';
+    requires 'ExtUtils::Config',  '0.003';
     requires 'ExtUtils::Helpers', '0.028';
     requires 'ExtUtils::Install';
     requires 'ExtUtils::InstallPaths', '0.002';
@@ -31,7 +38,6 @@ on build => sub {
     requires 'HTTP::Tiny';
     requires 'IO::Socket::SSL';
     requires 'JSON::PP', '2';
-    requires 'Module::Build';
     requires 'Path::Tiny';
     requires 'perl', 'v5.40.0';
 };
