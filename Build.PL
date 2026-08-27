@@ -55,7 +55,7 @@ my $class = Module::Build->subclass( class => 'Alien::Xmake::Builder', code => <
     # Pick what to fetch in this order
     #   1) dedicated prebuilt for (os, arch)
     #   2) cosmocc portable bundle
-    #   3) build from source tarball (download + instructions only?)
+    #   3) build from source (configure/make/install)
     sub _choose_asset ( $os, $arch, $ver, $assets ) {
         my $has = sub { _find_asset( $assets, $_[0] ) };
         if ( $os eq 'win' ) {
@@ -114,9 +114,8 @@ my $class = Module::Build->subclass( class => 'Alien::Xmake::Builder', code => <
         $s->log_verbose( "  extracted $count files -> " . File::Spec->catdir( $out, 'xmake' ) . "\n" );
     }
 
-    # The cosmocc/mac/linux*.x86_64 bundles are single self-contained binaries.
-    # Install as $dist/xmake (or xmake.exe) and drop a sibling wrapper that
-    # exposes xrepo (`xmake lua private.xrepo`).
+    # The cosmocc/mac/linux*.x86_64 bundles are single self contained binaries. Install as
+    # $dist/xmake(.exe) and drop a sibling wrapper that exposes xrepo (`xmake lua private.xrepo`)
     sub _install_bundle ( $s, $dist, $asset ) {
         my $exe     = File::Spec->catfile( $dist, _is_win() ? 'xmake.exe' : 'xmake' );
         my $wrapper = File::Spec->catfile( $dist, _is_win() ? 'xrepo.bat' : 'xrepo' );
@@ -128,12 +127,100 @@ my $class = Module::Build->subclass( class => 'Alien::Xmake::Builder', code => <
             @echo off
             "%~dp0xmake.exe" lua private.xrepo %*
             WIN
-            #!/bin/sh',
+            #!/bin/sh
             dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-            exec "$dir/xmake" lua private.xrepo "$@"'
+            exec "$dir/xmake" lua private.xrepo "$@"
             ETC
         close $fh;
         chmod 0755, $wrapper;
+    }
+
+    # No prebuilt binary for this platform so we replicate the official installer and build from source.
+    sub _install_source ( $s, $dist, $version, $rel ) {
+        my $bin  = File::Spec->catfile( $dist, 'bin', _is_win() ? 'xmake.exe' : 'xmake' );
+        my $wrap = File::Spec->catfile( $dist, 'bin', _is_win() ? 'xrepo.bat' : 'xrepo' );
+        return if -e $bin && -e $wrap;
+        $s->log_warn("Alien::Xmake: no prebuilt binary for this platform; building xmake $version from source (get.sh path)\n");
+        die "xmake source build needs 'make' on PATH\n" unless _have_cmd('make');
+        my $tmp = File::Spec->catdir( File::Spec->tmpdir, 'xmake-getter-' . $$ );
+        File::Path::remove_tree($tmp) if -d $tmp;
+        mkpath($tmp);
+
+        # Prefer an explicit .tar.gz asset on the release, else GitHub's auto-generated source archive (tarball_url redirects to it).
+        my $asset = _find_asset( $rel->{assets}, '\.tar\.gz$' );
+        my $url   = $asset ? $asset->{browser_download_url} : $rel->{tarball_url};
+        die "no source URL for xmake v$version\n" unless $url;
+        my $name = ( $asset ? $asset->{name} : "xmake-v$version.tar.gz" );
+        my $tgz  = File::Spec->catfile( $tmp, $name );
+        _download( $s, { browser_download_url => $url, name => $name }, $tgz );
+        _untargz( $s, $tgz, $tmp );
+
+        # GitHub archives unpack to a single top-level xmake-*/ directory whose name includes the commit sha; auto-detect it
+        opendir my $dh, $tmp or die "can't read $tmp: $!\n";
+        my ($top) = grep { !/^\.\.?$/ && -d File::Spec->catdir( $tmp, $_ ) } readdir $dh;
+        closedir $dh;
+        my $src = $top ? File::Spec->catdir( $tmp, $top ) : undef;
+        die "source archive did not unpack as expected\n" unless $src;
+        my $cd = "cd '$src'";
+        $s->_run_or_die("$cd && ./configure") if -f File::Spec->catfile( $src, 'configure' );
+        $s->_run_or_die("$cd && make");
+        my $qdist = $dist;
+        $qdist =~ s/'/'\\''/g;
+        $s->_run_or_die("$cd && make install PREFIX='$qdist'");
+        File::Path::remove_tree($tmp);
+        die "source build produced no xmake at $bin\n" unless -e $bin;
+        open my $fh, '>:raw', $wrap or die "can't write $wrap: $!\n";
+        print {$fh} _is_win() ? <<~'WIN' : <<~'ETC';
+            @echo off
+            "%~dp0xmake.exe" lua private.xrepo %*
+            WIN
+            #!/bin/sh
+            dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+            exec "$dir/xmake" lua private.xrepo "$@"
+            ETC
+        close $fh;
+        chmod 0755, $wrap;
+    }
+
+    sub _untargz ( $s, $tgz, $out ) {
+        require IO::Uncompress::Gunzip;
+        require Archive::Tar;
+        my $raw;
+        die "can't gunzip $tgz\n" unless IO::Uncompress::Gunzip::gunzip( $tgz => \$raw );
+        my $at = Archive::Tar->new;
+        open my $rfh, '<', \$raw or die "can't open tar stream: $!\n";
+        die "can't read tar from $tgz\n" unless $at->read($rfh);
+        mkpath($out)                     unless -d $out;
+        my $count = 0;
+
+        for my $e ( $at->get_files ) {
+            my $n = $e->full_path or next;
+            next if $e->is_dir;
+            my $target = File::Spec->catfile( $out, grep {length} split m{/}, $n );
+            my $parent = dirname($target);
+            mkpath($parent) unless -d $parent;
+            open my $fh, '>:raw', $target or die "can't write $target: $!\n";
+            print {$fh} $e->get_content;
+            close $fh;
+            $count++;
+        }
+        $s->log_verbose("  extracted $count files -> $out\n");
+    }
+
+    sub _run_or_die ( $s, $cmd ) {
+        if ( ref $cmd eq 'ARRAY' ) {
+            $s->log_verbose( '  $ ' . join( ' ', @$cmd ) . "\n" );
+            die "command failed\n" if system(@$cmd) != 0;
+        }
+        else {
+            $s->log_verbose("  \$ $cmd\n");
+            die "command failed: $cmd\n" if system($cmd) != 0;
+        }
+    }
+
+    sub _have_cmd ($name) {
+        if ( _is_win() ) { return system( 1, 'where', $name ) == 0 }
+        return system( 1, 'command', '-v', $name ) == 0;
     }
 
     sub _xmake_paths ($dist) {
@@ -142,6 +229,10 @@ my $class = Module::Build->subclass( class => 'Alien::Xmake::Builder', code => <
         my $xrepo = File::Spec->catfile( $dist, 'xmake', 'xrepo' . ( _is_win() ? '.bat' : '' ) );
         $xmake = File::Spec->catfile( $dist, 'xmake' . $ext )                        unless -e $xmake;
         $xrepo = File::Spec->catfile( $dist, 'xrepo' . ( _is_win() ? '.bat' : '' ) ) unless -e $xrepo;
+
+        # get.sh source-build layout: $dist/bin/xmake + $dist/bin/xrepo
+        $xmake = File::Spec->catfile( $dist, 'bin', 'xmake' . $ext )                        unless -e $xmake;
+        $xrepo = File::Spec->catfile( $dist, 'bin', 'xrepo' . ( _is_win() ? '.bat' : '' ) ) unless -e $xrepo;
         return ( $xmake, $xrepo );
     }
 
@@ -164,9 +255,8 @@ my $class = Module::Build->subclass( class => 'Alien::Xmake::Builder', code => <
         $s->log_warn("Alien::Xmake: could not run local xmake/xrepo -- tests may fail\n") unless $ok;
     }
 
-    # Install a local copy of xmake + xrepo into the share dir (where
-    # Alien::Xmake will find it via dist_dir), then smoke test both, then let
-    # Module::Build copy the share dir into blib (SUPER->ACTION_code).
+    # Install a local copy of xmake + xrepo into the share dir (where Alien::Xmake will find it via
+    # dist_dir), then smoke test both, then let Module::Build copy the share dir into blib.
     sub ACTION_code ($s) {
         $s->log_verbose("Alien::Xmake: ACTION_code\n");
         my $dist = $s->share_dir->{dist};
@@ -180,23 +270,13 @@ my $class = Module::Build->subclass( class => 'Alien::Xmake::Builder', code => <
             my ( $rel, $version ) = _latest_release( $ENV{XMAKE_RELEASE} );
             $version =~ s/^v//;
             $s->log_verbose("  release: $version\n");
-            my $plan  = _choose_asset( $os, $arch, $version, $rel->{assets} ) or die "no asset strategy for $os/$arch\n";
-            my $asset = _find_asset( $rel->{assets}, $plan->{pattern} )       or die "asset not found: $plan->{pattern}\n";
-
-            if ( $plan->{strategy} eq 'zip' ) {
-                _install_zip( $s, $dist, $asset );
-            }
-            elsif ( $plan->{strategy} eq 'bundle' ) {
-                _install_bundle( $s, $dist, $asset );
+            my $plan = _choose_asset( $os, $arch, $version, $rel->{assets} ) or die "no asset strategy for $os/$arch\n";
+            if ( $plan->{strategy} eq 'source' ) {
+                _install_source( $s, $dist, $version, $rel );
             }
             else {
-                my $src = File::Spec->catfile( $dist, $asset->{name} );
-                _download( $s, $asset, $src );
-                $s->log_warn(<<~"");
-                    No prebuilt xmake binary for $os/$arch. Download the source to:
-                        $src
-                    and build manually (tar xf; ./configure && make).
-
+                my $asset = _find_asset( $rel->{assets}, $plan->{pattern} ) or die "asset not found: $plan->{pattern}\n";
+                $plan->{strategy} eq 'zip' ? _install_zip( $s, $dist, $asset ) : _install_bundle( $s, $dist, $asset );
             }
             _smoke_test( $s, $dist );
         };

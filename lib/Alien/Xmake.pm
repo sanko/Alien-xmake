@@ -111,8 +111,31 @@ class Alien::Xmake 0.08 {
     method _resolve_path () {
         my $bin = $config->{bin};
 
-        # If ConfigData failed or we are in a fallback state:
-        $bin = File::Spec->catfile( $dir, 'xmake' . ( $windows ? '.exe' : '' ) ) if !$bin && $dir;
+        # Helper: first existing candidate wins, else undef
+        my $first_existing = sub {
+            for my $p (@_) {
+                return $p if defined $p && $p ne '' && -e $p;
+            }
+            return undef;
+        };
+
+        # Candidate paths rooted at the share dir (dist_dir), in order:
+        #   nested windows-zip layout: share/xmake/xmake.exe
+        #   nested unix layout:        share/xmake/xmake
+        #   flat bundle layout:        share/xmake.exe / share/xmake
+        #   get.sh source-build layout: share/bin/xmake
+        my @candidates;
+        if ($dir) {
+            my $ext = $windows ? '.exe' : '';
+            push @candidates,
+                File::Spec->catfile( $dir, 'xmake', 'xmake' . $ext ),
+                File::Spec->catfile( $dir, 'xmake' . $ext ),
+                File::Spec->catfile( $dir, 'xmake' ),
+                File::Spec->catfile( $dir, 'bin', 'xmake' . $ext );
+        }
+
+        $bin = $first_existing->(@candidates) if defined $dir;
+        $bin //= File::Spec->catfile( $dir, 'xmake' . ( $windows ? '.exe' : '' ) ) if $dir;
         $bin //= 'xmake';
 
         # Ensure we return a stringified absolute path safe for system()

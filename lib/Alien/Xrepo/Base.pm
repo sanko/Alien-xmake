@@ -138,6 +138,14 @@ EOF
             say 'Build complete';
         }
 
+        method ACTION_test() {
+            $self->ACTION_build();
+            say 'Running tests...';
+            require Test::Harness;
+            my @tests = glob('t/*.t');
+            Test::Harness::runtests(@tests) if @tests;
+        }
+
         method ACTION_install() {
             say 'Installing...';
             my $ip = ExtUtils::InstallPaths->new( dist_name => $meta->name );
