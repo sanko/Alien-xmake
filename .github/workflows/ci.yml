@@ -19,26 +19,12 @@ jobs:
     with:
       task: |
         perl -V
-        #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
-        #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
-        #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
-        #~ found"; FreeBSD VMs lack curl entirely, so the download must try
-        #~ curl -> wget -> fetch). Download the self-installer to a file
-        #~ instead so failures surface, then `--self` installs `cpanm` into the
-        #~ active perl's bin dir (already on PATH). `command -v cpanm` is a hard
-        #~ fail point.
-        if command -v curl >/dev/null 2>&1; then
-          curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
-        elif command -v wget >/dev/null 2>&1; then
-          wget -qO /tmp/cpanm https://cpanmin.us
-        else
-          fetch -o /tmp/cpanm https://cpanmin.us
-        fi
-        #~ Use the unambiguous --self-upgrade (App::cpanminus 1.7049 treats
-        #~ short "--self" as ambiguous between --self-contained/--self-upgrade
-        #~ and aborts). --self-upgrade installs cpanm into the active perl's
-        #~ bin dir.
-        perl /tmp/cpanm --self-upgrade --notest --verbose
+        #~ Install cpanm with its canonical self-bootstrap: pipe the fatpacked
+        #~ installer to perl with App::cpanminus as the argument, which installs
+        #~ the real `cpanm` binary into the active perl's bin dir (already on
+        #~ PATH). FreeBSD's prepare installs curl so this works in the VMs too.
+        #~ `command -v cpanm` is a hard fail point that catches any no-op.
+        curl -L https://cpanmin.us | perl - App::cpanminus
         command -v cpanm
         cpanm -v .
       matrix: >
@@ -54,26 +40,12 @@ jobs:
     with:
       task: |
         perl -V
-        #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
-        #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
-        #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
-        #~ found"; FreeBSD VMs lack curl entirely, so the download must try
-        #~ curl -> wget -> fetch). Download the self-installer to a file
-        #~ instead so failures surface, then `--self` installs `cpanm` into the
-        #~ active perl's bin dir (already on PATH). `command -v cpanm` is a hard
-        #~ fail point.
-        if command -v curl >/dev/null 2>&1; then
-          curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
-        elif command -v wget >/dev/null 2>&1; then
-          wget -qO /tmp/cpanm https://cpanmin.us
-        else
-          fetch -o /tmp/cpanm https://cpanmin.us
-        fi
-        #~ Use the unambiguous --self-upgrade (App::cpanminus 1.7049 treats
-        #~ short "--self" as ambiguous between --self-contained/--self-upgrade
-        #~ and aborts). --self-upgrade installs cpanm into the active perl's
-        #~ bin dir.
-        perl /tmp/cpanm --self-upgrade --notest --verbose
+        #~ Install cpanm with its canonical self-bootstrap: pipe the fatpacked
+        #~ installer to perl with App::cpanminus as the argument, which installs
+        #~ the real `cpanm` binary into the active perl's bin dir (already on
+        #~ PATH). FreeBSD's prepare installs curl so this works in the VMs too.
+        #~ `command -v cpanm` is a hard fail point that catches any no-op.
+        curl -L https://cpanmin.us | perl - App::cpanminus
         command -v cpanm
         cpanm -v .
       matrix: >
@@ -88,26 +60,12 @@ jobs:
     with:
       task: |
         perl -V
-        #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
-        #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
-        #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
-        #~ found"; FreeBSD VMs lack curl entirely, so the download must try
-        #~ curl -> wget -> fetch). Download the self-installer to a file
-        #~ instead so failures surface, then `--self` installs `cpanm` into the
-        #~ active perl's bin dir (already on PATH). `command -v cpanm` is a hard
-        #~ fail point.
-        if command -v curl >/dev/null 2>&1; then
-          curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
-        elif command -v wget >/dev/null 2>&1; then
-          wget -qO /tmp/cpanm https://cpanmin.us
-        else
-          fetch -o /tmp/cpanm https://cpanmin.us
-        fi
-        #~ Use the unambiguous --self-upgrade (App::cpanminus 1.7049 treats
-        #~ short "--self" as ambiguous between --self-contained/--self-upgrade
-        #~ and aborts). --self-upgrade installs cpanm into the active perl's
-        #~ bin dir.
-        perl /tmp/cpanm --self-upgrade --notest --verbose
+        #~ Install cpanm with its canonical self-bootstrap: pipe the fatpacked
+        #~ installer to perl with App::cpanminus as the argument, which installs
+        #~ the real `cpanm` binary into the active perl's bin dir (already on
+        #~ PATH). FreeBSD's prepare installs curl so this works in the VMs too.
+        #~ `command -v cpanm` is a hard fail point that catches any no-op.
+        curl -L https://cpanmin.us | perl - App::cpanminus
         command -v cpanm
         cpanm -v .
       matrix: >
@@ -123,31 +81,17 @@ jobs:
       os_version: '15.0'
       task: |
         perl -V
-        #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
-        #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
-        #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
-        #~ found"; FreeBSD VMs lack curl entirely, so the download must try
-        #~ curl -> wget -> fetch). Download the self-installer to a file
-        #~ instead so failures surface, then `--self` installs `cpanm` into the
-        #~ active perl's bin dir (already on PATH). `command -v cpanm` is a hard
-        #~ fail point.
-        if command -v curl >/dev/null 2>&1; then
-          curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
-        elif command -v wget >/dev/null 2>&1; then
-          wget -qO /tmp/cpanm https://cpanmin.us
-        else
-          fetch -o /tmp/cpanm https://cpanmin.us
-        fi
-        #~ Use the unambiguous --self-upgrade (App::cpanminus 1.7049 treats
-        #~ short "--self" as ambiguous between --self-contained/--self-upgrade
-        #~ and aborts). --self-upgrade installs cpanm into the active perl's
-        #~ bin dir.
-        perl /tmp/cpanm --self-upgrade --notest --verbose
+        #~ Install cpanm with its canonical self-bootstrap: pipe the fatpacked
+        #~ installer to perl with App::cpanminus as the argument, which installs
+        #~ the real `cpanm` binary into the active perl's bin dir (already on
+        #~ PATH). FreeBSD's prepare installs curl so this works in the VMs too.
+        #~ `command -v cpanm` is a hard fail point that catches any no-op.
+        curl -L https://cpanmin.us | perl - App::cpanminus
         command -v cpanm
         cpanm -v .
       matrix: >
         [
-          {"platform_name":"freebsd","os":"freebsd","arch":"x86_64","toolchain":"clang","prepare":"pkg install -y gmake","perl_version":"5.40.5"}
+          {"platform_name":"freebsd","os":"freebsd","arch":"x86_64","toolchain":"clang","prepare":"pkg install -y gmake curl","perl_version":"5.40.5"}
         ]
 
   results:

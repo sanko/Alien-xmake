@@ -533,13 +533,6 @@ use %s;
     method _test_tools ( ) {
         say 'Checking build tools...';
         my $ok = 1;
-        if ( $self->_run_cmd('git --version >/dev/null 2>&1') ) {
-            say ' - git: Found';
-        }
-        else {
-            say ' - git: Missing';
-            $ok = 0;
-        }
 
         # GNU or BSD make
         my $found_make = 0;
@@ -636,7 +629,7 @@ use %s;
         die <<~'MSG';
     Dependencies Installation Failed or Skipped.
 
-    We could not find the necessary tools (git, make, compiler) to build Xmake from source.
+    We could not find the necessary tools (make, compiler) to build Xmake from source.
 
     You have three options:
 
@@ -645,7 +638,6 @@ use %s;
        Alien::Xmake will detect and use the system installation.
 
     2. Install build tools manually:
-       * git
        * build-essential (make, gcc/clang, etc)
        * libreadline-dev / readline-devel
 
