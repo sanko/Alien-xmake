@@ -12,6 +12,10 @@ my $class = Module::Build->subclass( class => 'Alien::Xmake::Builder', code => <
     use File::Spec;
     use IO::Uncompress::Unzip qw[$UnzipError];
 
+    # The GitHub REST API rate-limits unauthenticated access (60/hr per IP),
+    # which the CI matrix's concurrent runner IPs can exhaust. When that happens
+    # we surface a clear diagnostic (limit / remaining / seconds-until-reset)
+    # via _rate_message() instead of failing with an opaque 403.
     sub _http {
         CORE::state $http
             //= HTTP::Tiny->new( default_headers => { 'X-GitHub-Api-Version' => '2026-03-10', accept => 'application/vnd.github+json' } );
@@ -35,10 +39,32 @@ my $class = Module::Build->subclass( class => 'Alien::Xmake::Builder', code => <
         return ( $os, $cpu );
     }
 
+    # Report the GitHub API rate-limit state (header values are always present
+    # on api.github.com responses) so the user knows when retries are possible.
+    sub _rate_message ($res) {
+        my $limit     = $res->{headers}{'x-ratelimit-limit'};
+        my $remaining = $res->{headers}{'x-ratelimit-remaining'};
+        my $reset_utc = $res->{headers}{'x-ratelimit-reset'};
+        my $msg       = 'github api rate limit';
+        $msg .= " (limit=$limit"            if defined $limit;
+        $msg .= ", remaining=$remaining"    if defined $remaining;
+        if ( defined $reset_utc && $reset_utc =~ /^\d+$/) {
+            my $wait = $reset_utc - time();
+            $wait = 0 if $wait < 0;
+            my $mins = int( $wait / 60 );
+            my $secs = $wait % 60;
+            $msg .= sprintf( ", resets in ~%dm %02ds (%s)", $mins, $secs, scalar gmtime( $reset_utc + 0 ) );
+        }
+        return $msg . '; consider setting GITHUB_TOKEN to raise the limit';
+    }
+
     sub _latest_release ($tag) {
         my $url = 'https://api.github.com/repos/xmake-io/xmake/releases';
         $url .= '/tags/' . $tag if $tag;
         my $res = _http->get($url);
+        if ( $res->{status} == 403 && $res->{headers}{'x-ratelimit-remaining'} eq '0' ) {
+            die 'github api rate limit exceeded: ' . _rate_message($res) . "\n";
+        }
         die "github api failed: $res->{status} $res->{reason}\n" unless $res->{success};
         my $rel = decode_json( $res->{content} );
         return ( $rel, $rel->{tag_name} ) if $tag;
@@ -146,7 +172,8 @@ my $class = Module::Build->subclass( class => 'Alien::Xmake::Builder', code => <
         File::Path::remove_tree($tmp) if -d $tmp;
         mkpath($tmp);
 
-        # Prefer an explicit .tar.gz asset on the release, else GitHub's auto-generated source archive (tarball_url redirects to it).
+        # Prefer an explicit .tar.gz asset on the release, else GitHub's auto-generated
+        # source archive (tarball_url redirects to it).
         my $asset = _find_asset( $rel->{assets}, '\.tar\.gz$' );
         my $url   = $asset ? $asset->{browser_download_url} : $rel->{tarball_url};
         die "no source URL for xmake v$version\n" unless $url;
