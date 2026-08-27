@@ -19,7 +19,15 @@ jobs:
     with:
       task: |
         perl -V
-        curl -L https://cpanmin.us | perl - App::cpanminus
+        #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
+        #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
+        #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
+        #~ found"). Download the self-installer to a file instead: curl failures
+        #~ surface, and `--self` installs `cpanm` into the active perl's bin dir
+        #~ (already on PATH). `command -v cpanm` is a hard fail point.
+        curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        perl /tmp/cpanm --self --notest --verbose
+        command -v cpanm
         cpanm -v .
       matrix: >
         [
@@ -34,7 +42,15 @@ jobs:
     with:
       task: |
         perl -V
-        curl -L https://cpanmin.us | perl - App::cpanminus
+        #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
+        #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
+        #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
+        #~ found"). Download the self-installer to a file instead: curl failures
+        #~ surface, and `--self` installs `cpanm` into the active perl's bin dir
+        #~ (already on PATH). `command -v cpanm` is a hard fail point.
+        curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        perl /tmp/cpanm --self --notest --verbose
+        command -v cpanm
         cpanm -v .
       matrix: >
         [
@@ -48,7 +64,15 @@ jobs:
     with:
       task: |
         perl -V
-        curl -L https://cpanmin.us | perl - App::cpanminus
+        #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
+        #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
+        #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
+        #~ found"). Download the self-installer to a file instead: curl failures
+        #~ surface, and `--self` installs `cpanm` into the active perl's bin dir
+        #~ (already on PATH). `command -v cpanm` is a hard fail point.
+        curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        perl /tmp/cpanm --self --notest --verbose
+        command -v cpanm
         cpanm -v .
       matrix: >
         [
@@ -63,7 +87,15 @@ jobs:
       os_version: '15.0'
       task: |
         perl -V
-        curl -L https://cpanmin.us | perl - App::cpanminus
+        #~ Robust cpanm bootstrap. The terse "curl cpanmin.us | perl -" one-liner
+        #~ silently no-ops on some runners/VMs (curl emits nothing, perl gets
+        #~ empty stdin, exits 0, and cpanm never lands on PATH -> "cpanm: not
+        #~ found"). Download the self-installer to a file instead: curl failures
+        #~ surface, and `--self` installs `cpanm` into the active perl's bin dir
+        #~ (already on PATH). `command -v cpanm` is a hard fail point.
+        curl -fSL --retry 3 -o /tmp/cpanm https://cpanmin.us
+        perl /tmp/cpanm --self --notest --verbose
+        command -v cpanm
         cpanm -v .
       matrix: >
         [
