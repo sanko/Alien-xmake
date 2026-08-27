@@ -34,7 +34,11 @@ jobs:
         else
           fetch -o /tmp/cpanm https://cpanmin.us
         fi
-        perl /tmp/cpanm --self --notest --verbose
+        #~ Use the unambiguous --self-upgrade (App::cpanminus 1.7049 treats
+        #~ short "--self" as ambiguous between --self-contained/--self-upgrade
+        #~ and aborts). --self-upgrade installs cpanm into the active perl's
+        #~ bin dir.
+        perl /tmp/cpanm --self-upgrade --notest --verbose
         command -v cpanm
         cpanm -v .
       matrix: >
@@ -65,7 +69,11 @@ jobs:
         else
           fetch -o /tmp/cpanm https://cpanmin.us
         fi
-        perl /tmp/cpanm --self --notest --verbose
+        #~ Use the unambiguous --self-upgrade (App::cpanminus 1.7049 treats
+        #~ short "--self" as ambiguous between --self-contained/--self-upgrade
+        #~ and aborts). --self-upgrade installs cpanm into the active perl's
+        #~ bin dir.
+        perl /tmp/cpanm --self-upgrade --notest --verbose
         command -v cpanm
         cpanm -v .
       matrix: >
@@ -95,7 +103,11 @@ jobs:
         else
           fetch -o /tmp/cpanm https://cpanmin.us
         fi
-        perl /tmp/cpanm --self --notest --verbose
+        #~ Use the unambiguous --self-upgrade (App::cpanminus 1.7049 treats
+        #~ short "--self" as ambiguous between --self-contained/--self-upgrade
+        #~ and aborts). --self-upgrade installs cpanm into the active perl's
+        #~ bin dir.
+        perl /tmp/cpanm --self-upgrade --notest --verbose
         command -v cpanm
         cpanm -v .
       matrix: >
@@ -126,7 +138,11 @@ jobs:
         else
           fetch -o /tmp/cpanm https://cpanmin.us
         fi
-        perl /tmp/cpanm --self --notest --verbose
+        #~ Use the unambiguous --self-upgrade (App::cpanminus 1.7049 treats
+        #~ short "--self" as ambiguous between --self-contained/--self-upgrade
+        #~ and aborts). --self-upgrade installs cpanm into the active perl's
+        #~ bin dir.
+        perl /tmp/cpanm --self-upgrade --notest --verbose
         command -v cpanm
         cpanm -v .
       matrix: >
