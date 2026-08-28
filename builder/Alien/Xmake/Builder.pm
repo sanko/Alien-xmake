@@ -338,19 +338,20 @@ use %s;
     method _install_windows ($installdir) {
         my $temppath = path('_build_xmake');
         $temppath->mkpath;
-        my $arch_env   = $ENV{PROCESSOR_ARCHITECTURE} // '';
-        my $arch64_env = $ENV{PROCESSOR_ARCHITEW6432} // '';
+        my $arch     = $self->_native_windows_arch;
         my $filename;
 
-        # Check for ARM64
-        if ( $arch_env eq 'ARM64' || $arch64_env eq 'ARM64' ) {
-
-            # ARM64 releases currently use the 'bundle' naming convention
-            $filename = "xmake-bundle-$target_version.arm64.exe";
+        # Check for ARM64. The NSIS installer (xmake-$V.arm64.exe) supports the
+        # /S /D silent-install flags just like win64/win32. The separate
+        # "xmake-bundle-*.arm64.exe" assets are NOT NSIS installers; they are
+        # xmake's own self-contained binaries that reject /S /D= and cannot be
+        # used with the silent installer command below.
+        if ( $arch eq 'ARM64' ) {
+            $filename = "xmake-$target_version.arm64.exe";
         }
 
         # Check for x64 (AMD64/IA64)
-        elsif ( $arch_env eq 'AMD64' || $arch_env eq 'IA64' || $arch64_env eq 'AMD64' || $arch64_env eq 'IA64' ) {
+        elsif ( $arch eq 'AMD64' || $arch eq 'IA64' ) {
             $filename = "xmake-$target_version.win64.exe";
         }
 
@@ -359,6 +360,7 @@ use %s;
             $filename = "xmake-$target_version.win32.exe";
         }
         my $url     = "https://github.com/xmake-io/xmake/releases/download/$target_version/$filename";
+        say "Detected Windows arch: $arch; installing $filename";
         my $outfile = $temppath->child('xmake-installer.exe');
         if ( !$self->_download_file( $url, $outfile ) ) {
             die "Download failed for $url";
@@ -379,6 +381,67 @@ use %s;
         # Cleanup
         #~ path('_build_xmake')->remove_tree;
     }
+
+    # Detect the *host* CPU architecture on Windows, not the architecture of the
+    # running perl. On Windows-on-ARM the Strawberry/x64 perl hardcodes its own
+    # arch (x64) and PROCESSOR_* env vars mirror the *emulated process*, so all
+    # of them report AMD64 even on ARM64 hardware. A C compiler built for the
+    # host reports the true architecture via `-dumpmachine` (the same approach
+    # infix's build.pl uses), so probe the available compilers first.
+    method _native_windows_arch () {
+        my $amd64;
+        for my $cc ( 'clang', 'gcc', 'cc', 'cl' ) {
+            my $m = $self->_probe_machine($cc);
+            next unless defined $m;
+            say "arch diagnostic: $cc -dumpmachine => $m";
+            return 'ARM64' if $m =~ /aarch64|arm64/i;
+            $amd64 ||= 1 if $m =~ /x86_64|amd64|i686|i386/i;
+        }
+
+        # Any native ARM64 compiler on the host trumps an emulated x64 toolchain
+        # that happens to sit earlier on PATH (e.g. Strawberry's mingw gcc).
+        return 'AMD64' if $amd64;
+        say 'arch diagnostic: no compiler reported a usable target';
+
+        # Fallback 1: GetNativeSystemInfo reports the native OS architecture.
+        if ( eval { require Win32::API; 1 } ) {
+            my $gns = Win32::API->new( 'kernel32', 'GetNativeSystemInfo', 'P', '' );
+            if ($gns) {
+                my $buf = "\0" x 48;
+                $gns->Call($buf);
+                my $w = unpack( 'v', substr( $buf, 0, 2 ) );
+                say "arch diagnostic: GetNativeSystemInfo wProcessorArchitecture=$w";
+                return 'ARM64' if $w == 12;
+                return 'ARM'   if $w == 5;
+                return 'AMD64' if $w == 9;
+                return 'x86'   if $w == 0;
+            }
+            say 'arch diagnostic: Win32::API present but GetNativeSystemInfo unavailable';
+        }
+        else {
+            say 'arch diagnostic: Win32::API not available; using env-var fallback';
+        }
+
+        # Fallback 2: the deprecated env-var heuristic.
+        my $arch_env   = $ENV{PROCESSOR_ARCHITECTURE} // '';
+        my $arch64_env = $ENV{PROCESSOR_ARCHITEW6432} // '';
+        say "arch diagnostic: env PROCESSOR_ARCHITECTURE='$arch_env' PROCESSOR_ARCHITEW6432='$arch64_env'";
+        return 'ARM64' if $arch_env eq 'ARM64' || $arch64_env eq 'ARM64';
+        return 'AMD64' if $arch_env eq 'AMD64' || $arch_env eq 'IA64'
+            || $arch64_env eq 'AMD64' || $arch64_env eq 'IA64';
+        return 'x86';
+    }
+
+    # Run `<compiler> -dumpmachine` and return its target triple, or undef if
+    # the compiler isn't found / produces no output.
+    method _probe_machine ($cc) {
+        my $null = _is_win() ? 'NUL' : '/dev/null';
+        my $out  = `$cc -dumpmachine 2>$null`;
+        return undef if ( $? >> 8 ) != 0;
+        chomp $out if defined $out;
+        return ( defined $out && length $out ) ? $out : undef;
+    }
+
 
     method _install_unix ($installdir) {
         my $build_dir = path('_build_xmake');

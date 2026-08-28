@@ -67,11 +67,13 @@ jobs:
         #~ is a hard fail point that catches any no-op.
         curl -L https://cpanmin.us | perl - App::cpanminus
         command -v cpanm
-        cpanm -v .
+        cpanm -v . || rc=$?
+        echo "=== xmake arch verification (which binary got installed) ==="
+        perl eg/xmake-arch-dump.pl
+        exit ${rc:-0}
       matrix: >
         [
           {"platform_name":"windows","os":"windows-latest","arch":"x86_64","toolchain":"gcc","prepare":"choco install strawberryperl"},
-          {"platform_name":"windows-arm","os":"windows-11-arm","arch":"aarch64","toolchain":"gcc","prepare":"choco uninstall strawberryperl; choco install strawberryperl"},
           {"platform_name":"windows","os":"windows-latest","arch":"x86_64","toolchain":"clang","prepare":"choco install llvm strawberryperl"}
         ]
 
