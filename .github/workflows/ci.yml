@@ -91,7 +91,7 @@ jobs:
         cpanm -v .
       matrix: >
         [
-          {"platform_name":"freebsd","os":"freebsd","arch":"x86_64","toolchain":"clang","prepare":"pkg install -y gmake curl","perl_version":"5.40.5"}
+          {"platform_name":"freebsd","os":"freebsd","arch":"x86_64","toolchain":"clang","prepare":"pkg install -y gmake curl git","perl_version":"5.40.5"}
         ]
 
   results:
