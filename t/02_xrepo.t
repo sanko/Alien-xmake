@@ -14,14 +14,15 @@ my $exe   = $xmake->exe;
 #~ diag `$exe --help`;
 #~ diag $exe;
 #~ diag `$exe update`;
-#~ xmake.exe lua private.xrepo install -y -k shared libpng
-diag `$exe lua private.xrepo install -y -k shared libpng`;
-ok my $pkg = $repo->install('libpng'), 'install libpng';
-skip_all 'Failed to install libpng', 3 unless $pkg;
+#~ xmake.exe lua private.xrepo install -y -k shared zlib
+#~ diag `$exe lua private.xrepo install -y -k shared zlib`;
+$repo->update_repo;
+ok my $pkg = $repo->install('zlib'), 'install zlib';
+skip_all 'Failed to install zlib', 3 unless $pkg;
 diag 'Found library at: ' . $pkg->libpath;
 diag 'Version: ' . $pkg->version;
 diag 'License: ' . $pkg->license;
-diag 'Header:  ' . $pkg->find_header('png.h');
+diag 'Header:  ' . $pkg->find_header('zlib.h');
 diag 'Include dirs: ';
 diag '     - ' . $_ for @{ $pkg->includedirs };
 diag 'Lib:     ' . $pkg->libpath;

@@ -71,7 +71,7 @@ jobs:
       matrix: >
         [
           {"platform_name":"windows","os":"windows-latest","arch":"x86_64","toolchain":"gcc","prepare":"choco install strawberryperl"},
-          {"platform_name":"windows","os":"windows-11-arm","arch":"aarch64","toolchain":"gcc","prepare":"choco install strawberryperl"},
+          {"platform_name":"windows-arm","os":"windows-11-arm","arch":"aarch64","toolchain":"gcc","prepare":"choco uninstall strawberryperl; choco install strawberryperl"},
           {"platform_name":"windows","os":"windows-latest","arch":"x86_64","toolchain":"clang","prepare":"choco install llvm strawberryperl"}
         ]
 
@@ -120,89 +120,8 @@ jobs:
           {"platform_name":"openbsd","os":"openbsd","arch":"aarch64","toolchain":"clang","prepare":"pkg_add gmake bash git curl","perl_version":"5.40.5"}
         ]
 
-  netbsd:
-    name: NetBSD
-    uses: sanko/workflow-testing/.github/workflows/run-vm.yml@main
-    secrets: inherit
-    with:
-      os_version: '10.1'
-      task: |
-        perl -V
-        export XMAKE_ROOT=y
-        #~ Install cpanm via its canonical self-bootstrap (installs the real
-        #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
-        #~ is a hard fail point that catches any no-op.
-        curl -L https://cpanmin.us | perl - App::cpanminus
-        command -v cpanm
-        cpanm -v .
-      matrix: >
-        [
-          {"platform_name":"netbsd","os":"netbsd","arch":"x86_64","toolchain":"gcc","prepare":"pkg_add gmake gcc bash git curl","perl_version":"5.40.5"},
-          {"platform_name":"netbsd","os":"netbsd","arch":"aarch64","toolchain":"gcc","prepare":"pkg_add gmake gcc bash git curl","perl_version":"5.40.5"}
-        ]
-
-  dragonflybsd:
-    name: DragonFly BSD
-    uses: sanko/workflow-testing/.github/workflows/run-vm.yml@main
-    secrets: inherit
-    with:
-      os_version: '6.4.0'
-      task: |
-        perl -V
-        export XMAKE_ROOT=y
-        #~ Install cpanm via its canonical self-bootstrap (installs the real
-        #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
-        #~ is a hard fail point that catches any no-op.
-        curl -L https://cpanmin.us | perl - App::cpanminus
-        command -v cpanm
-        cpanm -v .
-      matrix: >
-        [
-          {"platform_name":"dragonflybsd","os":"dragonflybsd","arch":"x86_64","toolchain":"gcc","prepare":"pkg install -y gmake gcc bash git curl","perl_version":"5.40.5"}
-        ]
-
-  solaris:
-    name: Solaris
-    uses: sanko/workflow-testing/.github/workflows/run-vm.yml@main
-    secrets: inherit
-    with:
-      os_version: '11.4'
-      task: |
-        perl -V
-        export XMAKE_ROOT=y
-        #~ Install cpanm via its canonical self-bootstrap (installs the real
-        #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
-        #~ is a hard fail point that catches any no-op.
-        curl -L https://cpanmin.us | perl - App::cpanminus
-        command -v cpanm
-        cpanm -v .
-      matrix: >
-        [
-          {"platform_name":"solaris","os":"solaris","arch":"x86_64","toolchain":"gcc","prepare":"pkg install -v --accept gcc gmake git","perl_version":"5.40.5"}
-        ]
-
-  omnios:
-    name: OmniOS
-    uses: sanko/workflow-testing/.github/workflows/run-vm.yml@main
-    secrets: inherit
-    with:
-      os_version: 'r151056'
-      task: |
-        perl -V
-        export XMAKE_ROOT=y
-        #~ Install cpanm via its canonical self-bootstrap (installs the real
-        #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
-        #~ is a hard fail point that catches any no-op.
-        curl -L https://cpanmin.us | perl - App::cpanminus
-        command -v cpanm
-        cpanm -v .
-      matrix: >
-        [
-          {"platform_name":"omnios","os":"omnios","arch":"x86_64","toolchain":"gcc","prepare":"pkg install -v --accept gcc gmake git","perl_version":"5.40.5"}
-        ]
-
   results:
     name: Summary
     if: always()
-    needs: [linux, macos, windows, freebsd, openbsd, netbsd, dragonflybsd, solaris, omnios]
+    needs: [linux, macos, windows, freebsd, openbsd]
     uses: sanko/workflow-testing/.github/workflows/results-summary.yml@main

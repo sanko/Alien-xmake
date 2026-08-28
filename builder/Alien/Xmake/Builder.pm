@@ -18,7 +18,7 @@ class Alien::Xmake::Builder {
     use IO::Uncompress::Unzip qw[$UnzipError];
 
     # Configuration
-    field $target_version : param : reader //= 'v3.0.6';
+    field $target_version : param : reader //= 'v3.1.1';
     field $force  : param  //= 0;
     field $meta   : reader //= CPAN::Meta->load_file('META.json');
     field $action : param  //= 'build';
@@ -87,9 +87,9 @@ use %s;
         $self->_copy_share_to_blib();
 
         # Generate ConfigData.pm (used for upgrade detection on later builds)
-        my $config_data = $resolved->{install_type} eq 'system'
-            ? { install_type => 'system', version => $resolved->{version}, bin => $resolved->{bin} }
-            : $self->_generate_share_config( $self->_staged_bin, $resolved->{version} );
+        my $config_data
+            = $resolved->{install_type} eq 'system' ? { install_type => 'system', version => $resolved->{version}, bin => $resolved->{bin} } :
+            $self->_generate_share_config( $self->_staged_bin, $resolved->{version} );
         $self->_write_config_data($config_data);
         say 'Build complete';
     }
@@ -158,15 +158,14 @@ use %s;
             }
         }
     }
-
-    method _run_cmd (@args) {        system(@args) == 0    }
+    method _run_cmd (@args) { system(@args) == 0 }
 
     # Xmake lives in the source share/ dir, then gets staged into blib so
     # File::ShareDir::dist_dir() can locate it at run time.
-    method _source_share    () { path('share')->absolute; }
-    method _dist_blib_root  () { path('blib/lib/auto/share/dist', $meta->name)->absolute; }
-    method _bin_name        () { $^O eq 'MSWin32' ? 'xmake.exe' : 'xmake'; }
-    method _staged_bin      () { $self->_dist_blib_root->child( $self->_bin_name ); }
+    method _source_share ()   { path('share')->absolute; }
+    method _dist_blib_root () { path( 'blib/lib/auto/share/dist', $meta->name )->absolute; }
+    method _bin_name ()       { $^O eq 'MSWin32' ? 'xmake.exe' : 'xmake'; }
+    method _staged_bin ()     { $self->_dist_blib_root->child( $self->_bin_name ); }
 
     method _copy_share_to_blib ( ) {
         my $src  = $self->_source_share;
@@ -378,7 +377,7 @@ use %s;
         die "Installer failed with code $ret" if $ret != 0;
 
         # Cleanup
-        path('_build_xmake')->remove_tree;
+        #~ path('_build_xmake')->remove_tree;
     }
 
     method _install_unix ($installdir) {
@@ -656,7 +655,6 @@ use %s;
         exit !$method->($self);
     }
 
-
     sub _http {
         CORE::state $http
             //= HTTP::Tiny->new( default_headers => { 'X-GitHub-Api-Version' => '2026-03-10', accept => 'application/vnd.github+json' } );
@@ -912,5 +910,5 @@ use %s;
         my ( $xmake, $xrepo ) = _xmake_paths($dist);
         return -e $xmake && -s $xmake && -e $xrepo;
     }
-    };
+};
 1;
