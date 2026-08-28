@@ -9,7 +9,6 @@ my $graphics = 'C:\Users\S\AppData\Local\.xmake\packages\c\csfml\2.6.1\38ea7a5d8
 my $network  = 'C:\Users\S\AppData\Local\.xmake\packages\c\csfml\2.6.1\38ea7a5d8b204d54ad2ecca8c871bb20\bin\csfml-network-2.dll';
 my $system   = 'C:\Users\S\AppData\Local\.xmake\packages\c\csfml\2.6.1\38ea7a5d8b204d54ad2ecca8c871bb20\bin\csfml-system-2.dll';
 my $window   = 'C:\Users\S\AppData\Local\.xmake\packages\c\csfml\2.6.1\38ea7a5d8b204d54ad2ecca8c871bb20\bin\csfml-window-2.dll';
-
 #
 my $window3 = 'C:\Users\S\AppData\Local\.xmake\packages\s\sfml\3.0.1\9fb8d83a6e424277b28fac860b80fad2\bin\sfml-window-3.dll';
 #
@@ -37,14 +36,13 @@ typedef sfWindowStyle => Enum [
 #
 affix $system, sfSleep => [ sfTime() ], Void;
 affix $window, sfWindow_create => [ sfVideoMode(), String, UInt32, Int, Pointer [ sfContextSettings() ] ], Pointer [Void];
+
 #~ my $win = sfWindow_create( { size => [ 640, 480 ]  }, "Hi", sfDefaultStyle(), sfWindowed(), {} );
 #~ sfSleep( { microseconds => 3000000 } );
-
 #
 warn `nm $window3`;
-affix $window3, [ '??0Window@sf@@QEAA@XZ' => 'new_Window'] => [ ], Pointer [Void];
-
-
+affix $window3, [ '??0Window@sf@@QEAA@XZ' => 'new_Window' ] => [],
+    Pointer [Void];
 
 #~ sf::sleep(sf::seconds(3));
 __END__
