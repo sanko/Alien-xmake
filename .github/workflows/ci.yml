@@ -81,6 +81,11 @@ jobs:
       os_version: '15.0'
       task: |
         perl -V
+        #~ The vmactions FreeBSD VM runs as root, and xmake refuses to run as
+        #~ root ("Running xmake as root is extremely dangerous and no longer
+        #~ supported") so the Alien::Xmake tests fail. XMAKE_ROOT=y is xmake's
+        #~ documented opt-in for exactly this case; harmless on non-root hosts.
+        export XMAKE_ROOT=y
         #~ Install cpanm with its canonical self-bootstrap: pipe the fatpacked
         #~ installer to perl with App::cpanminus as the argument, which installs
         #~ the real `cpanm` binary into the active perl's bin dir (already on
