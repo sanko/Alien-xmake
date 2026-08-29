@@ -52,3 +52,13 @@ eg/eg/
 eg/lib/
 eg/alien*
 t/test_alien_*
+
+eg-/
+t/packages
+get.*
+tmp/
+eg/nuklear
+apio.pl
+.tmp-workflow-testing/
+run-direct.yml
+

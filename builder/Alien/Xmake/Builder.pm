@@ -338,7 +338,7 @@ use %s;
     method _install_windows ($installdir) {
         my $temppath = path('_build_xmake');
         $temppath->mkpath;
-        my $arch     = $self->_native_windows_arch;
+        my $arch = $self->_native_windows_arch;
         my $filename;
 
         # Check for ARM64. The NSIS installer (xmake-$V.arm64.exe) supports the
@@ -359,7 +359,7 @@ use %s;
         else {
             $filename = "xmake-$target_version.win32.exe";
         }
-        my $url     = "https://github.com/xmake-io/xmake/releases/download/$target_version/$filename";
+        my $url = "https://github.com/xmake-io/xmake/releases/download/$target_version/$filename";
         say "Detected Windows arch: $arch; installing $filename";
         my $outfile = $temppath->child('xmake-installer.exe');
         if ( !$self->_download_file( $url, $outfile ) ) {
@@ -427,8 +427,7 @@ use %s;
         my $arch64_env = $ENV{PROCESSOR_ARCHITEW6432} // '';
         say "arch diagnostic: env PROCESSOR_ARCHITECTURE='$arch_env' PROCESSOR_ARCHITEW6432='$arch64_env'";
         return 'ARM64' if $arch_env eq 'ARM64' || $arch64_env eq 'ARM64';
-        return 'AMD64' if $arch_env eq 'AMD64' || $arch_env eq 'IA64'
-            || $arch64_env eq 'AMD64' || $arch64_env eq 'IA64';
+        return 'AMD64' if $arch_env eq 'AMD64' || $arch_env eq 'IA64' || $arch64_env eq 'AMD64' || $arch64_env eq 'IA64';
         return 'x86';
     }
 
@@ -438,10 +437,9 @@ use %s;
         my $null = _is_win() ? 'NUL' : '/dev/null';
         my $out  = `$cc -dumpmachine 2>$null`;
         return undef if ( $? >> 8 ) != 0;
-        chomp $out if defined $out;
+        chomp $out   if defined $out;
         return ( defined $out && length $out ) ? $out : undef;
     }
-
 
     method _install_unix ($installdir) {
         my $build_dir = path('_build_xmake');

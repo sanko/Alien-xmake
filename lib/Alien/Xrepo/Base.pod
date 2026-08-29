@@ -68,6 +68,42 @@ It leverages Perl 5.40's native C<class> features and provides a C<Module::Build
 
 =back
 
+=head1 CONSTRUCTOR
+
+=head2 C<new( ... )>
+
+    my $alien = Alien::Zstd->new(
+        package_name       => 'zstd',
+        version_constraint => 'latest',
+        root               => '/path/to/project-root',
+        verbose            => 1,
+    );
+
+Creates a new instance. If C<package_name> is omitted it is inherited from the subclass C<package_name> method.
+
+=over
+
+=item B<package_name>
+
+The name of the package as it appears in the C<xrepo> repository (e.g., C<zstd>). If omitted, the value returned by the
+subclass C<package_name> method is used. One of the two must be provided.
+
+=item B<version_constraint>
+
+Optional semantic version constraint (e.g., C<1.6.x>, C<latest>, C<1.6.32>). Passed to C<Alien::Xrepo::install> and
+appended to the C<xrepo> install spec.
+
+=item B<root>
+
+Optional path to an isolated, local installation root for packages and configuration. When set, C<XMAKE_CONFIGDIR> and
+C<XMAKE_PKG_INSTALLDIR> point inside this directory so the package does not touch the global C<~/.xmake> environment.
+
+=item B<verbose>
+
+Boolean. If true, prints xrepo status output to C<STDOUT>. Defaults to C<0>.
+
+=back
+
 =head1 SUBCLASSING
 
 To create a new Alien module, inherit from this class and implement the following methods:
@@ -78,7 +114,9 @@ B<Required>. Returns the name of the package as it appears in the C<xrepo> repos
 
 =head2 C<install_opts( )>
 
-Optional. Returns a hash (or list) of options passed to C<Alien::Xrepo::install>. Common options include:
+Optional. Returns a hash (or list) of options honored by the builder (C<Build_PL> / C<Build>) when it installs the
+package during the C<build> action. Pass these same options directly to C<install( %opts )> when installing at runtime.
+Common options include:
 
 =over 4
 
@@ -155,7 +193,7 @@ L<Alien::Xrepo>, L<Alien::Xmake>, L<xmake|https://xmake.io>, L<xrepo|https://xre
 
 =head1 AUTHOR
 
-Sanko Robinson E<lt>sanko@cpan.orgE<gt>
+Sanko Robinson <https://github.com/sanko>
 
 =head1 COPYRIGHT
 
