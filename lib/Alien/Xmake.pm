@@ -37,6 +37,7 @@ class Alien::Xmake 0.08 {
 
     method xrepo () {
         my $exe_path   = $self->_resolve_path;
+        return $exe_path .  ' lua private.xrepo';
         my $parent     = dirname($exe_path);
         my $xrepo_name = 'xrepo' . ( $windows ? '.bat' : '' );
         my $try        = File::Spec->catfile( $parent, $xrepo_name );
@@ -141,6 +142,7 @@ class Alien::Xmake 0.08 {
     method _xrepo_cmd (@cmd) {
         my $exe = $self->_resolve_path;
         if ($windows) {
+            return ($self->xrepo, @cmd);
 
             # Catch file-not-found immediately instead of relying on Perl's broken shell-fallback
             if ( $self->install_type ne 'system' && !-e $exe ) {
