@@ -40,6 +40,8 @@ share/bin
 *.session
 xmake.*
 .xmake/*
+xmake-*
+xmake/*
 xmake_installer*
 MANIFEST
 

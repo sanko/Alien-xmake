@@ -10,6 +10,13 @@ ok $Alien::Xrepo::VERSION, 'Alien::Xrepo::VERSION';
 my $repo  = Alien::Xrepo->new( verbose => 0 );
 my $xmake = Alien::Xmake->new;
 my $exe   = $xmake->exe;
+subtest 'repository mirror pinning' => sub {
+    my $bin_url  = 'https://github.com/xmake-mirror/build-artifacts.git';
+    my $main_url = 'https://github.com/xmake-io/xmake-repo.git';
+    Alien::Xrepo->new( binary_repo => $bin_url, main_repo => $main_url );
+    is $ENV{XMAKE_BINARY_REPO}, $bin_url,  'XMAKE_BINARY_REPO is set to binary_repo';
+    is $ENV{XMAKE_MAIN_REPO},   $main_url, 'XMAKE_MAIN_REPO is set to main_repo';
+};
 
 #~ diag `$exe --help`;
 #~ diag $exe;

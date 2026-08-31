@@ -110,19 +110,20 @@ $app->on(
 );
 
 # Synchronous element callbacks (void)
-$app->on( count_inc =>   sub ($e) { $count++;   $app->log( 'count_inc() -> ' . $count ); $app->run( 'updateCount(' . $count . ');' ) } );
-$app->on( count_dec =>   sub ($e) { $count--;   $app->log( 'count_dec() -> ' . $count ); $app->run( 'updateCount(' . $count . ');' ) } );
+$app->on( count_inc   => sub ($e) { $count++;   $app->log( 'count_inc() -> ' . $count ); $app->run( 'updateCount(' . $count . ');' ) } );
+$app->on( count_dec   => sub ($e) { $count--;   $app->log( 'count_dec() -> ' . $count ); $app->run( 'updateCount(' . $count . ');' ) } );
 $app->on( count_reset => sub ($e) { $count = 0; $app->log('count_reset() -> 0');         $app->run('updateCount(0);'); } );
 
 # Async, response-capable callbacks (Promise on the JS side)
-$app->on_call(double_async =>
-    sub ( $win, $event_type, $element, $event_number, $bind_id ) {
+$app->on_call(
+    double_async => sub ( $win, $event_type, $element, $event_number, $bind_id ) {
         my $n = $app->arg_i( $event_number, 0 );
         $app->log( 'double_async( ' . $n . ' ) - arg0 is ' . $app->arg_size( $event_number, 0 ) . ' byte(s)' );
         $app->respond( $event_number, $n * 2 );
     }
 );
-$app->on_call(    shout_async =>    sub ( $win, $event_type, $element, $event_number, $bind_id ) {
+$app->on_call(
+    shout_async => sub ( $win, $event_type, $element, $event_number, $bind_id ) {
         my $text = $app->arg_s( $event_number, 0 ) // '';
         $app->log( 'shout_async( "' . $text . '" )' );
         $app->respond( $event_number, uc $text );

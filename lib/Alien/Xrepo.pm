@@ -12,9 +12,22 @@ class Alien::Xrepo 0.08 {
     field $verbose : param //= 0;
     field $root    : param //= ();
     field $xmake = Alien::Xmake->new;
+
+    # Pin the package repositories xmake fetches from. xmake consults the
+    # XMAKE_BINARY_REPO / XMAKE_MAIN_REPO env vars and otherwise auto-selects
+    # a mirror via net.fasturl; letting the caller pin them avoids reaching an
+    # unreachable mirror (e.g. a proxy that can only tunnel github/gitlab).
+    field $binary_repo : param //= ();
+    field $main_repo   : param //= ();
     method blah ($msg) { return unless $verbose; say $msg; }
     #
     ADJUST {
+        if ( defined $binary_repo && length $binary_repo ) {
+            $ENV{XMAKE_BINARY_REPO} = $binary_repo;
+        }
+        if ( defined $main_repo && length $main_repo ) {
+            $ENV{XMAKE_MAIN_REPO} = $main_repo;
+        }
         if ($root) {
             my $p = path($root)->absolute;
             $p->mkpath;
@@ -115,7 +128,11 @@ class Alien::Xrepo 0.08 {
     method remove_repo ($name) {
         say "[*] xrepo: removing repo $name..." if $verbose;
         my @cmd = $self->_xrepo_cmd( 'remove-repo', '-y', $name );
-        system( { $cmd[0] } @cmd );
+
+        # Capture so a non-zero exit / network failure doesn't spew Perl's
+        # $! ("Can't spawn ...") to the caller's stdout.
+        capture { system( { $cmd[0] } @cmd ) };
+        return;
     }
 
     method update_repo ( $name //= () ) {
@@ -123,7 +140,11 @@ class Alien::Xrepo 0.08 {
         my @cmd = ( 'update-repo', '-y' );
         push @cmd, $name if defined $name;
         my @run = $self->_xrepo_cmd(@cmd);
-        system( { $run[0] } @run );
+
+        # update-repo is best-effort; don't die and don't spew $! when the
+        # remote mirror is unreachable (e.g. a proxy can't tunnel to it).
+        capture { system( { $run[0] } @run ) };
+        return;
     }
     #
     method _xrepo_cmd (@cmd) {

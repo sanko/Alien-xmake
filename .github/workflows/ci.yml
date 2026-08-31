@@ -68,8 +68,6 @@ jobs:
         curl -L https://cpanmin.us | perl - App::cpanminus
         command -v cpanm
         cpanm -v . || rc=$?
-        echo "=== xmake arch verification (which binary got installed) ==="
-        perl eg/xmake-arch-dump.pl
         exit ${rc:-0}
       matrix: >
         [

@@ -31,17 +31,17 @@ affix $dll, 'nk_win_context',  []                                               
 affix $dll, 'nk_win_begin',    [ Pointer [Void], String, Float, Float, Float, Float, UInt ] => Int;
 
 # --- nuklear API (direct exports) ---
-affix $dll, 'nk_end',                [ Pointer [Void] ]                                       => Void;
-affix $dll, 'nk_label',              [ Pointer [Void], String, Int ]                          => Void;
-affix $dll, 'nk_button_label',       [ Pointer [Void], String ]                               => Int;
-affix $dll, 'nk_layout_row_dynamic', [ Pointer [Void], Float, Int ]                           => Void;
-affix $dll, 'nk_slide_float',        [ Pointer [Void], Float, Float, Float, Float ]            => Float;
-affix $dll, 'nk_checkbox_label',     [ Pointer [Void], String, Pointer [Int] ]                => Int;
-affix $dll, 'nk_option_label',       [ Pointer [Void], String, Int ]                          => Int;
-affix $dll, 'nk_progress',           [ Pointer [Void], Pointer [Size_t], Size_t, Int ]        => Int;
-affix $dll, 'nk_group_begin',        [ Pointer [Void], String, Int ]                          => Int;
-affix $dll, 'nk_group_end',          [ Pointer [Void] ]                                       => Void;
-affix $dll, 'nk_spacing',            [ Pointer [Void], Int ]                                  => Void;
+affix $dll, 'nk_end',                [ Pointer [Void] ]                                => Void;
+affix $dll, 'nk_label',              [ Pointer [Void], String, Int ]                   => Void;
+affix $dll, 'nk_button_label',       [ Pointer [Void], String ]                        => Int;
+affix $dll, 'nk_layout_row_dynamic', [ Pointer [Void], Float, Int ]                    => Void;
+affix $dll, 'nk_slide_float',        [ Pointer [Void], Float, Float, Float, Float ]    => Float;
+affix $dll, 'nk_checkbox_label',     [ Pointer [Void], String, Pointer [Int] ]         => Int;
+affix $dll, 'nk_option_label',       [ Pointer [Void], String, Int ]                   => Int;
+affix $dll, 'nk_progress',           [ Pointer [Void], Pointer [Size_t], Size_t, Int ] => Int;
+affix $dll, 'nk_group_begin',        [ Pointer [Void], String, Int ]                   => Int;
+affix $dll, 'nk_group_end',          [ Pointer [Void] ]                                => Void;
+affix $dll, 'nk_spacing',            [ Pointer [Void], Int ]                           => Void;
 die 'failed to open window' unless nk_win_init( 'Affix + Nuklear', 900, 640, 'Arial', 14 );
 my $ctx      = nk_win_context();
 my $clicks_a = 0;
@@ -70,7 +70,7 @@ while ( nk_win_running() ) {
         nk_label( $ctx, sprintf( 'A:%d  B:%d', $clicks_a, $clicks_b ), NK_TEXT_LEFT );
         nk_layout_row_dynamic( $ctx, 25, 2 );
         nk_label( $ctx, 'Red', NK_TEXT_LEFT );
-        $red   = nk_slide_float( $ctx, 0, $red, 255, 1 );
+        $red = nk_slide_float( $ctx, 0, $red, 255, 1 );
         nk_label( $ctx, 'Green', NK_TEXT_LEFT );
         $green = nk_slide_float( $ctx, 0, $green, 255, 1 );
         nk_layout_row_dynamic( $ctx, 25, 1 );
