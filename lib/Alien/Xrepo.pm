@@ -78,19 +78,12 @@ class Alien::Xrepo 0.08 {
     }
 
     method _run_capture (@cmd) {
-        if ( $^O eq 'MSWin32' ) {
-
-            # Capture::Tiny + system() on Windows returns a bogus exit code
-            # because the spawned child inherits non-console pipe handles and
-            # Perl misinterprets the result (spurious "Can't spawn ... Inappropriate
-            # I/O control operation").  Use backticks with stderr merged so the
-            # child gets a normal console handle and we get a reliable $?.
-            my $cmd_str = join( ' ', map { ( /\s/ && !/"/ ) ? qq{"$_"} : $_ } @cmd );
-            my $out     = `$cmd_str 2>&1`;
-            return ( $out, '', $? >> 8 );
-        }
         require Capture::Tiny;
-        return Capture::Tiny::capture( sub { system(@cmd) } );
+        return Capture::Tiny::capture(
+            sub {
+                system(@cmd);
+            }
+        );
     }
     #
     method install ( $pkg_spec, $version //= (), %opts ) {

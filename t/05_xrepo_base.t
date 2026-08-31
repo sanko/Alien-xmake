@@ -8,7 +8,6 @@ use Alien::Xrepo::Base;
 use File::Temp qw[tempdir];
 no warnings qw[experimental::class];
 
-
 # Test package
 class Alien::Xrepo::TestPackage : isa(Alien::Xrepo::Base) {
     method package_name {'zlib'}

@@ -4,7 +4,6 @@ use Test2::Util::Importer 'Test2::Tools::Subtest' => ( subtest_streamed => { -as
 use blib;
 use Alien::Xrepo;
 use Path::Tiny;
-
 my $repo = Alien::Xrepo->new( verbose => 1 );
 
 # Install ninja (binary)

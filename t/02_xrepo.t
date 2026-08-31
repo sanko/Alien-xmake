@@ -5,7 +5,6 @@ use Test2::Util::Importer 'Test2::Tools::Subtest' => ( subtest_streamed => { -as
 use blib;
 use Alien::Xmake;
 use Alien::Xrepo;
-
 #
 ok $Alien::Xrepo::VERSION, 'Alien::Xrepo::VERSION';
 #
