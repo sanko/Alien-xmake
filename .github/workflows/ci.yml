@@ -1,130 +1,164 @@
-name: CI
+---
+jobs:
+  etc:
+    name: 'FreeBSD/v${{matrix.perl}}'
+    needs:
+      - setup
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - architecture: x86-64
+            host: ubuntu-latest
+            name: freebsd
+            pkg: pkg install -y
+            setup: sudo pkg install -y xmake-io git
+            version: 14.1
+          - architecture: arm64
+            host: ubuntu-latest
+            name: freebsd
+            pkg: pkg install -y
+            setup: sudo pkg install -y xmake-io git
+            version: 14.1
+        perl:
+          - "5.40"
+      max-parallel: 5
+    uses: ./.github/workflows/cross.yml
+    with:
+      arch: '${{ matrix.os.architecture }}'
+      host: '${{ matrix.os.host }}'
+      os: '${{ matrix.os.name }}'
+      perl: '${{ matrix.perl }}'
+      pkg: '${{ matrix.os.pkg }}'
+      version: '${{ matrix.os.version }}'
+      setup: '${{ matrix.os.setup }}'
+  linux:
+    name: 'Linux/v${{matrix.perl}}'
+    needs:
+      - setup
+    strategy:
+      fail-fast: false
+      matrix:
+        flags:
+          - ''
+          - -Dusethreads
+          - -Duselongdouble
+          - -Dusequadmath
+        os:
+          - ubuntu-22.04
+        perl: '${{ fromJSON(needs.setup.outputs.matrix).perl }}'
+      max-parallel: 25
+    uses: ./.github/workflows/unix.yml
+    with:
+      flags: '${{ matrix.flags }}'
+      os: '${{ matrix.os }}'
+      perl: '${{ matrix.perl }}'
+  macos:
+    name: "[${{ matrix.os == 'macos-14' && 'M1' || 'Intel' }}] macOS/v${{matrix.perl}}"
+    needs:
+      - setup
+    strategy:
+      fail-fast: false
+      matrix:
+        exclude:
+          - flags: -Dusequadmath
+          - flags: -Dusethreads
+        flags: '${{ fromJSON(needs.setup.outputs.matrix).flags }}'
+        os:
+          - macos-14
+          - macos-latest
+        perl: '${{ fromJSON(needs.setup.outputs.matrix).perl }}'
+      max-parallel: 25
+    uses: ./.github/workflows/unix.yml
+    with:
+      flags: '${{ matrix.flags }}'
+      os: '${{ matrix.os }}'
+      perl: '${{ matrix.perl }}'
+  results:
+    name: Results
+    needs:
+      - macos
+      - win32
+      - linux
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Report test results
+        run: |
+          # Function to process a directory
+          process_dir() {
+            local dir="$1"
+            # Loop through each element in the directory
+            for file in "$dir"/*; do
+              # Check if it's a directory
+              if [ -d "$file" ]; then
+                # Recursively call process_dir for subdirectories (except .)
+                if [ "$file" != "." ]; then
+                  process_dir "$file"
+                fi
+              # If it's a regular file, print its content
+              elif [ -f "$file" ]; then
+                echo "================> $file <================"
+                cat "$file"
+                echo ""  # Add an empty line between files
+              fi
+            done
+          }
+          # Get the directory path from the first argument (or current directory)
+          dir=${1:-.}
+          # Process the specified directory
+          process_dir "artifacts"
+  setup:
+    name: Generate Testing Matrix
+    outputs:
+      matrix: '${{ steps.matrix.outputs.matrix }}'
+    runs-on: ubuntu-22.04
+    steps:
+      - env:
+          DATA: |
+            {
+              "perl":  ["5.40.0"],
+              "flags": ["", "-Dusethreads", "-Duselongdouble", "-Dusequadmath"]
+            }
+        id: matrix
+        run: "jq -rn 'env.DATA | fromjson | @json \"matrix=\\(.)\"' > $GITHUB_OUTPUT\n"
+  win32:
+    name: 'Windows/v${{matrix.perl}}'
+    needs:
+      - setup
+    strategy:
+      fail-fast: false
+      matrix:
+        exclude:
+          - flags: -Duselongdouble
+          - flags: -Dusequadmath
+        flags:
+          - -Dusethreads
+          - ''
+        os:
+          - windows-2022
+        perl: '${{ fromJSON(needs.setup.outputs.matrix).perl }}'
+      max-parallel: 25
+    uses: ./.github/workflows/win32.yml
+    with:
+      flags: '${{ matrix.flags }}'
+      os: '${{ matrix.os }}'
+      perl: '${{ matrix.perl }}'
+
+name: CI Matrix
 
 on:
   pull_request: ~
-  push:
-    branches: [main, dev]
+  push: ~
+  schedule:
+    - cron: 42 5 * * 0
   workflow_dispatch: ~
 
 permissions:
   contents: read
+  # actions: read is required to list artifacts via the API
   actions: read
 
-jobs:
-
-  linux:
-    name: Linux
-    uses: sanko/workflow-testing/.github/workflows/run-direct.yml@main
-    secrets: inherit
-    with:
-      task: |
-        perl -V
-        #~ Install cpanm via its canonical self-bootstrap (installs the real
-        #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
-        #~ is a hard fail point that catches any no-op.
-        curl -L https://cpanmin.us | perl - App::cpanminus
-        command -v cpanm
-        cpanm -v .
-      matrix: >
-        [
-          {"platform_name":"ubuntu","os":"ubuntu-latest","arch":"x86_64","toolchain":"gcc","perl_version":"5.40.5"},
-          {"platform_name":"ubuntu","os":"ubuntu-latest","arch":"x86_64","toolchain":"gcc","perl_version":"5.42.3","configure":"-Duselongdouble","variant":"longdoubles"},
-          {"platform_name":"ubuntu-arm","os":"ubuntu-24.04-arm","arch":"aarch64","toolchain":"gcc","perl_version":"5.40.5"},
-          {"platform_name":"ubuntu","os":"ubuntu-latest","arch":"x86_64","toolchain":"clang","perl_version":"5.40.5"},
-          {"platform_name":"ubuntu-arm","os":"ubuntu-24.04-arm","arch":"aarch64","toolchain":"clang","perl_version":"5.40.5"}
-        ]
-
-  macos:
-    name: macOS
-    uses: sanko/workflow-testing/.github/workflows/run-direct.yml@main
-    secrets: inherit
-    with:
-      task: |
-        perl -V
-        #~ Install cpanm via its canonical self-bootstrap (installs the real
-        #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
-        #~ is a hard fail point that catches any no-op.
-        curl -L https://cpanmin.us | perl - App::cpanminus
-        command -v cpanm
-        cpanm -v .
-      matrix: >
-        [
-          {"platform_name":"macos","os":"macos-15","arch":"aarch64","toolchain":"gcc","perl_version":"5.42.3"},
-          {"platform_name":"macos-intel","os":"macos-15-intel","arch":"x86_64","toolchain":"gcc","perl_version":"5.42.3"},
-          {"platform_name":"macos","os":"macos-15","arch":"aarch64","toolchain":"clang","perl_version":"5.42.3"},
-          {"platform_name":"macos-intel","os":"macos-15-intel","arch":"x86_64","toolchain":"clang","perl_version":"5.42.3"}
-        ]
-
-  windows:
-    name: Windows
-    uses: sanko/workflow-testing/.github/workflows/run-direct.yml@main
-    secrets: inherit
-    with:
-      #~ This task runs under git-bash (run-direct.yml `shell: bash`), but
-      #~ native xmake.exe spawns from deep perl-under-bash chains fail with
-      #~ "Inappropriate I/O control operation" (EINVAL on CreateProcess). That
-      #~ is a CI-env artifact, not a code bug: t/00-05 pass under PowerShell
-      #~ (native Win32 spawning), which is what the passing 0.08 release used.
-      #~ So build + test on PowerShell, keeping strawberry perl on PATH.
-      task: |
-        export PATH="/c/Strawberry/perl/site/bin:/c/Strawberry/perl/bin:/c/Strawberry/c/bin:$PATH"
-        perl -e 'print qq(perl=\$^X :: \$^O\n)'
-        perl Build.PL
-        ./Build
-        pwsh -NoProfile -Command "./Build test --v; if (\$LASTEXITCODE) { exit \$LASTEXITCODE }"
-      matrix: >
-        [
-          {"platform_name":"windows","os":"windows-latest","arch":"x86_64","toolchain":"gcc","prepare":"choco install strawberryperl"},
-          {"platform_name":"windows","os":"windows-latest","arch":"x86_64","toolchain":"clang","prepare":"choco install llvm strawberryperl"}
-        ]
-
-  freebsd:
-    name: FreeBSD
-    uses: sanko/workflow-testing/.github/workflows/run-vm.yml@main
-    secrets: inherit
-    with:
-      os_version: '15.0'
-      task: |
-        perl -V
-        #~ The vmactions VMs run as root; allow xmake to run so the Alien::Xmake
-        #~ tests can invoke the freshly built binary.
-        export XMAKE_ROOT=y
-        #~ Install cpanm via its canonical self-bootstrap (installs the real
-        #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
-        #~ is a hard fail point that catches any no-op.
-        curl -L https://cpanmin.us | perl - App::cpanminus
-        command -v cpanm
-        cpanm -v .
-      matrix: >
-        [
-          {"platform_name":"freebsd","os":"freebsd","arch":"x86_64","toolchain":"clang","prepare":"pkg install -y gmake curl git bash","perl_version":"5.40.5"},
-          {"platform_name":"freebsd","os":"freebsd","arch":"aarch64","toolchain":"clang","prepare":"pkg install -y gmake curl git bash","perl_version":"5.40.5"},
-          {"platform_name":"freebsd","os":"freebsd","arch":"x86_64","toolchain":"gcc","prepare":"pkg install -y lang/gcc gmake curl git bash","perl_version":"5.40.5"}
-        ]
-
-  openbsd:
-    name: OpenBSD
-    uses: sanko/workflow-testing/.github/workflows/run-vm.yml@main
-    secrets: inherit
-    with:
-      os_version: '7.8'
-      task: |
-        perl -V
-        export XMAKE_ROOT=y
-        #~ Install cpanm via its canonical self-bootstrap (installs the real
-        #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
-        #~ is a hard fail point that catches any no-op.
-        curl -L https://cpanmin.us | perl - App::cpanminus
-        command -v cpanm
-        cpanm -v .
-      matrix: >
-        [
-          {"platform_name":"openbsd","os":"openbsd","arch":"x86_64","toolchain":"clang","prepare":"pkg_add gmake bash git curl","perl_version":"5.40.5"},
-          {"platform_name":"openbsd","os":"openbsd","arch":"aarch64","toolchain":"clang","prepare":"pkg_add gmake bash git curl","perl_version":"5.40.5"}
-        ]
-
-  results:
-    name: Summary
-    if: always()
-    needs: [linux, macos, windows, freebsd, openbsd]
-    uses: sanko/workflow-testing/.github/workflows/results-summary.yml@main
