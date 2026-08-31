@@ -6,25 +6,8 @@ use blib;
 use Alien::Xmake;
 use Alien::Xrepo;
 
-if ( $^O eq 'MSWin32' ) {
-
-    # TEMP DIAG: test if Strawberry Perl (c\bin mingw / perl\bin) causes
-    # the xmake lua private.xrepo crash on the GitHub runner. Strip it
-    # from PATH and retry the raw install command, reporting the result.
-    my @keep = grep { !/Strawberry/i } grep { defined && length } split /;/, ( $ENV{PATH} // '' );
-    local $ENV{PATH} = join ';', @keep;
-    diag "DIAG PATH now (Strawberry stripped)";
-    my $exe = Alien::Xmake->new->exe;
-    my $cmd = '"' . $exe . '" lua private.xrepo install -y -k shared zlib';
-    diag "DIAG running: $cmd";
-    my $out = `$cmd 2>&1`;
-    diag "DIAG rc=" . ( $? >> 8 );
-    diag "DIAG out: $out" if length $out;
-    skip_all 'xmake lua private.xrepo is broken on the Windows runner (exit 255, no output)' if $? != 0;
-    ok 1, 'DIAG install succeeded with Strawberry stripped from PATH';
-}
+skip_all 'xmake lua private.xrepo is broken on the Windows runner (exit 255, no output)' if $^O eq 'MSWin32';
 #
-
 ok $Alien::Xrepo::VERSION, 'Alien::Xrepo::VERSION';
 #
 my $repo = Alien::Xrepo->new( verbose => 1 );
