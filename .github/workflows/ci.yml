@@ -69,8 +69,7 @@ jobs:
         cpanm -v .
       matrix: >
         [
-          {"platform_name":"windows","os":"windows-latest","arch":"x86_64","toolchain":"gcc","prepare":"choco install strawberryperl"},
-          {"platform_name":"windows","os":"windows-latest","arch":"x86_64","toolchain":"clang","prepare":"choco install llvm strawberryperl"}
+          {"platform_name":"windows","os":"windows-latest","arch":"x86_64","toolchain":"msvc","prepare":"choco install strawberryperl"}
         ]
 
   results:
