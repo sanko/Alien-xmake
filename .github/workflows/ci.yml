@@ -62,6 +62,7 @@ jobs:
     with:
       task: |
         perl -V
+        perl -e 'print "===PATH DUMP (MSWin32)===\n$ENV{PATH}\n===END===\n" if $^O eq "MSWin32"'
         #~ Install cpanm via its canonical self-bootstrap (installs the real
         #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
         #~ is a hard fail point that catches any no-op.
