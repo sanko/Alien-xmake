@@ -43,7 +43,12 @@ class    #
     field $tag    = '';    # optional explicit tag, default latest
 
     #
-    field $http = HTTP::Tiny->new( default_headers => { 'X-GitHub-Api-Version' => '2026-03-10', accept => 'application/vnd.github+json' } );
+    field $http = do {
+        my %headers = ( 'X-GitHub-Api-Version' => '2026-03-10', accept => 'application/vnd.github+json' );
+        my $token   = $ENV{GITHUB_TOKEN} // $ENV{GH_TOKEN};
+        $headers{Authorization} = "Bearer $token" if $token && length $token;
+        HTTP::Tiny->new( default_headers => \%headers );
+    };
     #
     field $os   = $^O;
     field $arch = 'x64';    # We figure it out later

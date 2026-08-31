@@ -83,7 +83,8 @@ class Alien::Xrepo 0.08 {
         my @args      = $self->_build_args( \%opts );
         say "[*] xrepo: ensuring $full_spec is installed..." if $verbose;
         my @install_cmd = $self->_xrepo_cmd( 'install', '-y', '-q', @args, $full_spec );
-        system(@install_cmd) == 0 or die "xrepo install failed for $full_spec: $!";
+        my ( $out, $err, $exit ) = capture { system(@install_cmd) };
+        die "xrepo install failed for $full_spec:\n$err\n$out" if $exit != 0;
         my @fetch_cmd = $self->_xrepo_cmd( 'fetch', '--json', '-q', @args, $full_spec );
         my ( $json_out, $json_err, $json_exit ) = capture { system(@fetch_cmd) };
         die "xrepo fetch failed: $json_err" if $json_exit != 0;
@@ -101,19 +102,20 @@ class Alien::Xrepo 0.08 {
         my @args = $self->_build_args( \%opts );
         say "[*] xrepo: uninstalling $pkg_spec..." if $verbose;
         my @cmd = $self->_xrepo_cmd( 'remove', '-y', '-q', @args, $pkg_spec );
-        system(@cmd);
+        capture { system(@cmd) };
     }
 
     method search ($query) {
         say "[*] xrepo: searching for $query..." if $verbose;
         my @cmd = $self->_xrepo_cmd( 'search', '-q', $query );
-        system(@cmd);
+        my ($out) = capture { system(@cmd) };
+        print $out if $verbose;
     }
 
     method clean () {
         say '[*] xrepo: cleaning cache...' if $verbose;
         my @cmd = $self->_xrepo_cmd( 'clean', '-y', '-q' );
-        system(@cmd);
+        capture { system(@cmd) };
     }
     #
     method add_repo ( $name, $url, $branch //= () ) {

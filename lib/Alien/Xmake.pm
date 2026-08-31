@@ -54,7 +54,8 @@ class Alien::Xmake 0.08 {
     method pkg_config ($package) {
         use Capture::Tiny qw[capture];
         my @xrepo = $self->_xrepo_cmd;
-        system( @xrepo, 'install', '-y', $package ) == 0 || die "Alien::Xmake: Could not install package '$package'\n";
+        my ( $out, $err, $exit ) = capture { system( @xrepo, 'install', '-y', $package ) };
+        die "Alien::Xmake: Could not install package '$package'\n$err\n$out" if $exit != 0;
         my $cflags;
         {
             my ( $o, $e, $x ) = capture { system( @xrepo, 'fetch', '--cflags', $package ) };
