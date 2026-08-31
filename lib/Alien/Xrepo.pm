@@ -170,27 +170,14 @@ class Alien::Xrepo 0.08 {
     #
     method _build_args ($opts) {
         my @args;
-
-        # On Windows pin the toolchain to MSVC unless the caller chose one.
-        # Relying on auto-detection makes xmake latch onto whatever compiler
-        # shows up first on PATH (e.g. Git's broken mingw64), so force it.
-        my ( $plat, $toolchain );
-        if ( $^O eq 'MSWin32' ) {
-            $plat      = $opts->{plat}      // 'windows';
-            $toolchain = $opts->{toolchain} // 'msvc';
-            push @args, '-p', $plat;
-            push @args, '--toolchain=' . $toolchain;
-        }
-        else {
-            push @args, '-p', $opts->{plat}                    if $opts->{plat};
-            push @args, '--toolchain=' . $opts->{toolchain}    if $opts->{toolchain};
-        }
+        push @args, '-p', $opts->{plat} if $opts->{plat};
         push @args, '-a', $opts->{arch} if $opts->{arch};
         push @args, '-m', $opts->{mode} if $opts->{mode};
         push @args, '-k', ( $opts->{kind} // 'shared' );
-        push @args, '--force'   if $opts->{force};
-        push @args, '--build'   if $opts->{build};
-        push @args, '--shallow' if $opts->{shallow};
+        push @args, '--toolchain=' . $opts->{toolchain} if $opts->{toolchain};
+        push @args, '--force'                           if $opts->{force};
+        push @args, '--build'                           if $opts->{build};
+        push @args, '--shallow'                         if $opts->{shallow};
 
         if ( my $c = $opts->{configs} ) {
             if ( ref $c eq 'HASH' ) {

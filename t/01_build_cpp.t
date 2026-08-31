@@ -26,6 +26,21 @@ subtest xrepo => sub {
 
     chdir 'test_cpp';
 
+    # xmake's generated xmake.lua template embeds shell-style '$' lines in a
+    # comment block that xmake's Lua parser chokes on in some Windows
+    # environments.  Replace it with a minimal, comment-free config so the
+    # project always parses, then pin MSVC on Windows (auto-detection would
+    # otherwise latch onto Git's broken mingw64 on the CI runner).
+    my $lua = <<'LUA';
+add_rules("mode.debug", "mode.release")
+target("test_cpp")
+    set_kind("binary")
+    add_files("src/*.cpp")
+LUA
+    open my $fh, '>', 'xmake.lua' or die "cannot write xmake.lua: $!";
+    print {$fh} $lua;
+    close $fh;
+
     if ( $^O eq 'MSWin32' ) {
         diag qx[$exe f -p windows -m msvc -y 2>&1];
     }

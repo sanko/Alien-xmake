@@ -69,14 +69,10 @@ class Alien::Xmake 0.08 {
 
     method pkg_config ($package) {
         my @xrepo = $self->_xrepo_cmd;
-        my @platform;
-        if ($windows) {
-            @platform = ( '-p', 'windows', '--toolchain=msvc' );
-        }
-        my ( $out, $err, $exit ) = $self->_run_capture( @xrepo, 'install', '-y', @platform, $package );
+        my ( $out, $err, $exit ) = $self->_run_capture( @xrepo, 'install', '-y', $package );
         die "Alien::Xmake: Could not install package '$package'\n$err\n$out" if $exit != 0;
-        my ( $cflags, undef, undef ) = $self->_run_capture( @xrepo, 'fetch', '--cflags',  @platform, $package );
-        my ( $libs,   undef, undef ) = $self->_run_capture( @xrepo, 'fetch', '--ldflags', @platform, $package );
+        my ( $cflags, undef, undef ) = $self->_run_capture( @xrepo, 'fetch', '--cflags',  $package );
+        my ( $libs,   undef, undef ) = $self->_run_capture( @xrepo, 'fetch', '--ldflags', $package );
         return { cflags => $cflags, libs => $libs };
     }
     method version ()             { $self->install_type eq 'system' ? $self->_getver : $config->{version} }
