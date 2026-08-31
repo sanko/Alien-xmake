@@ -512,7 +512,15 @@ class    #
             return { strategy => 'prebuilt', pattern => "xmake-bundle-v${ver}\\.linux\\.x86_64" } if $has->("xmake-bundle-v${ver}\\.linux\\.x86_64");
         }
 
-        # every remaining platform (linux arm, bsd, etc.) -> cosmocc first,
+        # The BSDs: the cosmocc universal bundle is unreliable here (OpenBSD
+        # cannot exec it - "NUL byte unexpected"; FreeBSD fails its re-exec with
+        # "Illegal seek" under redirected stdio). Build from source instead,
+        # which is fully supported on FreeBSD/OpenBSD/NetBSD.
+        if ( $os =~ /^(?:freebsd|openbsd|netbsd|dragonfly)$/ ) {
+            return { strategy => 'build', pattern => "xmake-v${ver}\\.tar\\.gz" };
+        }
+
+        # every remaining platform (linux arm, etc.) -> cosmocc first,
         # build from source only if the cosmocc bundle is unavailable
         return { strategy => 'cosmocc', pattern => "xmake-bundle-v${ver}\\.cosmocc" } if $has->("xmake-bundle-v${ver}\\.cosmocc");
         return { strategy => 'build',   pattern => "xmake-v${ver}\\.tar\\.gz" };
