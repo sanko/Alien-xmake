@@ -5,7 +5,6 @@ use blib;
 use Alien::Xrepo;
 use Path::Tiny;
 
-skip_all 'xmake lua private.xrepo is broken on the Windows runner (exit 255, no output)' if $^O eq 'MSWin32';
 my $repo = Alien::Xrepo->new( verbose => 1 );
 
 # Install ninja (binary)

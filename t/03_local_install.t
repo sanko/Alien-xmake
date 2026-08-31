@@ -6,7 +6,6 @@ use Alien::Xrepo;
 use Path::Tiny;
 use File::Temp qw[tempdir];
 
-skip_all 'xmake lua private.xrepo is broken on the Windows runner (exit 255, no output)' if $^O eq 'MSWin32';
 #
 my $tmp  = path( tempdir( CLEANUP => 1 ) );
 my $repo = Alien::Xrepo->new( root => $tmp, verbose => 1 );

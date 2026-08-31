@@ -8,7 +8,6 @@ use Alien::Xrepo::Base;
 use File::Temp qw[tempdir];
 no warnings qw[experimental::class];
 
-skip_all 'xmake lua private.xrepo is broken on the Windows runner (exit 255, no output)' if $^O eq 'MSWin32';
 
 # Test package
 class Alien::Xrepo::TestPackage : isa(Alien::Xrepo::Base) {
