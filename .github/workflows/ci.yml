@@ -93,6 +93,21 @@ jobs:
             my $out = `"$x" lua private.xrepo install -y -k shared zlib 2>&1`;
             print "===FIX2-XREPO-START===\n$out\n===FIX2-XREPO-END===\nrc=" . ($? >> 8) . "\n";
         }'
+        # VERBOSE: capture xmake's own log + verbose lua output to find which
+        # path "The system cannot find the path specified." refers to.
+        perl -e 'if ($^O eq "MSWin32") {
+            $ENV{XMAKE_LOGFILE} = "D:/a/Alien-Xmake/Alien-Xmake/xmake-diag.log";
+            $ENV{HOME} = "C:\\Users\\runneradmin";
+            $ENV{USERPROFILE} = "C:\\Users\\runneradmin";
+            my $x = "D:/a/Alien-Xmake/Alien-Xmake/blib/lib/auto/share/dist/Alien-Xmake/xmake.exe";
+            my $out = `"$x" lua -v private.xrepo install -y -k shared zlib 2>&1`;
+            print "===VERBOSE-START===\n$out\n===VERBOSE-END===\nrc=" . ($? >> 8) . "\n";
+            if (-e "D:/a/Alien-Xmake/Alien-Xmake/xmake-diag.log") {
+                print "===XMAKE-LOG-START===\n" . `type D:/a/Alien-Xmake/Alien-Xmake/xmake-diag.log` . "\n===XMAKE-LOG-END===\n";
+            } else {
+                print "===NO XMAKE LOG===\n";
+            }
+        }'
         perl -V
         #~ Install cpanm via its canonical self-bootstrap (installs the real
         #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
