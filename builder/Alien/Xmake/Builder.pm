@@ -440,8 +440,60 @@ class    #
         chmod 0755, $target;
         my $wrap = catfile( $share, $^O eq 'MSWin32' ? 'xrepo.bat' : 'xrepo' );
         return if -e $wrap;
-        my $content = $^O eq 'MSWin32' ? '@echo off' . "\n\"%~dp0$exe\" lua private.xrepo %*\n" :
-            "#!/bin/sh\nsubdir=\"\$(CDPATH= cd -- \"\$(dirname -- \"\$0\")\" && pwd)\"\nexec \"\$subdir/$exe\" lua private.xrepo \"\$@\"\n";
+        my $content = $^O eq 'MSWin32' ? <<~'WIN' : sprintf (<<~'ELSE', $exe);
+            $script:SCRIPT_PATH = $myinvocation.mycommand.path
+            $script:BASE_DIR = Split-Path $SCRIPT_PATH -Parent
+            $Env:XMAKE_PROGRAM_FILE = Join-Path $BASE_DIR xmake.exe
+
+            if ($Args.Count -eq 0) {
+                # No args, just call the underlying xmake executable.
+                & $Env:XMAKE_PROGRAM_FILE lua private.xrepo;
+            } else {
+                $Command = $Args[0];
+                if (($Command -eq "env") -and ($Args.Count -ge 2)) {
+                    switch ($Args[1]) {
+                        "shell" {
+                            if (-not (Test-Path 'Env:XMAKE_ROOTDIR')) {
+                                $Env:XMAKE_ROOTDIR = $BASE_DIR;
+                                Import-Module "$Env:XMAKE_ROOTDIR\scripts\xrepo-hook.psm1";
+                                Add-XrepoEnvironmentToPrompt;
+                            }
+                            if ((Test-Path 'Env:XMAKE_PROMPT_MODIFIER') -and ($Env:XMAKE_PROMPT_MODIFIER -ne "")) {
+                                Exit-XrepoEnvironment;
+                            }
+                            Enter-XrepoEnvironment $Null;
+                            return;
+                        }
+                        "quit" {
+                            Exit-XrepoEnvironment;
+                            return;
+                        }
+                        {$_ -in "-b", "--bind"} {
+                            if (($Args.Count -ge 4) -and ($Args[3] -eq "shell")) {
+                                if (-not (Test-Path 'Env:XMAKE_ROOTDIR')) {
+                                    $Env:XMAKE_ROOTDIR = $BASE_DIR;
+                                    Import-Module "$Env:XMAKE_ROOTDIR\scripts\xrepo-hook.psm1";
+                                    Add-XrepoEnvironmentToPrompt;
+                                }
+                                if ((Test-Path 'Env:XMAKE_PROMPT_MODIFIER') -and ($Env:XMAKE_PROMPT_MODIFIER -ne "")) {
+                                    Exit-XrepoEnvironment;
+                                }
+                                Enter-XrepoEnvironment $Args[2];
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                & $Env:XMAKE_PROGRAM_FILE lua private.xrepo $Args;
+            }
+
+            WIN
+                #!/bin/sh
+                subdir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+                exec "$subdir/%s" lua private.xrepo "$@"
+            ELSE
+
         write_file( $wrap, $content );
         chmod 0755, $wrap;
     }

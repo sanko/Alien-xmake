@@ -1,5 +1,6 @@
 use v5.40;
 use Test2::V0 '!subtest', -no_srand => 1;
+
 use Test2::Util::Importer 'Test2::Tools::Subtest' => ( subtest_streamed => { -as => 'subtest' } );
 use blib;
 use Alien::Xmake;
@@ -7,9 +8,10 @@ use Alien::Xrepo;
 #
 ok $Alien::Xrepo::VERSION, 'Alien::Xrepo::VERSION';
 #
-my $repo  = Alien::Xrepo->new( verbose => 0 );
-my $xmake = Alien::Xmake->new;
-my $exe   = $xmake->exe;
+my $repo = Alien::Xrepo->new( verbose => 1 );
+
+#~ my $xmake = Alien::Xmake->new;
+#~ my $exe   = $xmake->exe;
 subtest 'repository mirror pinning' => sub {
     my $bin_url  = 'https://github.com/xmake-mirror/build-artifacts.git';
     my $main_url = 'https://github.com/xmake-io/xmake-repo.git';
