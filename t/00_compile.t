@@ -2,7 +2,6 @@ use v5.40;
 use blib;
 use Test2::V0 -no_srand => 1;
 use Alien::Xmake;
-use Alien::Xrepo::Base;
 use File::Temp qw[tempdir];
 #
 my $xmake = Alien::Xmake->new;

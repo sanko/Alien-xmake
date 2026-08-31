@@ -4,82 +4,99 @@ class Alien::Xmake 0.08 {
     use File::Spec;
     use File::Basename qw[dirname];
     use JSON::PP       qw[decode_json];
-    use File::ShareDir qw[dist_dir];
     #
     field $windows = $^O eq 'MSWin32';
     field $config : param //= sub {
-        my $conf = { install_type => 'system' };
+        my $conf;
         try {
-            require Alien::Xmake::ConfigData;
+            require Alien::Xmake::ConfigData;    # Try to load the ConfigData module generated during install
             $conf = { map { $_ => Alien::Xmake::ConfigData->config($_) } Alien::Xmake::ConfigData->config_names };
+
+            # The raw 'bin' value in config is a relative path string.
+            # We must call the generated helper method to get the absolute path.
             if ( Alien::Xmake::ConfigData->can('bin') ) {
                 $conf->{bin} = Alien::Xmake::ConfigData->bin;
             }
         }
-        catch ($e) { }
+        catch ($e) {    # Fallback / manual install detection
+            $conf = { install_type => 'system' };
+        }
         return $conf;
         }
         ->();
-    field $dir = dist_dir('Alien-Xmake');
+
+    # We don't really need $dir detection if ConfigData is working,
+    # but we keep it for fallback scenarios (running from blib/lib, etc).
+    field $dir;
+    ADJUST {
+        if ( !$config->{bin} || !-e $config->{bin} ) {
+            my @parts = qw[auto share dist Alien-Xmake];
+            push @parts, 'bin' unless $windows;
+
+            # Look through @INC for the share directory
+            foreach my $inc (@INC) {
+                my $d = File::Spec->catdir( $inc, @parts );
+                if ( -d $d ) {
+                    $dir = $d;
+                    last;
+                }
+            }
+        }
+    }
+
+    # Pointless stubs required by some Alien::Base consumers
     method cflags ()       {''}
     method libs ()         {''}
     method dynamic_libs () { }
+
+    # Valuable
     method install_type () { $config->{install_type} }
 
     method bin_dir () {
+
+        # Return the directory of the raw path (unquoted)
         my $exe = $self->_resolve_path;
         return dirname($exe);
     }
 
-    # Command word(s) used to launch xmake and to resolve --version. Always the
-    # resolved absolute path for the installed executable; a bare name can be
-    # mis-launched under a git-bash/MSYS2 runner.
-    method _run_base () {
-        return ($self->_resolve_path);
-    }
-
     method exe () {
-        return $self->_quote_path( $self->_resolve_path );
+
+        # Return a potentially quoted path for execution
+        my $path = $self->_resolve_path;
+        return $self->_quote_path($path);
     }
 
     method xrepo () {
+
+        # xrepo is usually in the same folder as Xmake
         my $exe_path   = $self->_resolve_path;
         my $parent     = dirname($exe_path);
         my $xrepo_name = 'xrepo' . ( $windows ? '.bat' : '' );
-        my $try        = File::Spec->catfile( $parent, $xrepo_name );
+
+        # Check sibling
+        my $try = File::Spec->catfile( $parent, $xrepo_name );
         if ( -e $try ) {
             return $self->_quote_path($try);
         }
-        if ( $config->{bin} && $self->install_type ne 'system' ) {
+
+        # Fallback to config path calculation if the sibling check failed
+        if ( $config->{bin} ) {
             my $conf_parent = dirname( $config->{bin} );
             my $target      = File::Spec->catfile( $conf_parent, $xrepo_name );
-            return $self->_quote_path( File::Spec->rel2abs($target) );
+            return $self->_quote_path($target);
         }
+
+        # Last resort: return bare command
         return $xrepo_name;
     }
 
-    method _run_capture (@cmd) {
-        require Capture::Tiny;
-        return Capture::Tiny::capture(
-            sub {
-                $self->_spawn(@cmd);
-            }
-        );
-    }
-
-    # Spawn the command with its argument list. The LIST form (multiple
-    # elements, no shell metacharacters) calls CreateProcess directly and is
-    # what t/00_compile.t exercises successfully on the CI Windows runners.
-    method _spawn (@cmd) {
-        system(@cmd);
-    }
-
     method pkg_config ($package) {
-        my @xrepo = $self->_xrepo_cmd;
-        my ( $out, $err, $exit ) = $self->_run_capture( @xrepo, 'install', '-y', $package );
-        die "Alien::Xmake: Could not install package '$package'\n$err\n$out" if $exit != 0;
-        my ( $cflags, undef, undef ) = $self->_run_capture( @xrepo, 'fetch', '--cflags',  $package );
-        my ( $libs,   undef, undef ) = $self->_run_capture( @xrepo, 'fetch', '--ldflags', $package );
+        my $xrepo = $self->xrepo;
+        system( $xrepo, 'install', '-y', $package ) == 0 || die "Alien::Xmake: Could not install package '$package'\n";
+        my $cflags = qx|$xrepo fetch --cflags "$package"|;
+        chomp $cflags;
+        my $libs = qx|$xrepo fetch --ldflags "$package"|;
+        chomp $libs;
         return { cflags => $cflags, libs => $libs };
     }
     method version ()             { $self->install_type eq 'system' ? $self->_getver : $config->{version} }
@@ -89,7 +106,7 @@ class Alien::Xmake 0.08 {
     sub alien_helper () {
         { xmake => sub { __PACKAGE__->new->exe }, xrepo => sub { __PACKAGE__->new->xrepo } }
     }
-
+    #
     method _getver() {
         my ( $ver, undef ) = $self->_getver_build;
         "v$ver";
@@ -101,53 +118,33 @@ class Alien::Xmake 0.08 {
     }
 
     method _getver_build() {
-        my @cmd = ( $self->_run_base, '--version' );
-        state $out //= do {
-            my ( $o, $e ) = $self->_run_capture(@cmd);
-            $o;
-        };
+        my $cmd = $self->exe;
+        state $out //= qx[$cmd --version];
         return ( $1, $2 ) if $out =~ /xmake\s+v?(\d+\.\d+\.\d+)(?:\+(.+),)?/i;
         ( '0.0.0', () );
     }
 
+    # Resolve absolute path without quotes
     method _resolve_path () {
         my $bin = $config->{bin};
 
-        # If system install, return exactly what was configured (could be bare 'xmake' or absolute path)
-        if ( $self->install_type eq 'system' && defined $bin && $bin ne '' ) {
-            return $bin;
-        }
+        # If ConfigData failed or we are in a fallback state:
+        $bin = File::Spec->catfile( $dir, 'xmake' . ( $windows ? '.exe' : '' ) ) if !$bin && $dir;
+        $bin //= 'xmake';
 
-        # Try configured bin first
-        if ( defined $bin && $bin ne '' && -e $bin ) {
-            return File::Spec->rel2abs($bin);
-        }
-
-        # Try to locate in the share directory layout
-        if ($dir) {
-            my $ext        = $windows ? '.exe' : '';
-            my @candidates = (
-                File::Spec->catfile( $dir, 'xmake', 'xmake' . $ext ),
-                File::Spec->catfile( $dir, 'xmake' . $ext ),
-                File::Spec->catfile( $dir, 'xmake' ),
-                File::Spec->catfile( $dir, 'bin', 'xmake' . $ext )
-            );
-            for my $c (@candidates) {
-                return File::Spec->rel2abs($c) if defined $c && -e $c;
-            }
-        }
-
-        # Fallback to the configured bin or default if everything fails
-        $bin //= File::Spec->catfile( $dir // '.', 'xmake' . ( $windows ? '.exe' : '' ) );
-        return File::Spec->canonpath( File::Spec->rel2abs($bin) );
+        # Ensure we return a stringified absolute path safe for system()
+        File::Spec->rel2abs($bin);
     }
 
-    method _xrepo_cmd (@cmd) {
-        return ( $self->_resolve_path, 'lua', 'private.xrepo', @cmd );
-    }
-
+    # Quote path if on Windows and spaces exist
     method _quote_path ($path) {
-        return qq{"$path"} if $windows && $path =~ /\s/ && $path !~ /^"/;
+        return qq{"$path"} if $windows && $path =~ /\s/;
         $path;
     }
 } 1;
+__END__
+Copyright (C) Sanko Robinson.
+
+This library is free software; you can redistribute it and/or modify it under
+the terms found in the Artistic License 2. Other copyrights, terms, and
+conditions may apply to data transmitted through this module.
