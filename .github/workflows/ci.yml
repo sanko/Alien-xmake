@@ -80,6 +80,19 @@ jobs:
             my $out = `"$x" lua private.xrepo install -y -k shared zlib 2>&1`;
             print "===FIXED-XREPO-START===\n$out\n===FIXED-XREPO-END===\nrc=" . ($? >> 8) . "\n";
         }'
+        # TEST FIX 2: HOME/USERPROFILE hypothesis. xrepo (unlike t/01's plain
+        # xmake) shells out to git to maintain its package repos; git resolves
+        # its global config under HOME/USERPROFILE. Under the runner's git-bash
+        # shell HOME can be a broken/UNIX path. Dump them, then retry with a
+        # valid Windows HOME/USERPROFILE.
+        perl -e 'if ($^O eq "MSWin32") {
+            my $x = "D:/a/Alien-Xmake/Alien-Xmake/blib/lib/auto/share/dist/Alien-Xmake/xmake.exe";
+            print "===ENVDUMP HOME=$ENV{HOME} USERPROFILE=$ENV{USERPROFILE} HOMEDRIVE=$ENV{HOMEDRIVE} HOMEPATH=$ENV{HOMEPATH}\n";
+            $ENV{HOME} = "C:\\Users\\runneradmin";
+            $ENV{USERPROFILE} = "C:\\Users\\runneradmin";
+            my $out = `"$x" lua private.xrepo install -y -k shared zlib 2>&1`;
+            print "===FIX2-XREPO-START===\n$out\n===FIX2-XREPO-END===\nrc=" . ($? >> 8) . "\n";
+        }'
         perl -V
         #~ Install cpanm via its canonical self-bootstrap (installs the real
         #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
