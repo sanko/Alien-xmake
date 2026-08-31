@@ -51,21 +51,27 @@ class Alien::Xmake 0.08 {
         return $xrepo_name;
     }
 
+    method _run_capture (@cmd) {
+        require Capture::Tiny;
+        return Capture::Tiny::capture(
+            sub {
+                if ($windows) {
+                    my $cmd_str = join( ' ', map { ( /\s/ && !/"/ ) ? qq{"$_"} : $_ } @cmd );
+                    system($cmd_str);
+                }
+                else {
+                    system(@cmd);
+                }
+            }
+        );
+    }
+
     method pkg_config ($package) {
-        use Capture::Tiny qw[capture];
         my @xrepo = $self->_xrepo_cmd;
-        my ( $out, $err, $exit ) = capture { system( @xrepo, 'install', '-y', $package ) };
+        my ( $out, $err, $exit ) = $self->_run_capture( @xrepo, 'install', '-y', $package );
         die "Alien::Xmake: Could not install package '$package'\n$err\n$out" if $exit != 0;
-        my $cflags;
-        {
-            my ( $o, $e, $x ) = capture { system( @xrepo, 'fetch', '--cflags', $package ) };
-            $cflags = $o;
-        }
-        my $libs;
-        {
-            my ( $o, $e, $x ) = capture { system( @xrepo, 'fetch', '--ldflags', $package ) };
-            $libs = $o;
-        }
+        my ( $cflags, undef, undef ) = $self->_run_capture( @xrepo, 'fetch', '--cflags',  $package );
+        my ( $libs,   undef, undef ) = $self->_run_capture( @xrepo, 'fetch', '--ldflags', $package );
         return { cflags => $cflags, libs => $libs };
     }
     method version ()             { $self->install_type eq 'system' ? $self->_getver : $config->{version} }
@@ -88,9 +94,8 @@ class Alien::Xmake 0.08 {
 
     method _getver_build() {
         my @cmd = ( $self->_resolve_path, '--version' );
-        require Capture::Tiny;
         state $out //= do {
-            my ( $o, $e ) = Capture::Tiny::capture { system(@cmd) };
+            my ( $o, $e ) = $self->_run_capture(@cmd);
             $o;
         };
         return ( $1, $2 ) if $out =~ /xmake\s+v?(\d+\.\d+\.\d+)(?:\+(.+),)?/i;

@@ -602,7 +602,6 @@ class    #
             die "system tar failed to extract $tgz\n" unless $rc == 0;
             return;
         }
-
         my $raw;
         die "can't gunzip $tgz\n" unless IO::Uncompress::Gunzip::gunzip( $tgz => \$raw );
         my $at = Archive::Tar->new;
@@ -687,7 +686,12 @@ class    #
     method http( $url //= '', %args ) {
 
         #~ warn $url =~ /https/ ? $url : qq[https://api.github.com/repos/$owner/$repo/releases/$url];
-        my $res = $http->get( $url =~ /https/ ? $url : qq[https://api.github.com/repos/$owner/$repo/releases/$url], \%args );
+        $args{headers} //= {};
+        if ( my $token = $ENV{GITHUB_TOKEN} ) {
+            $args{headers}{Authorization} = "Bearer $token";
+        }
+        my $req_url = $url =~ /^https?:/ ? $url : qq[https://api.github.com/repos/$owner/$repo/releases/$url];
+        my $res     = $http->get( $req_url, \%args );
         if ( $res->{status} == 403 && $res->{headers}{'x-ratelimit-remaining'} eq '0' ) {
             die 'github api rate limit exceeded: ' . _rate_message($res) . "\n";
         }

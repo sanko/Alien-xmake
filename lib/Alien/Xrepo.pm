@@ -7,7 +7,6 @@ class Alien::Xrepo 0.08 {
     use JSON::PP;
     use Path::Tiny;
     use Config;
-    use Capture::Tiny qw[capture];
     #
     field $verbose : param //= 0;
     field $root    : param //= ();
@@ -77,16 +76,31 @@ class Alien::Xrepo 0.08 {
             }
         }
     }
+
+    method _run_capture (@cmd) {
+        require Capture::Tiny;
+        return Capture::Tiny::capture(
+            sub {
+                if ( $^O eq 'MSWin32' ) {
+                    my $cmd_str = join( ' ', map { ( /\s/ && !/"/ ) ? qq{"$_"} : $_ } @cmd );
+                    system($cmd_str);
+                }
+                else {
+                    system(@cmd);
+                }
+            }
+        );
+    }
     #
     method install ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
         my @args      = $self->_build_args( \%opts );
         say "[*] xrepo: ensuring $full_spec is installed..." if $verbose;
         my @install_cmd = $self->_xrepo_cmd( 'install', '-y', '-q', @args, $full_spec );
-        my ( $out, $err, $exit ) = capture { system(@install_cmd) };
+        my ( $out, $err, $exit ) = $self->_run_capture(@install_cmd);
         die "xrepo install failed for $full_spec:\n$err\n$out" if $exit != 0;
         my @fetch_cmd = $self->_xrepo_cmd( 'fetch', '--json', '-q', @args, $full_spec );
-        my ( $json_out, $json_err, $json_exit ) = capture { system(@fetch_cmd) };
+        my ( $json_out, $json_err, $json_exit ) = $self->_run_capture(@fetch_cmd);
         die "xrepo fetch failed: $json_err" if $json_exit != 0;
         $json_out =~ s/\x1b\[[0-9;]*[a-zA-Z]//g;
         $json_out =~ s/\x1b\(B//g;
@@ -102,28 +116,28 @@ class Alien::Xrepo 0.08 {
         my @args = $self->_build_args( \%opts );
         say "[*] xrepo: uninstalling $pkg_spec..." if $verbose;
         my @cmd = $self->_xrepo_cmd( 'remove', '-y', '-q', @args, $pkg_spec );
-        capture { system(@cmd) };
+        $self->_run_capture(@cmd);
     }
 
     method search ($query) {
         say "[*] xrepo: searching for $query..." if $verbose;
         my @cmd = $self->_xrepo_cmd( 'search', '-q', $query );
-        my ($out) = capture { system(@cmd) };
+        my ($out) = $self->_run_capture(@cmd);
         print $out if $verbose;
     }
 
     method clean () {
         say '[*] xrepo: cleaning cache...' if $verbose;
         my @cmd = $self->_xrepo_cmd( 'clean', '-y', '-q' );
-        capture { system(@cmd) };
+        $self->_run_capture(@cmd);
     }
     #
     method add_repo ( $name, $url, $branch //= () ) {
         say "[*] xrepo: adding repo $name..." if $verbose;
         my @cmd = $self->_xrepo_cmd( 'add-repo', '-y', '-q', $name, $url );
         push @cmd, $branch if defined $branch;
-        my ( $out, $err, $exit ) = capture { system(@cmd) };
-        die "xrepo add-repo failed:\n$err" if $exit != 0;
+        my ( $out, $err, $exit ) = $self->_run_capture(@cmd);
+        die "xrepo add-repo failed:\n$err\n$out" if $exit != 0;
         return 1;
     }
 
@@ -133,7 +147,7 @@ class Alien::Xrepo 0.08 {
 
         # Capture so a non-zero exit / network failure doesn't spew Perl's
         # $! ("Can't spawn ...") to the caller's stdout.
-        capture { system(@cmd) };
+        $self->_run_capture(@cmd);
         return;
     }
 
@@ -145,7 +159,7 @@ class Alien::Xrepo 0.08 {
 
         # update-repo is best-effort; don't die and don't spew $! when the
         # remote mirror is unreachable (e.g. a proxy can't tunnel to it).
-        capture { system(@run) };
+        $self->_run_capture(@run);
         return;
     }
     #
