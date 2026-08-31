@@ -99,7 +99,20 @@ class Alien::Xrepo 0.08 {
         say "[*] xrepo: ensuring $full_spec is installed..." if $verbose;
         my @install_cmd = $self->_xrepo_cmd( 'install', '-y', '-q', @args, $full_spec );
         my ( $out, $err, $exit ) = $self->_run_capture(@install_cmd);
-        die "xrepo install failed for $full_spec:\n$err\n$out" if $exit != 0;
+        if ( $exit != 0 ) {
+            print STDERR "DIAG xrepo install failed for $full_spec: exit=$exit out-len=" . length($out) . " err-len=" . length($err) . " spawn_err=$!\n";
+            if ( $^O eq 'MSWin32' && !length $out ) {
+
+                # Diagnostics for the CI runner where xrepo fails with no output.
+                # Re-run without -q so xmake/xrepo streams its real stderr.
+                my $cmd_str = join( ' ', @install_cmd );
+                $cmd_str =~ s/\s+-q//;
+                print STDERR "DIAG re-running: $cmd_str\n";
+                system($cmd_str);
+                print STDERR "DIAG rc=$?\n";
+            }
+            die "xrepo install failed for $full_spec:\n$err\n$out";
+        }
         my @fetch_cmd = $self->_xrepo_cmd( 'fetch', '--json', '-q', @args, $full_spec );
         my ( $json_out, $json_err, $json_exit ) = $self->_run_capture(@fetch_cmd);
         die "xrepo fetch failed: $json_err" if $json_exit != 0;
