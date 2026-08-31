@@ -589,12 +589,25 @@ class    #
     }
 
     method extract_targz ( $tgz, $out ) {
+        mkpath($out) unless -d $out;
+
+        # Prefer the system tar. IO::Uncompress::Gunzip chokes on the gzip
+        # GitHub emits for these source tarballs (FNAME + multi-member), which
+        # yields zero bytes even though tar/gzip decode it fine.
+        if ( _have_cmd('tar') ) {
+            my $dir = cwd();
+            chdir $out or die "can't chdir to $out: $!\n";
+            my $rc = system( 'tar', '-xzf', $tgz );
+            chdir $dir or die "can't chdir back to $dir: $!\n";
+            die "system tar failed to extract $tgz\n" unless $rc == 0;
+            return;
+        }
+
         my $raw;
         die "can't gunzip $tgz\n" unless IO::Uncompress::Gunzip::gunzip( $tgz => \$raw );
         my $at = Archive::Tar->new;
         open my $rfh, '<', \$raw or die "can't open tar stream: $!\n";
         die "can't read tar from $tgz\n" unless $at->read($rfh);
-        mkpath($out)                     unless -d $out;
         for my $e ( $at->get_files ) {
             my $n = $e->full_path or next;
             next if $e->is_dir;
