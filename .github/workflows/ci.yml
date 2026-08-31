@@ -62,7 +62,14 @@ jobs:
     with:
       task: |
         perl -V
-        perl -e 'print "===PATH DUMP (MSWin32)===\n$ENV{PATH}\n===END===\n" if $^O eq "MSWin32"'
+        perl -e 'if ($^O eq "MSWin32") { print "===PATH DUMP (MSWin32)===\n$ENV{PATH}\n===END===\n"; print "===TMPDUMP===\nTMP=$ENV{TMP}\nTEMP=$ENV{TEMP}\nTMPDIR=$ENV{TMPDIR}\nWindows_TEMP=$ENV{Windows_TEMP}\n===END===\n" }'
+        # dump xmake's resolved tmpdir + full create-working error to a file
+        perl -e 'if ($^O eq "MSWin32") {
+            my $x = "D:/a/Alien-Xmake/Alien-Xmake/blib/lib/auto/share/dist/Alien-Xmake/xmake.exe";
+            my $out = `"$x" lua private.xrepo install -y -k shared zlib 2>&1`;
+            print "===XREPO-RAW-START===\n$out\n===XREPO-RAW-END===\nrc=" . ($? >> 8) . "\n";
+        }'
+        perl -V
         #~ Install cpanm via its canonical self-bootstrap (installs the real
         #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
         #~ is a hard fail point that catches any no-op.
