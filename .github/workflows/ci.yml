@@ -66,9 +66,7 @@ jobs:
         #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
         #~ is a hard fail point that catches any no-op.
         curl -L https://cpanmin.us | perl - App::cpanminus
-        command -v cpanm
-        cpanm -v . || rc=$?
-        exit ${rc:-0}
+        cpanm -v .
       matrix: >
         [
           {"platform_name":"windows","os":"windows-latest","arch":"x86_64","toolchain":"gcc","prepare":"choco install strawberryperl"},
