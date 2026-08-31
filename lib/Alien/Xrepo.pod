@@ -92,27 +92,6 @@ Creates a new instance.
 
 Boolean. If true, prints command output and status messages to C<STDOUT>. Defaults to C<0>.
 
-=item B<root>
-
-Path to a directory for a local, isolated installation of packages and configuration. If provided, `XMAKE_CONFIGDIR`
-and `XMAKE_PKG_INSTALLDIR` will be set to point inside this directory. This is useful for project-specific library
-management without affecting the global C<~/.xmake> environment.
-
-=item B<binary_repo>
-
-The URL of the repository xmake uses for prebuilt binary/artifact packages. If given, sets C<XMAKE_BINARY_REPO>, which
-pins xmake to this remote instead of auto-selecting a mirror via C<net.fasturl>. Useful when the auto-selected mirror
-(e.g. gitee) is unreachable through the network/proxy. Example:
-
-    my $repo = Alien::Xrepo->new( binary_repo => 'https://github.com/xmake-mirror/build-artifacts.git' );
-
-=item B<main_repo>
-
-The URL of the repository xmake uses for the main source package definitions. If given, sets C<XMAKE_MAIN_REPO>,
-pinning xmake to this remote over the auto-selected mirror:
-
-    my $repo = Alien::Xrepo->new( main_repo => 'https://github.com/xmake-io/xmake-repo.git' );
-
 =back
 
 =head1 METHODS
@@ -227,15 +206,7 @@ Returned by C<install( ... )>, this object contains the results of the dependenc
 =item B<libpath>
 
 The absolute path to the main library file (C<.dll>, C<.dylib>, or C<.so>). Returns C<undef> if the package is
-header-only, a binary, or the binary could not be identified.
-
-=item B<kind>
-
-The package kind: C<library> or C<binary>.
-
-=item B<installdir>
-
-The absolute path to the root installation directory of the package.
+header-only or the binary could not be identified.
 
 =item B<includedirs>
 
@@ -253,10 +224,6 @@ The license identifier.
 
 The installed version.
 
-=item B<bindirs>
-
-List of directories containing executables (for C<binary> packages).
-
 =back
 
 =head3 Methods
@@ -266,12 +233,6 @@ List of directories containing executables (for C<binary> packages).
     my $path = $info->find_header( 'png.h' );
 
 Scans C<includedirs> for the given filename and returns the absolute path if found. Returns C<undef> otherwise.
-
-=head4 C<bin_dir( )>
-
-    my $dirs = $info->bin_dir;
-
-Returns the list of binary directories (same as C<bindirs> attribute).
 
 =head1 SEE ALSO
 

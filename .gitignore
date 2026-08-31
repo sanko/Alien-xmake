@@ -40,8 +40,6 @@ share/bin
 *.session
 xmake.*
 .xmake/*
-xmake-*
-xmake/*
 xmake_installer*
 MANIFEST
 
@@ -50,17 +48,3 @@ eg/inst.pl
 eg/xmake-inst/
 
 eg/test/
-eg/eg/
-eg/lib/
-eg/alien*
-t/test_alien_*
-
-eg-/
-t/packages
-get.*
-tmp/
-eg/nuklear
-apio.pl
-.tmp-workflow-testing/
-run-direct.yml
-

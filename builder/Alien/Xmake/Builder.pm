@@ -5,706 +5,289 @@ use v5.40;
 use feature 'class';
 no warnings 'experimental::class';
 
-# https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#list-releases--code-samples
-# https://docs.github.com/en/rest/releases/assets?apiVersion=2026-03-10
-use v5.40;
-use experimental 'class';
-class    #
-    Alien::Xmake::Builder {
-    $|++;
-    use Config;
+class Alien::Xmake::Builder {
     use CPAN::Meta;
-    use Exporter 5.57 qw[import];
-    use ExtUtils::Config 0.003;
-    use ExtUtils::Helpers 0.020 qw[make_executable split_like_shell man1_pagename man3_pagename detildefy];
     use ExtUtils::Install qw[pm_to_blib install];
-    use ExtUtils::InstallPaths 0.002;
-    use Archive::Tar;
-    use Cwd qw[cwd];
-    use Data::Dumper;
-    use File::Basename qw[basename dirname];
-    use File::Copy     qw[copy];
-    use File::Find     ();
-    use File::Path     qw[mkpath rmtree];
-    use File::Spec;
-    use File::Spec::Functions qw[catfile catdir rel2abs abs2rel splitdir curdir];
-    use Getopt::Long 2.36 qw[GetOptionsFromArray];
+    use ExtUtils::InstallPaths;
+    use JSON::PP;
+    use Config;
     use HTTP::Tiny;
-    use IO::Uncompress::Gunzip;
-    use IO::Uncompress::Unzip qw[$UnzipError];
-    use JSON::PP 2 qw[encode_json decode_json];
-    use version;
-    #
-    field $owner = 'xmake-io';
-    field $repo  = 'xmake';
-    #
-    field $dryrun = 0;     # bool
-    field $force  = 0;     # bool: skip system/reuse detection and reinstall
-    field $tag    = '';    # optional explicit tag, default latest
+    use Path::Tiny        qw[path cwd];
+    use ExtUtils::Helpers qw[make_executable split_like_shell detildefy];
+    use Data::Dumper;
 
-    #
-    field $http = do {
-        my %headers = ( 'X-GitHub-Api-Version' => '2026-03-10', accept => 'application/vnd.github+json' );
-        my $token   = $ENV{GITHUB_TOKEN} // $ENV{GH_TOKEN};
-        $headers{Authorization} = "Bearer $token" if $token && length $token;
-        HTTP::Tiny->new( default_headers => \%headers );
-    };
-    #
-    field $os   = $^O;
-    field $arch = 'x64';    # We figure it out later
-    field $asset;
-    field $rel;
-    field $version;
+    # Configuration
+    field $target_version : param : reader //= 'v3.0.6';
+    field $force  : param  //= 0;
+    field $meta   : reader //= CPAN::Meta->load_file('META.json');
+    field $action : param  //= 'build';
+    field $target_config = 'lib/Alien/Xmake/ConfigData.pm';
+
+    # Params to Build script
+    field $install_base  : param    //= '';
+    field $installdirs   : param    //= '';
+    field $uninst        : param    //= 0;
+    field $install_paths : param    //= ExtUtils::InstallPaths->new( dist_name => $meta->name );
+    field $verbose       : param(v) //= 0;
+    field $dry_run       : param    //= 0;
+    field $pureperl      : param    //= 0;
+    field $jobs          : param    //= 1;
+    field $destdir       : param    //= '';
+    field $prefix        : param    //= '';
     ADJUST {
-        ( $os, $arch ) = $self->detect_platform();
-        if ( $ENV{PLATFORM} && $ENV{PLATFORM} =~ /^([^,]+),(.+)$/ ) { ( $os, $arch ) = ( lc $1, lc $2 ) }
-        say "platform: $os / $arch";
-        ( $rel, $version ) = $self->latest_release($tag);
-        $version =~ s/^v//;
-        say "release: $version";
+        -e 'META.json' or die "No META information provided\n";
     }
 
-    sub write_file ( $filename, $content ) {
-        open my $fh, '>', $filename or die "Could not open $filename: $!\n";
-        print $fh $content;
-    }
+    method Build_PL() {
+        die "Pure perl Affix? Ha! You wish.\n" if $pureperl;
+        say sprintf 'Creating new Build script for %s %s', $meta->name, $meta->version;
 
-    sub read_file ($filename) {
-        open my $fh, '<', $filename or die "Could not open $filename: $!\n";
-        return do { local $/; <$fh> };
-    }
+        # We must capture the current INC to ensure the builder finds itself
+        # when running the generated script.
+        my $inc_str = join( ' ', map {"-I$_"} @INC );
+        $self->write_file( 'Build', sprintf <<'', $^X, $inc_str, __PACKAGE__, __PACKAGE__ );
+#!%s %s
+use lib 'builder';
+use %s;
+%s->new( @ARGV && $ARGV[0] =~ /\A\w+\z/ ? ( action => shift @ARGV ) : (),
+    map { /^--/ ? ( shift(@ARGV) =~ s[^--][]r => 1 ) : /^-/ ? ( shift(@ARGV) =~ s[^-][]r => shift @ARGV ) : () } @ARGV )->Build();
 
-    sub get_meta {
-        my ($metafile) = grep { -e $_ } qw[META.json META.yml] or die "No META information provided\n";
-        return CPAN::Meta->load_file($metafile);
-    }
-
-    sub manify ( $input_file, $output_file, $section, $opts ) {
-        return if -e $output_file && -M $input_file <= -M $output_file;
-        my $dirname = dirname($output_file);
-        mkpath( $dirname, $opts->{verbose} ) if not -d $dirname;
-        require Pod::Man;
-        Pod::Man->new( section => $section )->parse_from_file( $input_file, $output_file );
-        print "Manifying $output_file\n" if $opts->{verbose} && $opts->{verbose} > 0;
-        return;
-    }
-
-    sub process_xs {
-        my ( $source, $options, $c_files ) = @_;
-        die "Can't build xs files under --pureperl-only\n" if $options->{'pureperl-only'};
-        my ( undef, @parts ) = splitdir( dirname($source) );
-        push @parts, my $file_base = basename( $source, '.xs' );
-        my $archdir = catdir( qw[blib arch auto], @parts );
-        my $tempdir = 'temp';
-        my $c_file  = catfile( $tempdir, "$file_base.c" );
-        require ExtUtils::ParseXS;
-        mkpath( $tempdir, $options->{verbose}, oct '755' );
-        ExtUtils::ParseXS::process_file( filename => $source, prototypes => 0, output => $c_file );
-        my $version = $options->{meta}->version;
-        require ExtUtils::CBuilder;
-        my $builder = ExtUtils::CBuilder->new( config => $options->{config}->values_set );
-        my @objects = $builder->compile(
-            source               => $c_file,
-            defines              => { VERSION => qq/"$version"/, XS_VERSION => qq/"$version"/ },
-            include_dirs         => [ curdir, 'include', 'src', dirname($source) ],
-            extra_compiler_flags => $options->{extra_compiler_flags}
-        );
-        my $o = $options->{config}->get('_o');
-
-        for my $c_source ( @{$c_files} ) {
-            my $o_file = catfile( $tempdir, basename( $c_source, '.c' ) . $o );
-            push @objects,
-                $builder->compile(
-                source               => $c_source,
-                include_dirs         => [ curdir, 'include', 'src', dirname($c_source) ],
-                extra_compiler_flags => $options->{extra_compiler_flags}
-                );
-        }
-        require DynaLoader;
-        my $mod2fname = defined &DynaLoader::mod2fname ? \&DynaLoader::mod2fname : sub { return $_[0][-1] };
-        mkpath( $archdir, $options->{verbose}, oct '755' ) unless -d $archdir;
-        my $lib_file = catfile( $archdir, $mod2fname->( \@parts ) . '.' . $options->{config}->get('dlext') );
-        return $builder->link(
-            objects            => \@objects,
-            lib_file           => $lib_file,
-            extra_linker_flags => $options->{extra_linker_flags},
-            module_name        => join '::',
-            @parts
-        );
-    }
-
-    sub find {
-        my ( $pattern, $dir ) = @_;
-        my @ret;
-        File::Find::find( sub { push @ret, $File::Find::name if /$pattern/ && -f }, $dir ) if -d $dir;
-        return @ret;
-    }
-
-    sub contains_pod {
-        my ($file) = @_;
-        return unless -T $file;
-        return read_file($file) =~ /^\=(?:head|pod|item)/m;
-    }
-    my %actions = (
-        build => method(%opt) {
-            my $install = $self->get_installer(%opt);
-            for my $pl_file ( find( qr/\.PL$/, 'lib' ) ) {
-                ( my $pm = $pl_file ) =~ s/\.PL$//;
-                system $^X, $pl_file, $pm and die "$pl_file returned $?\n";
-            }
-            my %modules = map { $_ => catfile( 'blib', $_ ) } find( qr/\.pm$/,  'lib' );
-            my %docs    = map { $_ => catfile( 'blib', $_ ) } find( qr/\.pod$/, 'lib' );
-            my %scripts = map { $_ => catfile( 'blib', $_ ) } find( qr/(?:)/,   'script' );
-            my %sdocs   = map { $_ => delete $scripts{$_} } grep {/.pod$/} keys %scripts;
-            my %dist_shared
-                = map { $_ => catfile( qw/blib lib auto share dist/, $opt{meta}->name, abs2rel( $_, 'share' ) ) } find( qr/(?:)/, 'share' );
-            my %module_shared
-                = map { $_ => catfile( qw/blib lib auto share module/, abs2rel( $_, 'module-share' ) ) } find( qr/(?:)/, 'module-share' );
-            pm_to_blib( { %modules, %docs, %scripts, %dist_shared, %module_shared }, catdir(qw[blib lib auto]) );
-            make_executable($_) for values %scripts;
-            mkpath( catdir(qw/blib arch/), $opt{verbose} );
-
-            if ( $opt{install_paths}->install_destination('bindoc') && $opt{install_paths}->is_default_installable('bindoc') ) {
-                my $section = $opt{config}->get('man1ext');
-                for my $input ( keys %scripts, keys %sdocs ) {
-                    next unless contains_pod($input);
-                    my $output = catfile( 'blib', 'bindoc', man1_pagename($input) );
-                    manify( $input, $output, $section, \%opt );
-                }
-            }
-            if ( $opt{install_paths}->install_destination('libdoc') && $opt{install_paths}->is_default_installable('libdoc') ) {
-                my $section = $opt{config}->get('man3ext');
-                for my $input ( keys %modules, keys %docs ) {
-                    next unless contains_pod($input);
-                    my $output = catfile( 'blib', 'libdoc', man3_pagename($input) );
-                    manify( $input, $output, $section, \%opt );
-                }
-            }
-            $self->_write_config_data( $install, $opt{meta}->name );
-            return 0;
-        },
-        test => sub (%opt) {
-            die "Must run `./Build build` first\n" if not -d 'blib';
-            require TAP::Harness::Env;
-            my %test_args = (
-                ( verbosity => $opt{verbose} ) x !!exists $opt{verbose},
-                ( jobs  => $opt{jobs} ) x !!exists $opt{jobs},
-                ( color => 1 ) x !!-t STDOUT,
-                lib => [ map { rel2abs( catdir( qw[blib], $_ ) ) } qw[arch lib] ],
-            );
-            my $tester = TAP::Harness::Env->create( \%test_args );
-            local $ENV{PERL_DL_NONLAZY} = 1;
-            return $tester->runtests( sort +find( qr/\.t$/, 't' ) )->has_errors;
-        },
-        install => sub (%opt) {
-            die "Must run `./Build build` first\n" if not -d 'blib';
-            install( $opt{install_paths}->install_map, @opt{qw[verbose dry_run uninst]} );
-            return 0;
-        },
-        clean => sub (%opt) {
-            rmtree( $_, $opt{verbose} ) for qw[blib temp];
-            return 0;
-        },
-        realclean => sub (%opt) {
-            rmtree( $_, $opt{verbose} ) for qw[blib temp Build _build_params MYMETA.yml MYMETA.json];
-            return 0;
-        },
-    );
-    my @options
-        = qw[install_base=s install_path=s% installdirs=s destdir=s prefix=s config=s% uninst:1 verbose:1 dry_run:1 pureperl-only:1 create_packlist=i jobs=i extra_compiler_flags=s extra_linker_flags=s];
-
-    sub get_arguments (@sources) {
-        my %opt;
-        GetOptionsFromArray( $_, \%opt, @options ) for @sources;
-        $_                  = detildefy($_) for grep {defined} @opt{qw/install_base destdir prefix/}, values %{ $opt{install_path} };
-        $_                  = [ split_like_shell($_) ] for grep {defined} @opt{qw/extra_compiler_flags extra_linker_flags/};
-        $opt{config}        = ExtUtils::Config->new( $opt{config} );
-        $opt{meta}          = get_meta();
-        $opt{install_paths} = ExtUtils::InstallPaths->new( %opt, dist_name => $opt{meta}->name );
-        return %opt;
-    }
-
-    method Build (@args) {
-        my $action = @ARGV && $ARGV[0] =~ /\A\w+\z/ ? shift @ARGV : 'build';
-        die "No such action '$action'\n" if not $actions{$action};
-        my ( $env, $bargv ) = @{ decode_json( read_file('_build_params') ) };
-        my %opt = get_arguments( $env, $bargv, \@ARGV );
-
-        # 'build' is a method (needs $self for get_installer/_write_config_data);
-        # the remaining actions are plain subs invoked MBT-style with only %opt.
-        if ( $action eq 'build' ) {
-            exit $actions{$action}->( $self, %opt );
-        }
-        exit $actions{$action}->(%opt);
-    }
-
-    sub Build_PL {
-        my $meta = get_meta();
-        printf "Creating new 'Build' script for '%s' version '%s'\n", $meta->name, $meta->version;
-        my $dir = $meta->name eq 'Module-Build-Tiny' ? "use lib 'lib';" : '';
-        my $use = __PACKAGE__;
-        write_file( 'Build', "#!perl\nuse lib 'builder';\nuse $use;\n$use->new->Build();\n" );
         make_executable('Build');
         my @env = defined $ENV{PERL_MB_OPT} ? split_like_shell( $ENV{PERL_MB_OPT} ) : ();
-        write_file( '_build_params', encode_json( [ \@env, \@ARGV ] ) );
-        my %mymeta = %{ $meta->as_struct };
-
+        $self->write_file( '_build_params', encode_json( [ \@env, \@ARGV ] ) );
         if ( my $dynamic = $meta->custom('x_dynamic_prereqs') ) {
-            my %opt = get_arguments( \@env, \@ARGV );
+            my %meta_struct = ( %{ $meta->as_struct }, dynamic_config => 1 );
             require CPAN::Requirements::Dynamic;
-            my $dynamic_parser = CPAN::Requirements::Dynamic->new(%opt);
+            my $dynamic_parser = CPAN::Requirements::Dynamic->new();
             my $prereq         = $dynamic_parser->evaluate($dynamic);
-            $mymeta{prereqs} = $meta->effective_prereqs->with_merged_prereqs($prereq)->as_string_hash;
+            $meta_struct{prereqs} = $meta->effective_prereqs->with_merged_prereqs($prereq)->as_string_hash;
+            $meta = CPAN::Meta->new( \%meta_struct );
         }
-        $mymeta{dynamic_config} = 0;
-        my $mymeta = CPAN::Meta->new( \%mymeta );
-        $mymeta->save(@$_) for ['MYMETA.json'], [ 'MYMETA.yml' => { version => 1.4 } ];
+        $meta->save(@$_) for ['MYMETA.json'];
     }
 
-    method detect_platform () {
+    # Actions
+    method ACTION_build ( ) {
+        say 'Building Alien-Xmake...';
 
-        # Detect host architecture from environment
-        if ( ( $ENV{PROCESSOR_IDENTIFIER} || '' ) =~ m[ARM]i ||
-            ( $ENV{PROCESSOR_ARCHITECTURE} || '' ) =~ /ARM64/i ||
-            ( $ENV{PROCESSOR_ARCHITEW6432} || '' ) =~ /ARM64/i ) {
-            $arch = 'arm64';
+        # Prepare blib
+        path('blib/lib')->mkpath;
+        path('blib/arch')->mkpath;
+        path('blib/script')->mkpath;
+        path('blib/bin')->mkpath;
+
+        # Copy Libs
+        $self->_copy_libs();
+
+        # Alien Logic: Check or Install Xmake
+        my $config_data = $self->_resolve_xmake();
+
+        # Generate ConfigData.pm
+        $self->_write_config_data($config_data);
+        say 'Build complete';
+    }
+
+    method ACTION_install ( ) {
+        say 'Installing...';
+        require ExtUtils::Install;
+        ExtUtils::Install::install( { 'blib/lib' => $Config{installprivlib}, 'blib/arch' => $Config{installarchlib} }, 1, 0, 0 );
+    }
+
+    method ACTION_clean () {
+        say 'Cleaning...';
+        path('blib')->remove_tree;
+        path('_build_xmake')->remove_tree;
+        path('config.log')->remove;
+        path('Build')->remove;
+        path('_build_params')->remove;
+    }
+
+    method ACTION_test ( ) {
+        $self->ACTION_build();
+        say 'Running tests...';
+        use Test::Harness;
+        my @tests = glob('t/*.t');
+        runtests(@tests) if @tests;
+    }
+
+    method _copy_libs ( ) {
+        my $src_root = path('lib');
+        return unless $src_root->exists;
+        my $iter = $src_root->iterator( { recurse => 1 } );
+        while ( my $file = $iter->() ) {
+            next unless $file->is_file;
+
+            # Skip hidden files/dirs
+            my $rel = $file->relative($src_root);
+            next if $rel =~ m{(^|/)\.};
+            my $dest = path('blib/lib')->child($rel);
+            $dest->parent->mkpath;
+            $file->copy($dest) or die "Copy failed: $!";
+        }
+    }
+
+    method _copy_directory ( $src, $dest ) {
+        my $src_path  = path($src)->absolute;
+        my $dest_path = path($dest)->absolute;
+        return unless $src_path->is_dir;
+        $dest_path->mkpath;
+        my $iter = $src_path->iterator( { recurse => 1 } );
+        while ( my $p = $iter->() ) {
+            next if $p eq $src_path;    # Skip root
+
+            # Skip if we are inside the destination directory
+            # (prevents infinite loop if dest is inside src)
+            if ( $p eq $dest_path || $dest_path->subsumes($p) ) {
+                next;
+            }
+            my $rel    = $p->relative($src_path);
+            my $target = $dest_path->child($rel);
+            if ( $p->is_dir ) {
+                $target->mkpath;
+            }
+            else {
+                $p->copy($target) or die "Failed to copy $p to $target: $!";
+                $target->chmod( $p->stat->mode );
+            }
+        }
+    }
+
+    method _run_cmd (@args) {
+        system(@args) == 0;
+    }
+
+    method _resolve_xmake ( ) {
+
+        # Check for system install
+        unless ($force) {
+            my $sys_path = $self->_find_system_xmake();
+            if ($sys_path) {
+                my $ver = $self->_get_xmake_version($sys_path);
+                if ( $self->_version_cmp( $ver, $target_version ) >= 0 ) {
+                    say "Found suitable system Xmake: $sys_path ($ver)";
+                    return { install_type => 'system', version => $ver, bin => "$sys_path" };
+                }
+                say "System Xmake found ($ver) but is older than required ($target_version).";
+            }
+        }
+
+        # Check build dir (idempotency)
+        my $install_dir = path('blib/lib/Alien/Xmake/share')->absolute;
+        $install_dir->mkpath;
+        my $bin_name = ( $^O eq 'MSWin32' ) ? 'xmake.exe' : 'xmake';
+        my $blib_bin = $install_dir->child( 'bin', $bin_name );
+        unless ( -x $blib_bin ) {
+            my $fallback = $install_dir->child($bin_name);
+            $blib_bin = $fallback if -x $fallback;
+        }
+        if ( -x $blib_bin ) {
+            my $ver = $self->_get_xmake_version($blib_bin);
+            if ( $self->_version_cmp( $ver, $target_version ) >= 0 ) {
+                say "Alien-Xmake build up-to-date ($ver).";
+                return $self->_generate_share_config( $blib_bin, $ver );
+            }
+        }
+
+        # Check existing shared installation for upgrading
+        my $existing = $self->_check_existing_share();
+        if ($existing) {
+            my $ex_ver = $existing->{version};
+            my $ex_dir = path( $existing->{install_dir} )->absolute;
+            if ( $self->_version_cmp( $ex_ver, $target_version ) >= 0 ) {
+                say "Found valid private Xmake ($ex_ver) in $ex_dir";
+                if ( $ex_dir->stringify ne $install_dir->stringify ) {
+                    say 'Copying existing installation to build directory...';
+                    $self->_copy_directory( $ex_dir, $install_dir );
+                }
+
+                # Re-locate binary in new dir
+                my $bin_path = $install_dir->child( 'bin', $bin_name );
+                unless ( -x $bin_path ) { $bin_path = $install_dir->child($bin_name); }
+                return $self->_generate_share_config( $bin_path, $ex_ver );
+            }
+        }
+
+        # Download and Install
+        say 'Installing a private copy of Xmake...';
+        if ( $^O eq 'MSWin32' ) {
+            $self->_install_windows($install_dir);
         }
         else {
-            my $m = `uname -m 2>&1` || '';
-            $arch = 'arm64' if $m =~ /aarch64|arm64/i;
-        }
-        $os = 'win'   if $os =~ /^MSWin32$/i;
-        $os = 'mac'   if $os eq 'darwin';
-        $os = 'linux' if $os eq 'linux';
-        my $cpu;
-        if    ( $arch =~ /(?:x86_64|amd64|x64)/ ) { $cpu = 'x86_64' }
-        elsif ( $arch =~ /(?:i[3-6]86|x86)/ )     { $cpu = 'x86' }
-        elsif ( $arch =~ /(?:arm64|aarch64)/ )    { $cpu = 'arm64' }
-        elsif ( $arch =~ /(?:armv7|armhf|arm)/ )  { $cpu = 'arm' }
-        else                                      { $cpu = $arch }
-        return ( $os, $cpu );
-    }
-
-    #~ use Data::Dump;
-    method latest_release ( $tag //= () ) {
-
-        #~ warn $tag;
-        my $res = $self->http('latest');
-        my $rel = decode_json( $res->{content} );
-
-        #~ ddx $rel;
-        return ( $rel, $rel->{tag_name} );    # XXX - if it's a prerelease version, grab full list and work continues...
-
-        #~ return ( $rel, $rel->{tag_name} ) if $tag;
-        #~ my ($current) = grep { $_->{prerelease} == JSON::PP::false and $_->{draft} == JSON::PP::false } @$rel;
-        #~ die "no stable xmake release found\n" unless $current;
-        #~ return ( $current, $current->{tag_name} );
-    }
-
-    method find_asset ( $assets, $re ) {
-        for my $a (@$assets) { return $a if $a->{name} =~ /$re/ }
-        return;
-    }
-
-    method get_installer (%opt) {
-        my $share = rel2abs('share');
-        mkpath($share) unless -d $share;
-        my $config = $self->resolve_xmake( $share, %opt );
-        say sprintf 'install_type: %s, version: %s, bin: %s', $config->{install_type}, $config->{version}, $config->{bin};
-        return $config;
-    }
-
-    # Priority: 1) usable system xmake, 2) already-installed private copy in
-    # share/, 3) prebuilt binary for the platform, 4) cosmocc portable bundle,
-    # 5) build from source tarball.
-    method resolve_xmake ( $share, %opt ) {
-        unless ($force) {
-            if ( my $sys = $self->find_system_xmake ) {
-                my $ver = $self->xmake_version($sys);
-                if ( $self->_version_ok( $ver, $version ) ) {
-                    say "Found usable system Xmake: $sys ($ver)";
-                    return { install_type => 'system', version => $ver, bin => "$sys" };
-                }
-                say "System Xmake ($ver) is older than the desired $version; installing a private copy.";
-            }
-            if ( my $cur = $self->current_share_install($share) ) {
-                if ( $self->_version_ok( $cur->{version}, $version ) ) {
-                    say "Reusing existing private Xmake ($cur->{version}) in $share";
-                    return { install_type => $cur->{type}, version => $cur->{version}, bin => $cur->{bin} };
-                }
-                say "Existing private Xmake ($cur->{version}) is older than the desired $version; reinstalling.";
-            }
-        }
-        return $self->install_fresh( $share, %opt );
-    }
-
-    # Locate an installed private copy in share/. Prefer the marker file we
-    # wrote; fall back to classifying whatever layout is already present so
-    # builds don't re-download when the folder was populated by older tooling.
-    method current_share_install ($share) {
-        my $marker = catfile( $share, '.alien-xmake.json' );
-        if ( -e $marker ) {
-            my $m = eval { decode_json( read_file($marker) ) };
-            if ( $m && $m->{install_type} && $m->{version} && $m->{bin} ) {
-                return { type => $m->{install_type}, version => $m->{version}, bin => $m->{bin} };
-            }
-        }
-        return $self->classify_share($share);
-    }
-
-    method classify_share ($share) {
-        my $exe = $^O eq 'MSWin32' ? 'xmake.exe' : 'xmake';
-        for my $c ( [ 'source', [qw[bin]], $exe ], [ 'prebuilt', [qw[xmake]], $exe ], [ 'prebuilt', [], $exe ] ) {
-            my ( $type, $sub, $name ) = @$c;
-            my $path = @$sub ? catfile( $share, @$sub, $name ) : catfile( $share, $name );
-            next unless -e $path;
-            my $rel = @$sub ? join( '/', @$sub, $name ) : $name;
-            return { type => $type, version => $self->xmake_version($path), bin => $rel };
-        }
-        return undef;
-    }
-
-    method install_fresh ( $share, %opt ) {
-        my $assets = $rel->{assets};
-        my $plan   = $self->choose_asset( $os, $arch, $version, $assets );
-        die "no strategy matched platform ($os/$arch)\n" unless $plan;
-        say "strategy: $plan->{strategy}";
-        $asset = $self->find_asset( $assets, $plan->{pattern} ) or die "asset not found for pattern: $plan->{pattern}\n";
-        if ($dryrun) {
-            say "asset: $asset->{name} ($asset->{size} bytes)";
-            say "would install into $share";
-            exit 0;
+            $self->_install_unix($install_dir);
         }
 
-        # Replace whatever was there before so layouts can't mix.
-        rmtree($share) if -d $share;
-        mkpath($share);
-        my $dest = $self->download_asset($asset);
-        my ( $type, $bin_rel ) = $self->install_asset( $share, $dest, $plan, %opt );
-        my $bin_path  = catfile( $share, grep {length} split m{/}, $bin_rel );
-        my $installed = $self->xmake_version($bin_path);
-        say "Installed Xmake $installed into $share ($type)";
-
-        # Persist how this copy was installed so later builds can report it
-        # without re-downloading.
-        write_file( catfile( $share, '.alien-xmake.json' ), encode_json( { install_type => $type, version => $installed, bin => $bin_rel } ) );
-        return { install_type => $type, version => $installed, bin => $bin_rel };
+        # Verify Install
+        my $bin_path = $install_dir->child( 'bin', $bin_name );
+        unless ( -x $bin_path ) {
+            my $fallback = $install_dir->child($bin_name);
+            $bin_path = $fallback if -x $fallback;
+        }
+        if ( !-x $bin_path ) {
+            die "Installation finished, but binary not found at $bin_path";
+        }
+        my $ver = $self->_get_xmake_version($bin_path);
+        say "Private install successful: $ver";
+        return $self->_generate_share_config( $bin_path, $ver );
     }
 
-    method install_asset ( $share, $dest, $plan, %opt ) {
-        if ( $plan->{strategy} eq 'build' ) {
-            my $bin = $self->build_from_source( $share, $dest, $opt{jobs} );
-            return ( 'source', $bin );
-        }
-        my $exe = $^O eq 'MSWin32' ? 'xmake.exe' : 'xmake';
-        if ( $dest =~ /\.zip$/i ) {
-            $self->install_zip( $share, $dest );
-            return ( 'prebuilt', $exe );
-        }
-        $self->install_bundle( $share, $dest, $exe );
-        return ( $plan->{strategy} eq 'cosmocc' ? 'cosmocc' : 'prebuilt', $exe );
+    method _generate_share_config( $bin_path, $version ) {
+
+        # Calculate relative path from Alien/xmake/ConfigData.pm to the binary
+        # ConfigData is in lib/Alien/xmake/
+        # Bin is in      lib/Alien/xmake/share/bin/
+        my $lib_base = path('blib/lib/Alien/Xmake')->absolute;
+        my $rel_bin  = $bin_path->relative($lib_base)->stringify;
+        return { install_type => 'share', version => $version, bin => $rel_bin };
     }
 
-    method download_asset ($asset) {
-        my $dl = catdir( rel2abs('tmp'), 'xmake-downloads' );
-        mkpath($dl) unless -d $dl;
-        my $dest = catfile( $dl, $asset->{name} );
-        say "downloading $asset->{name}";
-        my $res = $http->mirror( $asset->{browser_download_url}, $dest );
-        die "download failed: $res->{status} $res->{reason}\n" unless $res->{success};
-        say "saved: $dest";
-        return $dest;
+    method _check_existing_share() {
+        eval { require Alien::Xmake::ConfigData; 1; } or return undef;
+        my $type = eval { Alien::Xmake::ConfigData->config('install_type') } // '';
+        return undef unless $type eq 'share';
+        my $bin = eval { Alien::Xmake::ConfigData->bin };
+        return undef unless $bin && -x $bin;
+        my $ver      = $self->_get_xmake_version($bin);
+        my $bin_path = path($bin);
+        my $dir      = $bin_path->parent;
+
+        if ( $dir->basename eq 'bin' ) {
+            $dir = $dir->parent;
+        }
+        return { version => $ver, bin => $bin, install_dir => $dir };
     }
 
-    # The win*.zip archive carries a top-level xmake/ folder; flatten it into
-    # share/ so the layout matches the official installer (binary + data in one
-    # directory) and File::ShareDir/runtime probing can find it.
-    method install_zip ( $share, $zip ) {
-        say 'Installing from prebuilt zip...';
-        my $stage = catdir( rel2abs('tmp'), 'xmake-unzip-' . $$ );
-        rmtree($stage) if -d $stage;
-        mkpath($stage);
-        $self->extract_zip( $zip, $stage );
-        my $src = catdir( $stage, 'xmake' );
-        $src = $stage unless -d $src;
-        $self->copy_tree( $src, $share );
-        rmtree($stage);
-    }
-
-    # cosmocc / macOS / linux x86_64 bundles are single self-contained
-    # binaries. Install as share/xmake(.exe) with an xrepo wrapper alongside.
-    method install_bundle ( $share, $bundle, $exe ) {
-        say 'Installing portable bundle...';
-        my $target = catfile( $share, $exe );
-        copy( $bundle, $target ) or die "install_bundle: $!";
-        chmod 0755, $target;
-        my $wrap = catfile( $share, $^O eq 'MSWin32' ? 'xrepo.bat' : 'xrepo' );
-        return if -e $wrap;
-        my $content = $^O eq 'MSWin32' ? <<~'WIN' : sprintf (<<~'ELSE', $exe);
-            $script:SCRIPT_PATH = $myinvocation.mycommand.path
-            $script:BASE_DIR = Split-Path $SCRIPT_PATH -Parent
-            $Env:XMAKE_PROGRAM_FILE = Join-Path $BASE_DIR xmake.exe
-
-            if ($Args.Count -eq 0) {
-                # No args, just call the underlying xmake executable.
-                & $Env:XMAKE_PROGRAM_FILE lua private.xrepo;
-            } else {
-                $Command = $Args[0];
-                if (($Command -eq "env") -and ($Args.Count -ge 2)) {
-                    switch ($Args[1]) {
-                        "shell" {
-                            if (-not (Test-Path 'Env:XMAKE_ROOTDIR')) {
-                                $Env:XMAKE_ROOTDIR = $BASE_DIR;
-                                Import-Module "$Env:XMAKE_ROOTDIR\scripts\xrepo-hook.psm1";
-                                Add-XrepoEnvironmentToPrompt;
-                            }
-                            if ((Test-Path 'Env:XMAKE_PROMPT_MODIFIER') -and ($Env:XMAKE_PROMPT_MODIFIER -ne "")) {
-                                Exit-XrepoEnvironment;
-                            }
-                            Enter-XrepoEnvironment $Null;
-                            return;
-                        }
-                        "quit" {
-                            Exit-XrepoEnvironment;
-                            return;
-                        }
-                        {$_ -in "-b", "--bind"} {
-                            if (($Args.Count -ge 4) -and ($Args[3] -eq "shell")) {
-                                if (-not (Test-Path 'Env:XMAKE_ROOTDIR')) {
-                                    $Env:XMAKE_ROOTDIR = $BASE_DIR;
-                                    Import-Module "$Env:XMAKE_ROOTDIR\scripts\xrepo-hook.psm1";
-                                    Add-XrepoEnvironmentToPrompt;
-                                }
-                                if ((Test-Path 'Env:XMAKE_PROMPT_MODIFIER') -and ($Env:XMAKE_PROMPT_MODIFIER -ne "")) {
-                                    Exit-XrepoEnvironment;
-                                }
-                                Enter-XrepoEnvironment $Args[2];
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                & $Env:XMAKE_PROGRAM_FILE lua private.xrepo $Args;
-            }
-
-            WIN
-                #!/bin/sh
-                subdir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-                exec "$subdir/%s" lua private.xrepo "$@"
-            ELSE
-
-        write_file( $wrap, $content );
-        chmod 0755, $wrap;
-    }
-
-    # Last resort: replicate the official getter, ./configure && make && make
-    # install, landing everything (binary + data) under $share/bin like the
-    # upstream installer does.
-    method build_from_source ( $share, $tgz, $jobs //= 4 ) {
-        die "Building xmake from source on Windows requires MSYS2/mingw; use the prebuilt zip instead\n" if $^O eq 'MSWin32';
-        my $make = _have_cmd('gmake') ? 'gmake' : _have_cmd('make') ? 'make' : die "xmake source build needs 'make' on PATH\n";
-        die "xmake source build needs a C compiler (cc/gcc/clang) on PATH\n" unless _have_compiler();
-        my $stage = catdir( rel2abs('tmp'), 'xmake-src-' . $$ );
-        rmtree($stage) if -d $stage;
-        mkpath($stage);
-        say "Extracting $tgz...";
-        $self->extract_targz( $tgz, $stage );
-        opendir my $dh, $stage or die "can't read $stage: $!\n";
-        my ($top) = grep { !/^\.\.?$/ && -d catdir( $stage, $_ ) } readdir $dh;
-        closedir $dh;
-        die "source archive did not unpack as expected\n" unless $top;
-        my $src = catdir( $stage, $top );
-        my $cwd = cwd();
-        chdir $src or die "cannot chdir to $src: $!\n";
-
-        if ( -f 'configure' ) {
-            say 'Configuring...';
-            system('./configure') == 0 or die "xmake configure failed\n";
-        }
-        say "Building with $make (jobs=$jobs)...";
-        system( $make, "-j$jobs" ) == 0 or die "xmake make failed\n";
-        say "Installing to $share...";
-        system( $make, 'install', "PREFIX=$share" ) == 0 or die "xmake make install failed\n";
-        chdir $cwd                                       or warn "cannot chdir back to $cwd: $!\n";
-        rmtree($stage);
-        my $exe = $^O eq 'MSWin32' ? 'xmake.exe' : 'xmake';
-        my $bin = catfile( $share, 'bin', $exe );
-        die "source build produced no xmake at $bin\n" unless -e $bin;
-        my $wrap = catfile( $share, 'bin', $^O eq 'MSWin32' ? 'xrepo.bat' : 'xrepo' );
-
-        if ( !-e $wrap ) {
-            my $content = $^O eq 'MSWin32' ? '@echo off' . "\n\"%~dp0$exe\" lua private.xrepo %*\n" :
-                "#!/bin/sh\nexec \"\$(dirname -- \"\$0\")\"/$exe lua private.xrepo \"\$@\"\n";
-            write_file( $wrap, $content );
-            chmod 0755, $wrap;
-        }
-        return 'bin/' . $exe;
-    }
-
-    # Decide what to fetch. Priority per answer:
-    #   1. dedicated prebuilt for (os, arch)   -> download & (un)pack
-    #   2. cosmocc portable bundle             -> download
-    #   3. build from source tarball           -> download source
-    method choose_asset( $os, $arch, $ver, $assets ) {
-        my $has = sub { $self->find_asset( $assets, $_[0] ) };
-
-        # Windows: use the .zip distribution, not the .exe (that's an NSIS
-        # installer that prompts for elevation / UAC). The zip extracts a
-        # self-contained local xmake.exe + xrepo with no system install.
-        if ( $os eq 'win' ) {
-            return { strategy => 'prebuilt', pattern => "xmake-v${ver}\\.win64\\.zip" } if $arch eq 'x86_64';
-            return { strategy => 'prebuilt', pattern => "xmake-v${ver}\\.win32\\.zip" } if $arch eq 'x86';
-            return { strategy => 'prebuilt', pattern => "xmake-v${ver}\\.arm64\\.zip" } if $arch eq 'arm64';
-
-            # unknown windows cpu -> 64-bit fallback
-            return { strategy => 'prebuilt', pattern => "xmake-v${ver}\\.win64\\.zip" };
-        }
-        if ( $os eq 'mac' ) {
-            return { strategy => 'prebuilt', pattern => "xmake-bundle-v${ver}\\.macos\\.arm64" }  if $arch eq 'arm64';
-            return { strategy => 'prebuilt', pattern => "xmake-bundle-v${ver}\\.macos\\.x86_64" } if $arch eq 'x86_64';
-            return { strategy => 'prebuilt', pattern => "xmake-bundle-v${ver}\\.macos\\.x86_64" };
-        }
-        if ( $os eq 'linux' && $arch eq 'x86_64' ) {
-            return { strategy => 'prebuilt', pattern => "xmake-bundle-v${ver}\\.linux\\.x86_64" } if $has->("xmake-bundle-v${ver}\\.linux\\.x86_64");
-        }
-
-        # The BSDs: the cosmocc universal bundle is unreliable here (OpenBSD
-        # cannot exec it - "NUL byte unexpected"; FreeBSD fails its re-exec with
-        # "Illegal seek" under redirected stdio). Build from source instead,
-        # which is fully supported on FreeBSD/OpenBSD/NetBSD.
-        if ( $os =~ /^(?:freebsd|openbsd|netbsd|dragonfly)$/ ) {
-            return { strategy => 'build', pattern => "xmake-v${ver}\\.tar\\.gz" };
-        }
-
-        # every remaining platform (linux arm, etc.) -> cosmocc first,
-        # build from source only if the cosmocc bundle is unavailable
-        return { strategy => 'cosmocc', pattern => "xmake-bundle-v${ver}\\.cosmocc" } if $has->("xmake-bundle-v${ver}\\.cosmocc");
-        return { strategy => 'build',   pattern => "xmake-v${ver}\\.tar\\.gz" };
-    }
-    method _version_ok ( $have, $want ) { $self->_version_cmp( $have, $want ) >= 0 }
-
-    method _version_cmp ( $v1, $v2 ) {
-        ( my $a = $v1 ) =~ s/^v//;
-        ( my $b = $v2 ) =~ s/^v//;
-        return version->parse($a) <=> version->parse($b);
-    }
-
-    method find_system_xmake () {
-        my $sep  = $^O eq 'MSWin32' ? ';'                : ':';
-        my @exts = $^O eq 'MSWin32' ? qw[.exe .cmd .bat] : ('');
-        for my $dir ( split /$sep/, ( $ENV{PATH} // '' ) ) {
-            next unless length $dir;
-            for my $ext (@exts) {
-                my $full = catfile( $dir, "xmake$ext" );
-                return $full if -e $full && -f $full && -x _;
+    method _find_system_xmake ( ) {
+        my $sep = ( $^O eq 'MSWin32' ) ? ';' : ':';
+        for my $dir ( split /$sep/, $ENV{PATH} ) {
+            my $p    = path($dir);
+            my $exts = ( $^O eq 'MSWin32' ) ? [qw(.exe .cmd .bat)] : [''];
+            for my $ext (@$exts) {
+                my $full = $p->child("xmake$ext");
+                return $full if -x $full;
             }
         }
         return undef;
     }
 
-    method xmake_version ($cmd) {
-        my $safe = $^O eq 'MSWin32' ? qq{"$cmd"} : $cmd;
-        my $out  = `$safe --version`;
-        return "v$1" if $out =~ /xmake\s+v?(\d+\.\d+\.\d+)/i;
+    method _get_xmake_version ($cmd) {
+        my $safe_cmd = ( $^O eq 'MSWin32' ) ? qq{"$cmd"} : "$cmd";
+        my $out      = `$safe_cmd --version`;
+        if ( $out =~ /xmake\s+v?(\d+\.\d+\.\d+)/i ) {
+            return "v$1";
+        }
         return 'v0.0.0';
     }
 
-    method extract_zip ( $zip, $out ) {
-        my $uz = IO::Uncompress::Unzip->new($zip) or die "can't open zip $zip: $UnzipError\n";
-        mkpath($out) unless -d $out;
-        while ( my $status = $uz->nextStream() ) {
-            my $name = $uz->getHeaderInfo()->{Name};
-            next unless defined $name && length $name;
-
-            # sanitise entry path: strip drive letters, leading slashes and
-            # neutralise any ../ traversal so extraction stays inside $out
-            $name =~ s{^[A-Za-z]:[/\\]+}{};
-            $name =~ s{^[/\\]+}{};
-            $name =~ s{(?:\.\./|\.\.\\)}{}g;
-            next unless length $name;
-            my $target = catfile( $out, grep {length} split m{[/\\]}, $name );
-            if ( $name =~ m{[/\\]$} ) { mkpath($target); next; }
-            my $parent = dirname($target);
-            mkpath($parent) unless -d $parent;
-            open my $fh, '>:raw', $target or die "can't write $target: $!\n";
-            my $buf;
-
-            while (1) {
-                my $rc = $uz->read( $buf, 1_048_576 );
-                die "Error reading from zip $zip: $UnzipError\n" if $rc < 0;
-                last                                             if $rc == 0;
-                print {$fh} $buf;
-            }
-            close $fh;
-        }
+    method _version_cmp ( $v1, $v2 ) {
+        require version;
+        $v1 =~ s/^v//;
+        $v2 =~ s/^v//;
+        return version->parse($v1) <=> version->parse($v2);
     }
 
-    method extract_targz ( $tgz, $out ) {
-        mkpath($out) unless -d $out;
-
-        # Prefer the system tar. IO::Uncompress::Gunzip chokes on the gzip
-        # GitHub emits for these source tarballs (FNAME + multi-member), which
-        # yields zero bytes even though tar/gzip decode it fine.
-        if ( _have_cmd('tar') ) {
-            my $dir = cwd();
-            chdir $out or die "can't chdir to $out: $!\n";
-            my $rc = system( 'tar', '-xzf', $tgz );
-            chdir $dir or die "can't chdir back to $dir: $!\n";
-            die "system tar failed to extract $tgz\n" unless $rc == 0;
-            return;
-        }
-        my $raw;
-        die "can't gunzip $tgz\n" unless IO::Uncompress::Gunzip::gunzip( $tgz => \$raw );
-        my $at = Archive::Tar->new;
-        open my $rfh, '<', \$raw or die "can't open tar stream: $!\n";
-        die "can't read tar from $tgz\n" unless $at->read($rfh);
-        for my $e ( $at->get_files ) {
-            my $n = $e->full_path or next;
-            next if $e->is_dir;
-            my $target = catfile( $out, grep {length} split m{/}, $n );
-            my $parent = dirname($target);
-            mkpath($parent) unless -d $parent;
-            open my $fh, '>:raw', $target or die "can't write $target: $!\n";
-            print {$fh} $e->get_content;
-            close $fh;
-        }
-    }
-
-    method copy_tree ( $src, $dst ) {
-        mkpath($dst) unless -d $dst;
-        ( my $src_n = $src ) =~ tr{\\}{/};
-        File::Find::find(
-            sub {
-                my $p = $File::Find::name;
-                ( my $rel = $p ) =~ tr{\\}{/};
-
-                # File::Find joins paths with '/'; normalise both sides so the
-                # prefix strip survives on Windows.
-                $rel =~ s{^\Q$src_n\E}{};
-                $rel =~ s{^/+}{};
-                my $target = length $rel ? catfile( $dst, grep {length} split m{/}, $rel ) : $dst;
-                if ( -d $p ) { mkpath($target) unless -d $target; }
-                else         { copy( $p, $target ) or die "copy $p -> $target: $!\n"; }
-            },
-            $src
-        );
-    }
-
-    # Generate lib/Alien/Xmake/ConfigData.pm inside blib, recording how we got
-    # xmake. install_type is one of: system, prebuilt, cosmocc, source.
-    method _write_config_data ( $config, $dist_name ) {
-        my $data = {%$config};
-        if ( $data->{install_type} ne 'system' && $data->{bin} ) {
-
-            # bin is stored relative to share/ (e.g. xmake.exe or bin/xmake);
-            # rewrite it relative to this ConfigData so the installed module can
-            # find the staged binary next to File::ShareDir's dist dir.
-            my $base = rel2abs( catdir( 'blib', 'lib', 'Alien', 'Xmake' ) );
-            my $root = rel2abs( catdir( 'blib', 'lib', 'auto',  'share', 'dist', $dist_name ) );
-            my $abs  = rel2abs( catfile( $root, grep {length} split m{/}, $data->{bin} ) );
-            $data->{bin} = abs2rel( $abs, $base );
-        }
+    method _write_config_data ($data) {
+        my $dest = path('blib')->child($target_config);
+        $dest->parent->mkpath;
         my $dumper = Data::Dumper->new( [$data], ['conf'] );
         $dumper->Indent(1)->Terse(1)->Sortkeys(1);
         my $content = sprintf <<~'PERL', $dumper->Dump;
@@ -728,72 +311,336 @@ class    #
         };
         1;
         PERL
-        my $dest   = catfile( rel2abs('blib'), 'lib', 'Alien', 'Xmake', 'ConfigData.pm' );
-        my $parent = dirname($dest);
-        mkpath($parent) unless -d $parent;
-        write_file( $dest, $content );
+        $dest->spew_utf8($content);
         say "Generated $dest";
     }
 
-    method http( $url //= '', %args ) {
+    method _install_windows ($installdir) {
+        my $temppath = path('_build_xmake');
+        $temppath->mkpath;
+        my $arch_env   = $ENV{PROCESSOR_ARCHITECTURE} // '';
+        my $arch64_env = $ENV{PROCESSOR_ARCHITEW6432} // '';
+        my $filename;
 
-        #~ warn $url =~ /https/ ? $url : qq[https://api.github.com/repos/$owner/$repo/releases/$url];
-        $args{headers} //= {};
-        if ( my $token = $ENV{GITHUB_TOKEN} ) {
-            $args{headers}{Authorization} = "Bearer $token";
-        }
-        my $req_url = $url =~ /^https?:/ ? $url : qq[https://api.github.com/repos/$owner/$repo/releases/$url];
-        my $res     = $http->get( $req_url, \%args );
-        if ( $res->{status} == 403 && $res->{headers}{'x-ratelimit-remaining'} eq '0' ) {
-            die 'github api rate limit exceeded: ' . _rate_message($res) . "\n";
+        # Check for ARM64
+        if ( $arch_env eq 'ARM64' || $arch64_env eq 'ARM64' ) {
+
+            # ARM64 releases currently use the 'bundle' naming convention
+            $filename = "xmake-bundle-$target_version.arm64.exe";
         }
 
-        #~ use Data::Dump;
-        #~ ddx $res;
-        die "github api failed: $res->{status} $res->{reason}\n" unless $res->{success} || $res->{status} == 304;
-        $res;
+        # Check for x64 (AMD64/IA64)
+        elsif ( $arch_env eq 'AMD64' || $arch_env eq 'IA64' || $arch64_env eq 'AMD64' || $arch64_env eq 'IA64' ) {
+            $filename = "xmake-$target_version.win64.exe";
+        }
+
+        # Fallback to x86
+        else {
+            $filename = "xmake-$target_version.win32.exe";
+        }
+        my $url     = "https://github.com/xmake-io/xmake/releases/download/$target_version/$filename";
+        my $outfile = $temppath->child('xmake-installer.exe');
+        if ( !$self->_download_file( $url, $outfile ) ) {
+            die "Download failed for $url";
+        }
+        my $install_str = $installdir->stringify;
+        $install_str =~ s{/}{\\}g;
+        my $outfile_str = $outfile->stringify;
+        $outfile_str =~ s{/}{\\}g;
+        say "Installing to $install_str...";
+
+        # /NOADMIN: Avoid UAC prompt if possible (installs to local user path if allowed)
+        # /S: Silent
+        # /D: Destination directory
+        my $cmd = qq{"$outfile_str" /NOADMIN /S /D=$install_str};
+        my $ret = system($cmd);
+        die "Installer failed with code $ret" if $ret != 0;
+
+        # Cleanup
+        path('_build_xmake')->remove_tree;
     }
 
-    sub _rate_message ($res) {
-        my $limit     = $res->{headers}{'x-ratelimit-limit'};
-        my $remaining = $res->{headers}{'x-ratelimit-remaining'};
-        my $reset_utc = $res->{headers}{'x-ratelimit-reset'};
-        my $msg       = 'github api rate limit';
-        $msg .= " (limit=$limit"         if defined $limit;
-        $msg .= ", remaining=$remaining" if defined $remaining;
-        if ( defined $reset_utc && $reset_utc =~ /^\d+$/ ) {
-            my $wait = $reset_utc - time();
-            $wait = 0 if $wait < 0;
-            my $mins = int( $wait / 60 );
-            my $secs = $wait % 60;
-            $msg .= sprintf( ", resets in ~%dm %02ds (%s)", $mins, $secs, scalar gmtime( $reset_utc + 0 ) );
+    method _install_unix ($installdir) {
+        my $build_dir = path('_build_xmake');
+        $build_dir->remove_tree;
+        $build_dir->mkpath;
+        my $sudo = '';
+        if ( $> != 0 && $self->_run_cmd('sudo -n --version >/dev/null 2>&1') ) {
+            $sudo = 'sudo';
         }
-        return $msg . '; consider setting GITHUB_TOKEN to raise the limit';
+        unless ( $self->_test_tools() ) {
+
+            # Do not auto-install system tools unless requested.
+            if ( $ENV{ALIEN_INSTALL_SYSTEM_TOOLS} ) {
+                say 'Attempting to install system tools via package manager...';
+                if ( $self->_install_tools($sudo) ) {
+                    $self->_test_tools() or $self->_raise_dep_error();
+                }
+                else {
+                    $self->_raise_dep_error();
+                }
+            }
+            else {
+                $self->_raise_dep_error();
+            }
+        }
+        my $version  = $target_version;
+        my $filename = "xmake-$version.gz.run";
+        my $gh_url   = "https://github.com/xmake-io/xmake/releases/download/$version/$filename";
+        my $cdn_url  = "https://fastly.jsdelivr.net/gh/xmake-mirror/xmake-releases\@$version/$filename";
+        my @urls;
+        my $fasthost = $self->_get_fast_host();
+        if ( $fasthost eq 'gitee.com' ) {
+            @urls = ( $cdn_url, $gh_url );
+        }
+        else {
+            @urls = ( $gh_url, $cdn_url );
+        }
+        my $outfile    = $build_dir->child('xmake.run');
+        my $downloaded = 0;
+        for my $url (@urls) {
+            say "Attempting download from $url...";
+            if ( $self->_download_file( $url, $outfile ) ) {
+                $downloaded = 1;
+                last;
+            }
+        }
+        die 'All download attempts failed.' unless $downloaded;
+        say 'Extracting source bundle...';
+        $self->_run_cmd( 'sh', $outfile, '--noexec', '--quiet', '--target', $build_dir ) or die 'Failed to extract .run file';
+        my $cwd = cwd();
+        chdir $build_dir or die 'Cannot chdir to build dir';
+        say 'Building Xmake...';
+
+        # DETERMINE MAKE
+        # On FreeBSD/NetBSD/OpenBSD/DragonFly, 'make' is BSD make.
+        # Xmake generates GNU makefiles. We MUST use gmake.
+        my $make_cmd = 'make';
+        if ( $^O =~ /bsd/i || $^O eq 'dragonfly' ) {
+            if ( $self->_run_cmd('gmake --version >/dev/null 2>&1') ) {
+                $make_cmd = 'gmake';
+            }
+            else {
+                # This should have been caught by _test_tools, but safe guard here
+                die 'gmake is required on BSD systems to build Xmake.';
+            }
+        }
+        elsif ( $self->_run_cmd('gmake --version >/dev/null 2>&1') ) {
+            $make_cmd = 'gmake';
+        }
+        if ( -f 'configure' ) {
+            say "Configuring with make=$make_cmd...";
+            system( './configure', "--make=$make_cmd" ) == 0 or die 'Configure failed';
+            system( $make_cmd,     '-j4' ) == 0              or die 'Make failed';
+            say "Installing to $installdir...";
+            system( $make_cmd, 'install', "PREFIX=$installdir" ) == 0 or die 'Install failed';
+        }
+        else {
+            system( $make_cmd, 'build',   '-j4' ) == 0                or die 'Make build failed';
+            system( $make_cmd, 'install', "prefix=$installdir" ) == 0 or die 'Make install failed';
+        }
+        chdir $cwd;
     }
 
-    sub _have_cmd ($name) {
-        my $sep  = $^O eq 'MSWin32' ? ';'                : ':';
-        my @exts = $^O eq 'MSWin32' ? qw[.exe .cmd .bat] : ('');
-        for my $dir ( split /$sep/, ( $ENV{PATH} // '' ) ) {
-            next unless length $dir;
-            for my $ext (@exts) {
-                my $full = catfile( $dir, "$name$ext" );
-                return 1 if -e $full && -f $full && -x _;
+    method _get_host_speed ($host) {
+        my $cmd;
+        if ( $^O eq 'darwin' ) {
+            $cmd = "ping -c 1 -t 1 $host 2>/dev/null";
+        }
+        else {
+            $cmd = "ping -c 1 -W 1 $host 2>/dev/null";
+        }
+        my $output = `$cmd`;
+        if ( $output =~ /time=(\d+)/ ) {
+            return $1;
+        }
+        return 65535;
+    }
+
+    method _get_fast_host ( ) {
+        if ( $ENV{GITHUB_ACTIONS} ) {
+            return 'github.com';
+        }
+        say 'Testing connection speed to github.com vs gitee.com...';
+        my $speed_gitee  = $self->_get_host_speed('gitee.com');
+        my $speed_github = $self->_get_host_speed('github.com');
+        if ( $speed_gitee <= $speed_github ) {
+            return 'gitee.com';
+        }
+        return 'github.com';
+    }
+
+    method _download_file ( $url, $dest ) {
+        my $dest_str = "$dest";
+
+        # Try HTTP::Tiny + IO::Socket::SSL
+        if ( eval { require IO::Socket::SSL; 1 } ) {
+            say 'Downloading with HTTP::Tiny...';
+            my $http = HTTP::Tiny->new( verify_SSL => 1 );
+            my $res  = $http->mirror( $url, $dest_str );
+            if ( $res->{success} ) {
+                return 1;
+            }
+            say "HTTP::Tiny failed: $res->{status} $res->{reason}";
+        }
+        else {
+            say 'HTTP::Tiny skipped: IO::Socket::SSL not installed.';
+        }
+
+        # Try curl
+        if ( $self->_run_cmd('curl --version >/dev/null 2>&1') ) {
+            say 'Downloading with curl...';
+
+            # -L: Follow redirects, -f: Fail on error, -o: Output
+            if ( $self->_run_cmd( 'curl', '-L', '-f', '-o', $dest_str, $url ) ) {
+                return 1;
+            }
+            say 'curl failed.';
+        }
+
+        # Try wget
+        if ( $self->_run_cmd('wget --version >/dev/null 2>&1') ) {
+            say 'Downloading with wget...';
+            if ( $self->_run_cmd( 'wget', '--quiet', '-O', $dest_str, $url ) ) {
+                return 1;
+            }
+            say 'wget failed.';
+        }
+        return 0;
+    }
+
+    method _test_tools ( ) {
+        say 'Checking build tools...';
+        my $ok = 1;
+        if ( $self->_run_cmd('git --version >/dev/null 2>&1') ) {
+            say ' - git: Found';
+        }
+        else {
+            say ' - git: Missing';
+            $ok = 0;
+        }
+
+        # GNU or BSD make
+        my $found_make = 0;
+        if ( $self->_run_cmd('gmake --version >/dev/null 2>&1') ) {
+            say ' - make: Found (gmake)';
+            $found_make = 1;
+        }
+        elsif ( $self->_run_cmd('make --version >/dev/null 2>&1') ) {
+            say ' - make: Found (make - likely GNU compatible)';
+            $found_make = 1;
+        }
+        elsif ( $self->_run_cmd('make -V MACHINE >/dev/null 2>&1') ) {
+            say ' - make: Found (make - BSD)';
+
+            # If we are on BSD, this is technically 'found', but we know it won't work for Xmake.
+            # We must fail here to trigger the installer if we are on BSD.
+            if ( $^O =~ /bsd/i || $^O eq 'dragonfly' ) {
+                say '   ! Note: BSD make is not compatible with Xmake build (needs gmake).';
+            }
+            else {
+                $found_make = 1;    # On non-BSD systems, maybe they have a different make setup.
+            }
+        }
+
+        # STRICT CHECK for BSDs
+        if ( $^O =~ /bsd/i || $^O eq 'dragonfly' ) {
+            unless ( $self->_run_cmd('gmake --version >/dev/null 2>&1') ) {
+                say ' - make: Missing gmake (Required on FreeBSD/BSD for Xmake build)';
+                $found_make = 0;
+                $ok         = 0;
+            }
+            else {
+                $found_make = 1;
+            }
+        }
+        unless ($found_make) {
+            say ' - make: Missing';
+            $ok = 0;
+        }
+
+        # Compiler
+        my $found_cc = 0;
+        my $prog     = "#include <stdio.h>\nint main(){return 0;}";
+        my @compilers
+            = ( [ 'cc', '-xc', '-', '-o', '/dev/null' ], [ 'gcc', '-xc', '-', '-o', '/dev/null' ], [ 'clang', '-xc', '-', '-o', '/dev/null' ] );
+        for my $cmd_ref (@compilers) {
+            my $name    = $cmd_ref->[0];
+            my $cmd_str = join( ' ', @$cmd_ref );
+            my $pid     = open( my $ph, '|-', "$cmd_str >/dev/null 2>&1" );
+            if ($pid) {
+                print $ph $prog;
+                close $ph;
+                if ( $? == 0 ) {
+                    say " - compiler: Found ($name)";
+                    $found_cc = 1;
+                    last;
+                }
+            }
+        }
+        unless ($found_cc) {
+            say ' - compiler: Missing (checked cc, gcc, clang)';
+            $ok = 0;
+        }
+        return $ok;
+    }
+
+    method _install_tools ($sudo) {
+        my @installers = (
+            [ 'apt --version', 'apt install -y git build-essential libreadline-dev' ],
+            [ 'dnf --version', 'dnf install -y git readline-devel bzip2 @development-tools' ],
+            [ 'yum --version', qq[yum install -y git readline-devel bzip2 && $sudo yum groupinstall -y 'Development Tools'] ],
+            [   'zypper --version',
+                qq[zypper --non-interactive install git readline-devel && $sudo zypper --non-interactive install -t pattern devel_C_C++]
+            ],
+            [ 'pacman -V',              'pacman -S --noconfirm --needed git base-devel ncurses readline' ],
+            [ 'emerge -V',              'emerge -atv dev-vcs/git' ],
+            [ 'pkg list-installed',     'pkg install -y git gmake' ],
+            [ 'nix-env --version',      'nix-env -i git gcc readline ncurses' ],
+            [ 'apk --version',          'apk add git gcc g++ make readline-dev ncurses-dev libc-dev linux-headers' ],
+            [ 'xbps-install --version', 'xbps-install -Sy git base-devel' ]
+        );
+        for my $pair (@installers) {
+            my ( $check, $install ) = @$pair;
+            if ( $self->_run_cmd( $check . ' >/dev/null 2>&1' ) ) {
+                say "Detected package manager via: $check";
+                say 'Attempting to install dependencies...';
+                return $self->_run_cmd( $sudo . ' ' . $install );
             }
         }
         return 0;
     }
 
-    sub _have_compiler () {
-        for my $cc (qw[cc gcc clang]) { return 1 if _have_cmd($cc) }
-        return 0;
-    }
-    };
-1;
-if ( $0 eq __FILE__ ) {
-    chdir '../../../';
-    Alien::Xmake::Builder->new->Build_PL;
-    Alien::Xmake::Builder->new->Build;
+    method _raise_dep_error () {
+        die <<~'MSG';
+    Dependencies Installation Failed or Skipped.
 
-    #~ Alien::Xmake::Builder->new->Build('test');
+    We could not find the necessary tools (git, make, compiler) to build Xmake from source.
+
+    You have three options:
+
+    1. Install Xmake manually (Recommended if you lack build tools):
+       See: https://xmake.io/guide/quick-start.html#installation
+       Alien::Xmake will detect and use the system installation.
+
+    2. Install build tools manually:
+       * git
+       * build-essential (make, gcc/clang, etc)
+       * libreadline-dev / readline-devel
+
+    3. Allow this builder to try installing system tools:
+       Set ENV ALIEN_INSTALL_SYSTEM_TOOLS=1
+    MSG
+    }
+
+    method write_file( $filename, $content ) {
+        path($filename)->spew_raw($content);
+    }
+
+    method Build(@args) {
+        my $method = $self->can( 'ACTION_' . $action );
+        $method // die "No such action '$action'\n";
+        exit !$method->($self);
+    }
 }
+1;
