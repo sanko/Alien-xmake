@@ -81,7 +81,7 @@ class Alien::Xrepo 0.08 {
         require Capture::Tiny;
         return Capture::Tiny::capture(
             sub {
-                system(@cmd);
+                $xmake->_spawn(@cmd);
             }
         );
     }

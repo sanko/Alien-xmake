@@ -5,6 +5,7 @@ class Alien::Xmake 0.08 {
     use File::Basename qw[dirname];
     use JSON::PP       qw[decode_json];
     use File::ShareDir qw[dist_dir];
+    use Config;
     #
     field $windows = $^O eq 'MSWin32';
     field $config : param //= sub {
@@ -31,6 +32,32 @@ class Alien::Xmake 0.08 {
         return dirname($exe);
     }
 
+    # Prepend the xmake/xrepo bin directory to PATH so the helpers can be
+    # invoked by bare name instead of by an absolute Windows path. Passing a
+    # full "D:\..." path to a child process launched from a git-bash runner
+    # can fail with "Inappropriate I/O control operation"; a bare name that
+    # CreateProcess resolves through PATH does not. Resolves the right
+    # directory whether running from blib (ConfigData points into blib) or
+    # from an installed share.
+    method _ensure_path () {
+        return unless $windows;
+        my $dir    = $self->bin_dir;
+        my $sep    = $Config{path_sep};
+        return unless -d $dir;
+        my $cur = $ENV{PATH} // '';
+        return if $cur =~ m{(?:^|$sep)\Q$dir\E(?:$sep|$)}i;
+        $ENV{PATH} = join $sep, $dir, $cur;
+    }
+    # Command word(s) used to launch xmake by bare name (after the bin dir is
+    # on PATH). Used for --version resolution and any direct xmake invocation.
+    method _run_base () {
+        if ($windows) {
+            $self->_ensure_path;
+            return ('xmake');
+        }
+        return ($self->_resolve_path);
+    }
+
     method exe () {
         return $self->_quote_path( $self->_resolve_path );
     }
@@ -55,9 +82,24 @@ class Alien::Xmake 0.08 {
         require Capture::Tiny;
         return Capture::Tiny::capture(
             sub {
-                system(@cmd);
+                $self->_spawn(@cmd);
             }
         );
+    }
+
+    # On Win32, `system LIST` silently falls back to the shell (cmd.exe, or
+    # bash/msys when launched from a git-bash runner), which dies with
+    # "Inappropriate I/O control operation". The indirect-object form
+    # `system { $prog } LIST` calls CreateProcess directly and never touches
+    # the shell, so it works even when Perl itself is a child of msys bash.
+    method _spawn (@cmd) {
+        if ($windows) {
+            my $prog = shift @cmd;
+            system { $prog } $prog, @cmd;
+        }
+        else {
+            system(@cmd);
+        }
     }
 
     method pkg_config ($package) {
@@ -87,7 +129,7 @@ class Alien::Xmake 0.08 {
     }
 
     method _getver_build() {
-        my @cmd = ( $self->_resolve_path, '--version' );
+        my @cmd = ( $self->_run_base, '--version' );
         state $out //= do {
             my ( $o, $e ) = $self->_run_capture(@cmd);
             $o;
@@ -129,14 +171,12 @@ class Alien::Xmake 0.08 {
     }
 
     method _xrepo_cmd (@cmd) {
-        my $exe = $self->_resolve_path;
         if ($windows) {
+            $self->_ensure_path;
 
-            # Catch file-not-found immediately instead of relying on Perl's broken shell-fallback
-            if ( $self->install_type ne 'system' && !-e $exe ) {
-                die "Alien::Xmake error: executable not found at '$exe'. Installation is corrupted.\n";
-            }
-            return ( $exe, 'lua', 'private.xrepo', @cmd );
+            # Invoke xmake by bare name via PATH rather than an absolute
+            # D:\... path, which can fail to spawn under a git-bash runner.
+            return ( 'xmake', 'lua', 'private.xrepo', @cmd );
         }
         return ( $self->xrepo, @cmd );
     }
