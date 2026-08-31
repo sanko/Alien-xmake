@@ -5,7 +5,6 @@ class Alien::Xmake 0.08 {
     use File::Basename qw[dirname];
     use JSON::PP       qw[decode_json];
     use File::ShareDir qw[dist_dir];
-    use Config;
     #
     field $windows = $^O eq 'MSWin32';
     field $config : param //= sub {
@@ -32,29 +31,10 @@ class Alien::Xmake 0.08 {
         return dirname($exe);
     }
 
-    # Prepend the xmake/xrepo bin directory to PATH so the helpers can be
-    # invoked by bare name instead of by an absolute Windows path. Passing a
-    # full "D:\..." path to a child process launched from a git-bash runner
-    # can fail with "Inappropriate I/O control operation"; a bare name that
-    # CreateProcess resolves through PATH does not. Resolves the right
-    # directory whether running from blib (ConfigData points into blib) or
-    # from an installed share.
-    method _ensure_path () {
-        return unless $windows;
-        my $dir    = $self->bin_dir;
-        my $sep    = $Config{path_sep};
-        return unless -d $dir;
-        my $cur = $ENV{PATH} // '';
-        return if $cur =~ m{(?:^|$sep)\Q$dir\E(?:$sep|$)}i;
-        $ENV{PATH} = join $sep, $dir, $cur;
-    }
-    # Command word(s) used to launch xmake by bare name (after the bin dir is
-    # on PATH). Used for --version resolution and any direct xmake invocation.
+    # Command word(s) used to launch xmake and to resolve --version. Always the
+    # resolved absolute path for the installed executable; a bare name can be
+    # mis-launched under a git-bash/MSYS2 runner.
     method _run_base () {
-        if ($windows) {
-            $self->_ensure_path;
-            return ('xmake');
-        }
         return ($self->_resolve_path);
     }
 
@@ -87,19 +67,11 @@ class Alien::Xmake 0.08 {
         );
     }
 
-    # On Win32, `system LIST` silently falls back to the shell (cmd.exe, or
-    # bash/msys when launched from a git-bash runner), which dies with
-    # "Inappropriate I/O control operation". The indirect-object form
-    # `system { $prog } LIST` calls CreateProcess directly and never touches
-    # the shell, so it works even when Perl itself is a child of msys bash.
+    # Spawn the command with its argument list. The LIST form (multiple
+    # elements, no shell metacharacters) calls CreateProcess directly and is
+    # what t/00_compile.t exercises successfully on the CI Windows runners.
     method _spawn (@cmd) {
-        if ($windows) {
-            my $prog = shift @cmd;
-            system { $prog } $prog, @cmd;
-        }
-        else {
-            system(@cmd);
-        }
+        system(@cmd);
     }
 
     method pkg_config ($package) {
@@ -171,14 +143,7 @@ class Alien::Xmake 0.08 {
     }
 
     method _xrepo_cmd (@cmd) {
-        if ($windows) {
-            $self->_ensure_path;
-
-            # Invoke xmake by bare name via PATH rather than an absolute
-            # D:\... path, which can fail to spawn under a git-bash runner.
-            return ( 'xmake', 'lua', 'private.xrepo', @cmd );
-        }
-        return ( $self->xrepo, @cmd );
+        return ( $self->_resolve_path, 'lua', 'private.xrepo', @cmd );
     }
 
     method _quote_path ($path) {
