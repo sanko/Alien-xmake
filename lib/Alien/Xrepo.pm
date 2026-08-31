@@ -82,8 +82,12 @@ class Alien::Xrepo 0.08 {
         return Capture::Tiny::capture(
             sub {
                 if ( $^O eq 'MSWin32' ) {
-                    my $cmd_str = join( ' ', map { ( /\s/ && !/"/ ) ? qq{"$_"} : $_ } @cmd );
-                    system($cmd_str);
+
+                    # LIST form bypasses cmd.exe and uses CreateProcess
+                    # directly.  SCALAR form routes through cmd.exe which
+                    # inherits Capture::Tiny's non-console pipe handles and
+                    # fails with ENOTTY ("Inappropriate I/O control operation").
+                    system(@cmd);
                 }
                 else {
                     system(@cmd);
