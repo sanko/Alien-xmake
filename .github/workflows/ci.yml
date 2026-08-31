@@ -69,6 +69,17 @@ jobs:
             my $out = `"$x" lua private.xrepo install -y -k shared zlib 2>&1`;
             print "===XREPO-RAW-START===\n$out\n===XREPO-RAW-END===\nrc=" . ($? >> 8) . "\n";
         }'
+        # TEST FIX: point TMP/TEMP at a real long-style path (short 8.3 name
+        # RUNNER~1 may be unresolvable if 8dot3name generation is disabled),
+        # then retry the xrepo install to confirm the crash is a bad temp dir.
+        perl -e 'if ($^O eq "MSWin32") {
+            my $long = "C:\\Users\\runneradmin\\AppData\\Local\\Temp";
+            $ENV{TMP} = $ENV{TEMP} = $ENV{TMPDIR} = $long;
+            print "===FIXED-TMP=$long===\n";
+            my $x = "D:/a/Alien-Xmake/Alien-Xmake/blib/lib/auto/share/dist/Alien-Xmake/xmake.exe";
+            my $out = `"$x" lua private.xrepo install -y -k shared zlib 2>&1`;
+            print "===FIXED-XREPO-START===\n$out\n===FIXED-XREPO-END===\nrc=" . ($? >> 8) . "\n";
+        }'
         perl -V
         #~ Install cpanm via its canonical self-bootstrap (installs the real
         #~ `cpanm` binary into the active perl's bin dir). `command -v cpanm`
