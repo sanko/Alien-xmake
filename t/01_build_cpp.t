@@ -25,6 +25,11 @@ subtest xrepo => sub {
     ok( ( -d 'test_cpp' ), 'project created' );
 
     chdir 'test_cpp';
+
+    if ( $^O eq 'MSWin32' ) {
+        diag qx[$exe f -p windows -m msvc -y 2>&1];
+    }
+
     subtest compile => sub {
         diag 'Building project..';
         my $build = `$exe --quiet 2>&1`;
