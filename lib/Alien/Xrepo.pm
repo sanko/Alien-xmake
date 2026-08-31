@@ -78,22 +78,19 @@ class Alien::Xrepo 0.08 {
     }
 
     method _run_capture (@cmd) {
-        require Capture::Tiny;
-        return Capture::Tiny::capture(
-            sub {
-                if ( $^O eq 'MSWin32' ) {
+        if ( $^O eq 'MSWin32' ) {
 
-                    # LIST form bypasses cmd.exe and uses CreateProcess
-                    # directly.  SCALAR form routes through cmd.exe which
-                    # inherits Capture::Tiny's non-console pipe handles and
-                    # fails with ENOTTY ("Inappropriate I/O control operation").
-                    system(@cmd);
-                }
-                else {
-                    system(@cmd);
-                }
-            }
-        );
+            # Capture::Tiny + system() on Windows returns a bogus exit code
+            # because the spawned child inherits non-console pipe handles and
+            # Perl misinterprets the result (spurious "Can't spawn ... Inappropriate
+            # I/O control operation").  Use backticks with stderr merged so we
+            # get a reliable exit code from $?
+            my $cmd_str = join( ' ', map { ( /\s/ && !/"/ ) ? qq{"$_"} : $_ } @cmd );
+            my $out = `$cmd_str 2>&1`;
+            return ( $out, '', $? >> 8 );
+        }
+        require Capture::Tiny;
+        return Capture::Tiny::capture( sub { system(@cmd) } );
     }
     #
     method install ( $pkg_spec, $version //= (), %opts ) {

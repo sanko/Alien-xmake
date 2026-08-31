@@ -38,6 +38,7 @@ class Alien::Xmake 0.08 {
     method xrepo () {
         my $exe_path   = $self->_resolve_path;
         return $exe_path .  ' lua private.xrepo';
+        #
         my $parent     = dirname($exe_path);
         my $xrepo_name = 'xrepo' . ( $windows ? '.bat' : '' );
         my $try        = File::Spec->catfile( $parent, $xrepo_name );
@@ -53,22 +54,19 @@ class Alien::Xmake 0.08 {
     }
 
     method _run_capture (@cmd) {
-        require Capture::Tiny;
-        return Capture::Tiny::capture(
-            sub {
-                if ($windows) {
+        if ($windows) {
 
-                    # LIST form bypasses cmd.exe and uses CreateProcess
-                    # directly.  SCALAR form routes through cmd.exe which
-                    # inherits Capture::Tiny's non-console pipe handles and
-                    # fails with ENOTTY ("Inappropriate I/O control operation").
-                    system(@cmd);
-                }
-                else {
-                    system(@cmd);
-                }
-            }
-        );
+            # Capture::Tiny + system() on Windows returns a bogus exit code
+            # because the spawned child inherits non-console pipe handles and
+            # Perl misinterprets the result (spurious "Can't spawn ... Inappropriate
+            # I/O control operation").  Use backticks with stderr merged so we
+            # get a reliable exit code from $?
+            my $cmd_str = join( ' ', map { ( /\s/ && !/"/ ) ? qq{"$_"} : $_ } @cmd );
+            my $out = `$cmd_str 2>&1`;
+            return ( $out, '', $? >> 8 );
+        }
+        require Capture::Tiny;
+        return Capture::Tiny::capture( sub { system(@cmd) } );
     }
 
     method pkg_config ($package) {
@@ -142,8 +140,6 @@ class Alien::Xmake 0.08 {
     method _xrepo_cmd (@cmd) {
         my $exe = $self->_resolve_path;
         if ($windows) {
-            return ($self->xrepo, @cmd);
-
             # Catch file-not-found immediately instead of relying on Perl's broken shell-fallback
             if ( $self->install_type ne 'system' && !-e $exe ) {
                 die "Alien::Xmake error: executable not found at '$exe'. Installation is corrupted.\n";
