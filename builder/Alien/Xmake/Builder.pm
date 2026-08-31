@@ -572,7 +572,13 @@ class    #
             mkpath($parent) unless -d $parent;
             open my $fh, '>:raw', $target or die "can't write $target: $!\n";
             my $buf;
-            while ( ( my $rc = $uz->read( $buf, 1_048_576 ) ) > 0 ) { print {$fh} $buf; }
+
+            while (1) {
+                my $rc = $uz->read( $buf, 1_048_576 );
+                die "Error reading from zip $zip: $UnzipError\n" if $rc < 0;
+                last                                             if $rc == 0;
+                print {$fh} $buf;
+            }
             close $fh;
         }
     }
@@ -692,8 +698,16 @@ class    #
     }
 
     sub _have_cmd ($name) {
-        if ( $^O eq 'MSWin32' ) { return system( 1, 'where', $name ) == 0 }
-        return system( 1, 'command', '-v', $name ) == 0;
+        my $sep  = $^O eq 'MSWin32' ? ';'                : ':';
+        my @exts = $^O eq 'MSWin32' ? qw[.exe .cmd .bat] : ('');
+        for my $dir ( split /$sep/, ( $ENV{PATH} // '' ) ) {
+            next unless length $dir;
+            for my $ext (@exts) {
+                my $full = catfile( $dir, "$name$ext" );
+                return 1 if -e $full && -f $full && -x _;
+            }
+        }
+        return 0;
     }
 
     sub _have_compiler () {
