@@ -16,8 +16,6 @@ jobs:
     name: Linux
     uses: sanko/workflow-testing/.github/workflows/run-direct.yml@main
     secrets: inherit
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     with:
       task: |
         perl -V
@@ -40,8 +38,6 @@ jobs:
     name: macOS
     uses: sanko/workflow-testing/.github/workflows/run-direct.yml@main
     secrets: inherit
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     with:
       task: |
         perl -V
@@ -63,8 +59,6 @@ jobs:
     name: Windows
     uses: sanko/workflow-testing/.github/workflows/run-direct.yml@main
     secrets: inherit
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     with:
       #~ This task runs under git-bash (run-direct.yml `shell: bash`), but
       #~ native xmake.exe spawns from deep perl-under-bash chains fail with
