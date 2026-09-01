@@ -111,7 +111,6 @@ EOF
         use Path::Tiny;
         use JSON::PP;
         use Alien::Xrepo;
-        use Data::Dumper;
         field $alien_class : param;
         field $action      : param  //= 'build';
         field $argv        : param  //= [];
@@ -215,17 +214,19 @@ EOF
             my @parts         = split( /::/, $package );
             my $target_config = path('blib/lib')->child( @parts[ 0 .. $#parts - 1 ] )->child( $parts[-1] . '.pm' );
             $target_config->parent->mkpath;
-            my $dumper = Data::Dumper->new( [$data], ['conf'] );
-            $dumper->Indent(1)->Terse(1)->Sortkeys(1);
+            my $json = encode_json($data);
+            $json =~ s/\\/\\\\/g;
+            $json =~ s/'/\\'/g;
             my $depth   = scalar(@parts);
-            my $content = sprintf <<~'PERL', $package, $meta->name, $depth, $dumper->Dump;
+            my $content = sprintf <<~'PERL', $package, $meta->name, $depth, $json;
             package %s {
                 use v5.40;
+                use JSON::PP qw[decode_json];
                 use File::ShareDir qw[dist_dir];
                 use Path::Tiny qw[path];
                 my $dist_name = '%s';
                 my $depth     = %d;
-                my $config    = %s;
+                my $config    = decode_json('%s');
                 my $share_dir;
                 try {
                     $share_dir = path( dist_dir($dist_name) );

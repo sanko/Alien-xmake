@@ -14,7 +14,6 @@ class Alien::Xmake::Builder {
     use HTTP::Tiny;
     use Path::Tiny        qw[path cwd];
     use ExtUtils::Helpers qw[make_executable split_like_shell detildefy];
-    use Data::Dumper;
 
     # Configuration
     field $target_version : param : reader //= '';    # empty means "latest release" (resolved from the GitHub API)
@@ -24,19 +23,16 @@ class Alien::Xmake::Builder {
     field $target_config = 'lib/Alien/Xmake/ConfigData.pm';
 
     # GitHub release discovery
-    field $owner = 'xmake-io';
-    field $repo  = 'xmake';
-    field $http  : reader = do {
-        my %headers = (
-            'X-GitHub-Api-Version' => '2026-03-10',
-            accept                => 'application/vnd.github+json',
-        );
-        my $token = $ENV{GITHUB_TOKEN} // $ENV{GH_TOKEN};
+    field $owner         = 'xmake-io';
+    field $repo          = 'xmake';
+    field $http : reader = do {
+        my %headers = ( 'X-GitHub-Api-Version' => '2026-03-10', accept => 'application/vnd.github+json', );
+        my $token   = $ENV{GITHUB_TOKEN} // $ENV{GH_TOKEN};
         $headers{Authorization} = "Bearer $token" if $token && length $token;
         HTTP::Tiny->new( default_headers => \%headers, verify_SSL => 1 );
     };
-    field $gh_release;            # decoded latest/pinned release hashref (lazy)
-    field $resolved_version;      # target version tag (lazy, from the API when needed)
+    field $gh_release;          # decoded latest/pinned release hashref (lazy)
+    field $resolved_version;    # target version tag (lazy, from the API when needed)
 
     # Params to Build script
     field $install_base  : param    //= '';
@@ -177,25 +173,18 @@ use %s;
     method _github_release () {
         return $gh_release if defined $gh_release;
         my $tag = $self->target_version;
-        my $url = $tag
-            ? "https://api.github.com/repos/$owner/$repo/releases/tags/$tag"
-            : "https://api.github.com/repos/$owner/$repo/releases/latest";
+        my $url = $tag ? "https://api.github.com/repos/$owner/$repo/releases/tags/$tag" : "https://api.github.com/repos/$owner/$repo/releases/latest";
         say 'Resolving Xmake release info from the GitHub API...';
         my $res = $self->http->get($url);
-        my %rl  = map { $_ => $res->{headers}{$_} // '' }
-            qw[x-ratelimit-remaining x-ratelimit-limit x-ratelimit-reset retry-after];
+        my %rl  = map { $_ => $res->{headers}{$_} // '' } qw[x-ratelimit-remaining x-ratelimit-limit x-ratelimit-reset retry-after];
         if ( $res->{status} == 403 || $res->{status} == 429 ) {
             if ( $rl{'x-ratelimit-remaining'} eq '0' ) {
-                my $when = $rl{'x-ratelimit-reset'} =~ /^\d+$/
-                    ? '; resets at ' . scalar gmtime( $rl{'x-ratelimit-reset'} + 0 )
-                    : '';
-                die "GitHub API rate limit exceeded (limit=$rl{'x-ratelimit-limit'}$when)."
-                    . " Recommend setting GITHUB_TOKEN (5,000 req/hr) to raise the 60 req/hr unauth limit\n";
+                my $when = $rl{'x-ratelimit-reset'} =~ /^\d+$/ ? '; resets at ' . scalar gmtime( $rl{'x-ratelimit-reset'} + 0 ) : '';
+                die "GitHub API rate limit exceeded (limit=$rl{'x-ratelimit-limit'}$when)." .
+                    " Recommend setting GITHUB_TOKEN (5,000 req/hr) to raise the 60 req/hr unauth limit\n";
             }
-            my $retry = $rl{'retry-after'} =~ /^\d+$/ ? "; retry after $rl{'retry-after'}s" : '';
-            my $reset = $rl{'x-ratelimit-reset'} =~ /^\d+$/
-                ? "; remaining resets at " . scalar gmtime( $rl{'x-ratelimit-reset'} + 0 )
-                : '';
+            my $retry = $rl{'retry-after'}       =~ /^\d+$/ ? "; retry after $rl{'retry-after'}s"                                      : '';
+            my $reset = $rl{'x-ratelimit-reset'} =~ /^\d+$/ ? "; remaining resets at " . scalar gmtime( $rl{'x-ratelimit-reset'} + 0 ) : '';
             die "GitHub API rate limited (status $res->{status}$retry$reset). Set GITHUB_TOKEN to raise the limit\n";
         }
         die "GitHub releases API failed ($res->{status} $res->{reason}) for $url\n" unless $res->{success};
@@ -211,7 +200,7 @@ use %s;
     }
 
     # Locate a release asset by name pattern. Returns the asset hashref.
-    method _find_asset ( $re ) {
+    method _find_asset ($re) {
         my $assets = $self->_github_release->{assets} // [];
         for my $a (@$assets) {
             return $a if ( $a->{name} // '' ) =~ $re;
@@ -230,8 +219,7 @@ use %s;
                     say "Found suitable system Xmake: $sys_path ($ver)";
                     return { install_type => 'system', version => $ver, bin => "$sys_path" };
                 }
-                say "System Xmake found ($ver) but is older than required ("
-                    . $self->_desired_version . ").";
+                say "System Xmake found ($ver) but is older than required (" . $self->_desired_version . ").";
             }
         }
 
@@ -352,15 +340,17 @@ use %s;
     method _write_config_data ($data) {
         my $dest = path('blib')->child($target_config);
         $dest->parent->mkpath;
-        my $dumper = Data::Dumper->new( [$data], ['conf'] );
-        $dumper->Indent(1)->Terse(1)->Sortkeys(1);
-        my $content = sprintf <<~'PERL', $dumper->Dump;
+        my $json = encode_json($data);
+        $json =~ s/\\/\\\\/g;
+        $json =~ s/'/\\'/g;
+        my $content = sprintf <<~'PERL', $json;
         package Alien::Xmake::ConfigData {
             use v5.40;
+            use JSON::PP qw[decode_json];
             use File::Spec;
             use File::Basename qw[dirname];
 
-            my $config = %s;
+            my $config = decode_json('%s');
 
             sub config ($s, $key //= ()) { defined $key ? $config->{$key} : $config }
             sub config_names { sort keys %%$config }
@@ -406,9 +396,8 @@ use %s;
 
         # Preferred: the exact asset URL reported by the GitHub API. Fall back to
         # the canonical hardcoded URL if the release metadata is unavailable.
-        my $asset = $self->_find_asset( qr/\Q$filename\E\z/i );
-        my $url   = $asset ? $asset->{browser_download_url}
-                          : "https://github.com/$owner/$repo/releases/download/$target/$filename";
+        my $asset   = $self->_find_asset(qr/\Q$filename\E\z/i);
+        my $url     = $asset ? $asset->{browser_download_url} : "https://github.com/$owner/$repo/releases/download/$target/$filename";
         my $outfile = $temppath->child('xmake-installer.exe');
         if ( !$self->_download_file( $url, $outfile ) ) {
             die "Download failed for $url";
@@ -459,9 +448,8 @@ use %s;
 
         # Preferred: the exact asset URL reported by the GitHub API. Fall back to
         # the canonical hardcoded URL if the release metadata is unavailable.
-        my $asset  = $self->_find_asset( qr/\Q$filename\E\z/i );
-        my $gh_url = $asset ? $asset->{browser_download_url}
-                          : "https://github.com/$owner/$repo/releases/download/$version/$filename";
+        my $asset   = $self->_find_asset(qr/\Q$filename\E\z/i);
+        my $gh_url  = $asset ? $asset->{browser_download_url} : "https://github.com/$owner/$repo/releases/download/$version/$filename";
         my $outfile = $build_dir->child('xmake.run');
         say "Attempting download from $gh_url...";
         if ( !$self->_download_file( $gh_url, $outfile ) ) {

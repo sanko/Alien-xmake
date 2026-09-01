@@ -110,11 +110,17 @@
          "file" : "lib/Alien/Xrepo.pm",
          "version" : "0.08"
       },
+      "Alien::Xrepo::Base" : {
+         "file" : "lib/Alien/Xrepo/Base.pm"
+      },
+      "Alien::Xrepo::Base::Builder" : {
+         "file" : "lib/Alien/Xrepo/Base.pm"
+      },
       "Alien::Xrepo::PackageInfo" : {
          "file" : "lib/Alien/Xrepo.pm"
       }
    },
-   "release_status" : "stable",
+   "release_status" : "testing",
    "resources" : {
       "bugtracker" : {
          "web" : "https://github.com/sanko/Alien-Xmake/issues"
