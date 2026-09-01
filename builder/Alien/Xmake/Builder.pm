@@ -311,6 +311,7 @@ use %s;
     method _find_system_xmake ( ) {
         my $sep = ( $^O eq 'MSWin32' ) ? ';' : ':';
         for my $dir ( split /$sep/, $ENV{PATH} ) {
+            next unless length $dir;
             my $p    = path($dir);
             my $exts = ( $^O eq 'MSWin32' ) ? [qw(.exe .cmd .bat)] : [''];
             for my $ext (@$exts) {
