@@ -11,6 +11,7 @@ class Alien::Xrepo v0.9.0 {
     #
     field $verbose : param //= 0;
     field $root    : param //= undef;
+    field $theme   : param //= 'plain';
     field $xmake = Alien::Xmake->new;
 
     # Resolve which package store a call should operate on. A per-call `installdir` wins, then the
@@ -67,6 +68,7 @@ class Alien::Xrepo v0.9.0 {
         #
         method install ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
 
@@ -95,6 +97,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method uninstall ( $pkg_spec, %opts ) {
+        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @args = $self->_build_args( \%opts );
@@ -105,6 +108,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method search ( $query, %opts ) {
+        local $ENV{XMAKE_THEME} = $self->_theme(%opts);
         say "[*] xrepo: searching for $query..." if $verbose;
         my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'search' );
         push @cmd, '--addon' if $opts{addon};
@@ -113,6 +117,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method clean (%opts) {
+        local $ENV{XMAKE_THEME}               = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         say '[*] xrepo: cleaning cache...' if $verbose;
@@ -120,6 +125,7 @@ class Alien::Xrepo v0.9.0 {
     }
     #
     method add_repo ( $name, $url, $branch //= () ) {
+        local $ENV{XMAKE_THEME} = $self->_theme;
         say "[*] xrepo: adding repo $name..." if $verbose;
         my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'add-repo', '-y', $name, $url );
         push @cmd, $branch if defined $branch;
@@ -129,11 +135,13 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method remove_repo ($name) {
+        local $ENV{XMAKE_THEME} = $self->_theme;
         say "[*] xrepo: removing repo $name..." if $verbose;
         system $xmake->exe, qw[lua private.xrepo], 'remove-repo', '-y', $name;
     }
 
     method update_repo ( $name //= () ) {
+        local $ENV{XMAKE_THEME} = $self->_theme;
         say '[*] xrepo: updating repositories...' if $verbose;
         my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'update-repo', '-y' );
         push @cmd, $name if defined $name;
@@ -194,9 +202,14 @@ class Alien::Xrepo v0.9.0 {
         return @args;
     }
 
+    # Theme used for xmake/xrepo output. Defaults to 'plain' (no ANSI); callers may pass
+    # `theme =>` per-call, or `theme =>` to the constructor. xmake reads $ENV{XMAKE_THEME}.
+    method _theme (%opts) { $opts{theme} // $theme }
+
     # Run `xrepo fetch` and return a parsed PackageInfo (or raw flags).
     method fetch ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
@@ -226,6 +239,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method info ( $pkg_spec, %opts ) {
+        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
@@ -247,6 +261,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method scan ( $pkg //= (), %opts ) {
+        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @args = $self->_build_args( { %opts, no_kind => 1 } );
@@ -261,6 +276,7 @@ class Alien::Xrepo v0.9.0 {
 
     method download ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
@@ -276,6 +292,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method list_repo () {
+        local $ENV{XMAKE_THEME} = $self->_theme;
         say '[*] xrepo: listing remote repositories...' if $verbose;
         my ( $out, $err, $exit ) = capture { system( $xmake->exe, qw[lua private.xrepo], 'list-repo' ) };
         return () if $exit != 0;
@@ -285,6 +302,7 @@ class Alien::Xrepo v0.9.0 {
 
     method import_pkg ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
@@ -301,6 +319,7 @@ class Alien::Xrepo v0.9.0 {
 
     method export ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
@@ -316,6 +335,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method env ( $program //= (), %opts ) {
+        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;

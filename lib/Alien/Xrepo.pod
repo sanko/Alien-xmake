@@ -135,6 +135,12 @@ C<fetch>, C<scan>, C<uninstall>, ...) uses C<installdir =E<gt> $root> unless a p
 instance is confined to its own project-local directory instead of the shared per-user store. Used by
 L<Alien::Xrepo::Base> and the dist builder to keep a distribution's native dependencies inside its C<share> directory.
 
+=item B<theme>
+
+Optional xmake output theme, passed to xmake as C<$ENV{XMAKE_THEME}>. Defaults to C<plain>, which suppresses ANSI
+color codes from xmake/xrepo output (clean CPAN test reports, CI logs, and captures). Set C<theme =E<gt> 'default'>
+to restore xmake's colored output. May be overridden per-call with C<theme =E<gt> ...> on any store-touching method.
+
 =back
 
 =head1 METHODS
@@ -243,6 +249,10 @@ C<XMAKE_PKG_INSTALLDIR> / C<XMAKE_PKG_CACHEDIR> environment variables. This lets
 project-local directory instead of the shared per-user store, which gives reproducible builds and protects against an
 unrelated C<xrepo> run upgrading or removing the packages your wrapper depends on. Pass the same values to C<fetch>,
 C<scan>, C<uninstall>, and friends so they operate on the same store.
+
+=item B<theme>
+
+Per-call xmake output theme override. Defaults to the C<theme> constructor value (C<plain>). See L</new>.
 
 =back
 

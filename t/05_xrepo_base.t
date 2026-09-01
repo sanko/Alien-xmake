@@ -1,11 +1,11 @@
 use v5.40;
-use feature 'class';
+use blib;
 use Test2::V0 '!subtest', -no_srand => 1;
 use Test2::Util::Importer 'Test2::Tools::Subtest' => ( subtest_streamed => { -as => 'subtest' } );
 use Path::Tiny qw[path cwd];
 use Alien::Xrepo::Base;
 use File::Temp qw[tempdir];
-no warnings qw[experimental::class];
+use experimental 'class';
 
 # Test package
 class Alien::Xrepo::TestPackage : isa(Alien::Xrepo::Base) {
@@ -33,8 +33,8 @@ subtest 'pre-install delegation' => sub {
     is $fresh->libs,                  '',    'libs is empty before install';
     is $fresh->find_header('zlib.h'), undef, 'find_header is undef before install';
     my @bins0 = $fresh->bin_dir;
-    is [@bins0],             [ [] ], 'bin_dir is empty before install';
-    is $fresh->package_info, undef,  'package_info is undef before install';
+    is [@bins0],             [ U() ], 'bin_dir is empty before install';
+    is $fresh->package_info, undef,   'package_info is undef before install';
 };
 
 # Test install
