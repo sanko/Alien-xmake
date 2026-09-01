@@ -92,10 +92,8 @@ class Alien::Xrepo v0.9.0 {
         $self->blah("Running: @fetch_cmd");
         my ( $json_out, $json_err, $json_exit ) = capture { system @fetch_cmd };
         die "xrepo fetch failed:\nCommand: @fetch_cmd\nError:\n$json_err" if $json_exit != 0;
-        my $data;
-        try { $data = decode_json($json_out); } catch ($e) {
-            die "Failed to decode xrepo JSON output: $e\nOutput was: $json_out"
-        };
+        $self->blah("Raw fetch output:\n$json_out");
+        my $data = $self->_decode_json_output($json_out);
 
         # xrepo might return a single object or a list.
         $self->_process_info( ( ref $data eq 'ARRAY' ) ? $data->[0] : $data );
@@ -240,10 +238,8 @@ class Alien::Xrepo v0.9.0 {
 
         # cflags/ldflags mode: xrepo returns a plain flag string, not JSON
         return $json_out if $flags_mode;
-        my $data;
-        try { $data = decode_json($json_out); } catch ($e) {
-            die "Failed to decode xrepo JSON output: $e\nOutput was: $json_out";
-        };
+        $self->blah("Raw fetch output:\n$json_out");
+        my $data = $self->_decode_json_output($json_out);
 
         # xrepo might return a single object or a list.
         return $self->_process_info( ( ref $data eq 'ARRAY' ) ? $data->[0] : $data );
@@ -363,6 +359,24 @@ class Alien::Xrepo v0.9.0 {
         system @cmd;
     }
 
+    # Decode xrepo `--json` output. xrepo can prefix the JSON with non-JSON "checking for X"
+    # chatter (e.g. the MSVC/compiler check on first install on Windows), so we skip leading
+    # prose lines and decode starting at the first JSON value line instead of demanding the
+    # whole capture be pure JSON.
+    method _decode_json_output ($raw) {
+        die "xrepo produced no JSON: got empty output" unless defined $raw && length $raw;
+        my ( $rest, $found );
+        for my $line ( split /\r?\n/, $raw ) {
+            if ( $line =~ /^\s*[\[{"]/ ) { $found = 1; }
+            next unless $found;
+            $rest .= $line . "\n";
+        }
+        die "xrepo produced no JSON; the probe/check chatter did not yield any JSON value.\nOutput was:\n$raw" unless $found;
+        my $decoded = eval { decode_json($rest) };
+        die "Failed to decode xrepo JSON output: $@\nOutput was:\n$raw" if !defined $decoded;
+        return $decoded;
+    }
+
     method _process_info ($info) {
         return () unless defined $info;
         my $libfiles   = $info->{libfiles}    // [];
@@ -387,9 +401,9 @@ class Alien::Xrepo v0.9.0 {
             }
         }
 
-        # A package that ships neither libraries nor headers but has an install
-        # root is a binary tool (ninja, cmake, node, ...); anything else is a
-        # library (or header-only). xrepo only reports `kind` for the former.
+        # A package that ships neither libraries nor headers but has an install root is a binary
+        # tool (ninja, cmake, node, ...); anything else is a library (or header-only). xrepo only
+        # reports `kind` for the former.
         if ( !defined $kind || !length $kind ) {
             $kind = ( defined $installdir && !@$libfiles && !@$incdirs ) ? 'binary' : 'library';
         }

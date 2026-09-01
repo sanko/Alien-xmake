@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - We install the latest tagged release of xmake rather than hardcoding a version.
 
+### Fixed
+
+- `Alien::Xrepo` no longer chokes when xrepo prefixes its `--json` fetch/info
+  output with non-JSON "checking for ..." chatter (e.g. the MSVC/compiler probe
+  on a first install on Windows CI). Fetch/install/info now skip leading prose
+  lines and decode starting at the first JSON value.
+- `bin_dir` semantics in `t/05_xrepo_base.t`: a pure library such as zlib only
+  reports a `bin_dir` when its install root actually has a `bin/` subdir (DLLs
+  on Windows). The test no longer requires one on Unix, where the shared lib
+  lives in `lib/` and `bin_dir` is legitimately empty; the non-empty guarantee
+  is asserted for binary tools (ninja) instead.
+
 ### Added
 
 - Automatic confirmation for xmake/xrepo prompts: both `Alien::Xmake` and

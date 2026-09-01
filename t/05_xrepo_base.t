@@ -57,9 +57,19 @@ like $alien->cflags, qr{-I}, 'cflags include at least one -I include flag';
 my $cflag_inc_count = () = $alien->cflags =~ /-I/g;
 is $cflag_inc_count, scalar @{ $pi->includedirs }, 'one -I flag per includedir';
 
-# bin_dir lists the directories holding executables / DLLs
+# bin_dir lists the directories holding executables / DLLs. A pure library
+# (zlib) only carries one when its install root has a bin/ subdir (e.g. DLLs on
+# Windows); on Unix the shared lib sits in lib/ so bin_dir may be empty. What is
+# guaranteed is that it mirrors package_info and never lies about the layout.
 my @zlib_bin_dirs = $alien->bin_dir;
-ok @zlib_bin_dirs, 'bin_dir reports where the DLLs/executables live';
+is [@zlib_bin_dirs], [ $alien->package_info->bin_dir ], 'zlib bin_dir matches package_info';
+if (@zlib_bin_dirs) {
+    my $expect = path( $alien->package_info->installdir )->child('bin');
+    ok( ( map { path($_) } @zlib_bin_dirs )[0] eq $expect, 'zlib bin_dir is the installdir/bin dir' );
+}
+else {
+    ok !-d path( $alien->package_info->installdir )->child('bin'), 'zlib has no bin/ subdir on this platform, so bin_dir is empty';
+}
 
 # Idempotency: installing again reuses the cached package
 my $info2 = $alien->install;
