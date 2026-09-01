@@ -1,12 +1,12 @@
 use v5.40;
-use feature 'class';
-no warnings 'experimental::class';
-
-class Alien::Xrepo::Base {
+use experimental 'class';
+#
+class Alien::Xrepo::Base v0.0.9 {
     use Alien::Xrepo;
     use Path::Tiny;
     use Exporter qw[import];
     our @EXPORT = qw[Build_PL];
+    #
     field $package_name       : param = undef;
     field $version_constraint : param = undef;
     field $root               : param = undef;
@@ -19,7 +19,7 @@ class Alien::Xrepo::Base {
 
         # Attempt to populate $info from generated ConfigData
         my $child_class  = ref($self);
-        my $config_class = "${child_class}::ConfigData";
+        my $config_class = $child_class . '::ConfigData';
         try {
             my $file = $config_class =~ s|::|/|gr . '.pm';
             require $file;
@@ -53,7 +53,7 @@ class Alien::Xrepo::Base {
     # Delegation methods
     method libpath () { $info ? $info->libpath : undef }
     method ffi_lib () { $self->libpath }
-    method bin_dir () { $info ? $info->bin_dir : [] }
+    method bin_dir () { $info ? $info->bin_dir : () }
     method version () { $info ? $info->version : undef }
     method kind ()    { $info ? $info->kind    : undef }
 
@@ -103,15 +103,13 @@ EOF
         }
         Alien::Xrepo::Base::Builder->new( alien_class => $alien_class, action => $action, argv => \@ARGV )->execute();
     }
-
-    class Alien::Xrepo::Base::Builder {
+    class Alien::Xrepo::Base::Builder v0.0.9 {
         use CPAN::Meta;
         use ExtUtils::Install qw[install];
         use ExtUtils::InstallPaths;
         use Path::Tiny;
         use JSON::PP;
         use Alien::Xrepo;
-        use Data::Dumper;
         field $alien_class : param;
         field $action      : param  //= 'build';
         field $argv        : param  //= [];
@@ -119,17 +117,17 @@ EOF
         field $verbose     : param  //= 0;
 
         method execute() {
-            my $method = "ACTION_$action";
+            my $method = 'ACTION_' . $action;
             if ( $self->can($method) ) {
                 $self->$method();
             }
             else {
-                die "No such action: $action";
+                die 'No such action: ' . $action;
             }
         }
 
         method ACTION_build() {
-            say "Building " . $meta->name;
+            say 'Building ' . $meta->name;
             path('blib/lib')->mkpath;
             path('blib/arch')->mkpath;
             $self->_copy_libs();
@@ -171,7 +169,7 @@ EOF
                 next if $rel =~ m{(^|/)\.};
                 my $dest = path('blib/lib')->child($rel);
                 $dest->parent->mkpath;
-                $file->copy($dest) or die "Copy failed: $!";
+                $file->copy($dest) or die 'Copy failed: ' . $!;
             }
         }
 
@@ -205,27 +203,29 @@ EOF
                     installdir  => $make_rel->( $info->installdir ),
                     license     => $info->license,
                     shared      => $info->shared ? 1 : 0,
-                    static      => $info->static ? 1 : 0,
+                    static      => $info->static ? 1 : 0
                 }
             };
         }
 
         method _write_config_data($data) {
-            my $package       = $alien_class . "::ConfigData";
+            my $package       = $alien_class . '::ConfigData';
             my @parts         = split( /::/, $package );
             my $target_config = path('blib/lib')->child( @parts[ 0 .. $#parts - 1 ] )->child( $parts[-1] . '.pm' );
             $target_config->parent->mkpath;
-            my $dumper = Data::Dumper->new( [$data], ['conf'] );
-            $dumper->Indent(1)->Terse(1)->Sortkeys(1);
+            my $json = encode_json($data);
+            $json =~ s/\\/\\\\/g;
+            $json =~ s/'/\\'/g;
             my $depth   = scalar(@parts);
-            my $content = sprintf <<~'PERL', $package, $meta->name, $depth, $dumper->Dump;
+            my $content = sprintf <<~'PERL', $package, $meta->name, $depth, $json;
             package %s {
                 use v5.40;
+                use JSON::PP qw[decode_json];
                 use File::ShareDir qw[dist_dir];
                 use Path::Tiny qw[path];
                 my $dist_name = '%s';
                 my $depth     = %d;
-                my $config    = %s;
+                my $config    = decode_json('%s');
                 my $share_dir;
                 try {
                     $share_dir = path( dist_dir($dist_name) );
@@ -248,7 +248,7 @@ EOF
                                 installdir  => $make_abs->($c->{installdir}),
                                 includedirs =>[ map { $make_abs->($_) } @{ $c->{includedirs} // [] } ],
                                 linkdirs    =>[ map { $make_abs->($_) } @{ $c->{linkdirs} // [] } ],
-                                bindirs     =>[ map { $make_abs->($_) } @{ $c->{bindirs} // [] } ],
+                                bindirs     =>[ map { $make_abs->($_) } @{ $c->{bindirs} // [] } ]
                             };
                         }
                         $copy;
@@ -266,5 +266,12 @@ EOF
             say "Generated $target_config";
         }
     }
-}
-1;
+    }
+    #
+    1;
+__END__
+Copyright (C) Sanko Robinson.
+
+This library is free software; you can redistribute it and/or modify it under the terms found in
+the Artistic License 2. Other copyrights, terms, and conditions may apply to data transmitted
+through this module.

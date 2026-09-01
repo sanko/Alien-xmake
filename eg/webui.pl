@@ -1,204 +1,269 @@
 use v5.40;
+use feature 'class';
+no warnings 'experimental::class';
 
-#~ use lib 'C:\Users\S\Documents\GitHub\Alien-Xmake\lib';
-use blib;
+# A modern, object-oriented WebUI example.
+#
+# Shows how to:
+#   * resolve the webui C library through Alien::Xrepo / xrepo
+#   * declare typed, named Affix signatures (enums, structs, callbacks)
+#   * register synchronous element callbacks  via webui_bind()
+#   * register async, response-capable calls  via webui_interface_bind()
+#     (these show up on the JS side as Promise-returning functions)
+#   * push state from Perl back into the page via webui_run()
+#   * observe window events: connected, disconnected, click, navigation
+#
+# TODO: https://webui.me/docs.html#/
+#
 use Alien::Xrepo;
-$|++;
-
-# Initialize
 my $repo = Alien::Xrepo->new( verbose => 0 );
 $repo->update_repo;
 my $webui = $repo->install('webui');
-use Affix;
-use Affix::Wrap;
 
-#~ use Data::Dump;
-#~ ddx $webui;
-#~ ddx $webui->_data_printer;
-#~ ddx $webui->includedirs;
-my $lib = $webui->libpath;
+# A tiny OO wrapper around the WebUI C API used here.
+# The affix declarations mirror include/webui.h from the installed package.
+class WebUI {
+    use Affix    qw[:all];
+    use JSON::PP qw[encode_json];
+    #
+    my $lib = $webui->libpath;
+    typedef webui_events =>
+        Enum [ 'WEBUI_EVENT_DISCONNECTED', 'WEBUI_EVENT_CONNECTED', 'WEBUI_EVENT_MOUSE_CLICK', 'WEBUI_EVENT_NAVIGATION', 'WEBUI_EVENT_CALLBACK' ];
+    typedef webui_event_t => Struct [ window => Size_t, event_type => Size_t, element => String, event_number => Size_t, bind_id => Size_t ];
+    affix $lib, webui_new_window => [], Size_t;
+    affix $lib, webui_show       => [ Size_t, String ], Bool;
+    affix $lib, webui_wait       => [], Void;
+    affix $lib, webui_close      => [Size_t], Void;
+    affix $lib, webui_clean      => [], Void;
+    affix $lib, webui_run        => [ Size_t, String ], Void;
+    affix $lib, webui_navigate   => [ Size_t, String ], Void;
+    affix $lib, webui_get_url    => [Size_t], String;
+    affix $lib, webui_set_size   => [ Size_t, UInt, UInt ], Void;
 
-=head2 webui_browsers
+    # Synchronous window event / element callbacks: void, event struct pointer
+    affix $lib,
+        webui_bind => [ Size_t, String, Callback [ [ Pointer [ webui_event_t() ] ] => Void ] ],
+        Size_t;
 
--- Enums ---------------------------
-
-=cut
-
-typedef webui_browsers => Enum [
-    [ NoBrowser     => 0 ],
-    [ AnyBrowser    => 1 ],
-    [ Chrome        => 2 ],
-    [ Firefox       => 3 ],
-    [ Edge          => 4 ],
-    [ Safari        => 5 ],
-    [ Chromium      => 6 ],
-    [ Opera         => 7 ],
-    [ Brave         => 8 ],
-    [ Vivaldi       => 9 ],
-    [ Epic          => 10 ],
-    [ Yandex        => 11 ],
-    [ ChromiumBased => 12 ]
-];
-typedef webui_runtimes => Enum [qw[None Deno NodeJS]];
-typedef webui_events =>
-    Enum [ 'WEBUI_EVENT_DISCONNECTED', 'WEBUI_EVENT_CONNECTED', 'WEBUI_EVENT_MOUSE_CLICK', 'WEBUI_EVENT_NAVIGATION', 'WEBUI_EVENT_CALLBACK' ];
-typedef webui_event_t => Struct [ window => Size_t, event_type => Size_t, element => Pointer [Char], event_number => Size_t, bind_id => Size_t ];
-affix $lib, webui_new_window        => [], Size_t;
-affix $lib, webui_new_window_id     => [Size_t], Size_t;
-affix $lib, webui_get_new_window_id => [], Size_t;
-affix $lib,
-    webui_bind => [ Size_t, Pointer [Char], Callback [ [ Pointer [ webui_event_t() ] ] => Void ] ],
-    Size_t;
-affix $lib, webui_show                    => [ Size_t, Pointer [Char] ], Bool;
-affix $lib, webui_show_browser            => [ Size_t, Pointer [Char], Size_t ], Bool;
-affix $lib, webui_set_kiosk               => [ Size_t, Bool ], Void;
-affix $lib, webui_wait                    => [], Void;
-affix $lib, webui_close                   => [Size_t], Void;
-affix $lib, webui_destroy                 => [Size_t], Void;
-affix $lib, webui_exit                    => [], Void;
-affix $lib, webui_set_root_folder         => [ Size_t, Pointer [Char] ], Bool;
-affix $lib, webui_set_default_root_folder => [ Pointer [Char] ], Bool;
-affix $lib,
-    webui_set_file_handler => [ Size_t, Callback [ [ Pointer [Char], Pointer [Int] ] => Pointer [Void] ] ],
-    Void;
-affix $lib, webui_is_shown              => [Size_t], Bool;
-affix $lib, webui_set_timeout           => [Size_t], Void;
-affix $lib, webui_set_icon              => [ Size_t, Pointer [Char], Pointer [Char] ], Void;
-affix $lib, webui_encode                => [ Pointer [Char] ], Pointer [Char];
-affix $lib, webui_decode                => [ Pointer [Char] ], Pointer [Char];
-affix $lib, webui_free                  => [ Pointer [Void] ], Void;
-affix $lib, webui_malloc                => [Size_t], Pointer [Void];
-affix $lib, webui_send_raw              => [ Size_t, Pointer [Char], Pointer [Void], Size_t ], Void;
-affix $lib, webui_set_hide              => [ Size_t, Bool ], Void;
-affix $lib, webui_set_size              => [ Size_t, UInt, UInt ], Void;
-affix $lib, webui_set_position          => [ Size_t, UInt, UInt ], Void;
-affix $lib, webui_set_profile           => [ Size_t, Pointer [Char], Pointer [Char] ], Void;
-affix $lib, webui_get_url               => [Size_t], Pointer [Char];
-affix $lib, webui_set_public            => [ Size_t, Bool ], Void;
-affix $lib, webui_navigate              => [ Size_t, Pointer [Char] ], Void;
-affix $lib, webui_clean                 => [], Void;
-affix $lib, webui_delete_all_profiles   => [], Void;
-affix $lib, webui_delete_profile        => [Size_t], Void;
-affix $lib, webui_get_parent_process_id => [Size_t], Size_t;
-affix $lib, webui_get_child_process_id  => [Size_t], Size_t;
-affix $lib, webui_set_port              => [ Size_t, Size_t ], Bool;
-affix $lib, webui_set_tls_certificate   => [ Pointer [Char], Pointer [Char] ], Bool;
-affix $lib, webui_run                   => [ Size_t, Pointer [Char] ], Void;
-affix $lib, webui_script                => [ Size_t, Pointer [Char], Size_t, Pointer [Char], Size_t ], Bool;
-affix $lib, webui_set_runtime           => [ Size_t, Size_t ], Void;
-affix $lib, webui_get_int_at            => [ Pointer [ webui_event_t() ], Size_t ], LongLong;
-affix $lib, webui_get_int               => [ Pointer [ webui_event_t() ] ], LongLong;
-affix $lib, webui_get_string_at         => [ Pointer [ webui_event_t() ], Size_t ], Pointer [Char];
-affix $lib, webui_get_string            => [ Pointer [ webui_event_t() ] ], Pointer [Char];
-affix $lib, webui_get_bool_at           => [ Pointer [ webui_event_t() ], Size_t ], Bool;
-affix $lib, webui_get_bool              => [ Pointer [ webui_event_t() ] ], Bool;
-affix $lib, webui_get_size_at           => [ Pointer [ webui_event_t() ], Size_t ], Size_t;
-affix $lib, webui_get_size              => [ Pointer [ webui_event_t() ] ], Size_t;
-affix $lib, webui_return_int            => [ Pointer [ webui_event_t() ], LongLong ], Void;
-affix $lib, webui_return_string         => [ Pointer [ webui_event_t() ], Pointer [Char] ], Void;
-affix $lib, webui_return_bool           => [ Pointer [ webui_event_t() ], Bool ], Void;
-affix $lib,
-    webui_interface_bind => [ Size_t, Pointer [Char], Callback [ [ Size_t, Size_t, Pointer [Char], Size_t, Size_t ] => Void ] ],
-    Size_t;
-affix $lib, webui_interface_set_response   => [ Size_t, Size_t, Pointer [Char] ], Void;
-affix $lib, webui_interface_is_app_running => [], Bool;
-affix $lib, webui_interface_get_window_id  => [Size_t], Size_t;
-affix $lib, webui_interface_get_string_at  => [ Size_t, Size_t, Size_t ], Pointer [Char];
-affix $lib, webui_interface_get_int_at     => [ Size_t, Size_t, Size_t ], LongLong;
-affix $lib, webui_interface_get_bool_at    => [ Size_t, Size_t, Size_t ], Bool;
-affix $lib, webui_interface_get_size_at    => [ Size_t, Size_t, Size_t ], Size_t;
-#
-sub events($e) {
-    use Data::Dump;
-    ddx $e;
-    warn 'Event!';
-    if ( $$e->{event_type} == WEBUI_EVENT_CONNECTED() ) {
-        say 'Connected.';
+    # Async, response-capable callbacks: window, type, element, event#, bind#
+    affix $lib,
+        webui_interface_bind => [ Size_t, String, Callback [ [ Size_t, Size_t, String, Size_t, Size_t ] => Void ] ],
+        Size_t;
+    affix $lib, webui_interface_set_response  => [ Size_t, Size_t, String ], Void;
+    affix $lib, webui_interface_get_int_at    => [ Size_t, Size_t, Size_t ], LongLong;
+    affix $lib, webui_interface_get_string_at => [ Size_t, Size_t, Size_t ], String;
+    affix $lib, webui_interface_get_size_at   => [ Size_t, Size_t, Size_t ], Size_t;
+    #
+    field $win : param //= webui_new_window();
+    #
+    # Synchronous event / element callback
+    method on ( $element, $callback ) {
+        webui_bind( $win, $element, $callback );
+        $self;
     }
-    elsif ( $$e->{event_type} == WEBUI_EVENT_DISCONNECTED() ) {
-        say("Disconnected. \n");
+
+    # Async callback callable from JS as a Promise
+    method on_call ( $element, $callback ) {
+        webui_interface_bind( $win, $element, $callback );
+        $self;
     }
-    elsif ( $$e->{event_type} == WEBUI_EVENT_MOUSE_CLICK() ) {
-        say("Click. \n");
-    }
-    elsif ( $$e->{event_type} == WEBUI_EVENT_NAVIGATION() ) {
-        say( "Starting navigation to: %s \n", e->data );
-    }
+
+    # Argument access for async callbacks
+    method arg_size ( $event_number, $i )     { webui_interface_get_size_at( $win, $event_number, $i ) }
+    method arg_i    ( $event_number, $i )     { webui_interface_get_int_at( $win, $event_number, $i ) }
+    method arg_s    ( $event_number, $i )     { webui_interface_get_string_at( $win, $event_number, $i ) }
+    method respond  ( $event_number, $value ) { webui_interface_set_response( $win, $event_number, '' . $value ) }
+
+    # Run JavaScript in the page
+    method run ($script)  { webui_run( $win, $script );                              return $self }
+    method log ($message) { $self->run( 'log(' . encode_json( [$message] ) . ');' ); return $self }
+    method url ( )                     { webui_get_url($win) }
+    method navigate ($url)             { webui_navigate( $win, $url );            return $self }
+    method set_size( $width, $height ) { webui_set_size( $win, $width, $height ); $self }
+    method show ($html)                { webui_show( $win, $html );               $self }
+    method wait ( )                    { webui_wait() }
+    method clean ( )                   { webui_clean() }
 }
 #
-my $win = webui_new_window();
-webui_bind( $win, '', \&events );
+my $app = WebUI->new;
+my $home;    # our own URL, captured on connect
+my $count = 0;
 
-#~ webui_bind($win, '', \&events);
-sub _e { warn '!!!!!!!!!!!!!!_e'; }
-webui_bind( $win, 'my_function_string', \&_e );
-my $html = '<html><script src="webui.js"></script> Hello World from C! </html>';
-$html = <<'HTML';
-    <!DOCTYPE html>
-	    <html>
-	      <head>
-	        <meta charset="UTF-8">
-	        <script src="webui.js"></script>
-	        <title>Call C from JavaScript Example</title>
-	        <style>
-	           body {
-	                font-family: 'Arial', sans-serif;
-	                color: white;
-	                background: linear-gradient(to right, #507d91, #1c596f, #022737);
-	                text-align: center;
-	                font-size: 18px;
-	            }
-	            button, input {
-	                padding: 10px;
-	                margin: 10px;
-	                border-radius: 3px;
-	               border: 1px solid #ccc;
-	                box-shadow: 0 3px 5px rgba(0,0,0,0.1);
-	                transition: 0.2s;
-	            }
-	            button {
-	                background: #3498db;
-	                color: #fff;
-	                cursor: pointer;
-	                font-size: 16px;
-	            }
-	            h1 { text-shadow: -7px 10px 7px rgb(67 57 57 / 76%); }
-	            button:hover { background: #c9913d; }
-	            input:focus { outline: none; border-color: #3498db; }
-	        </style>
-	      </head>
-	      <body>
-	        <h1>WebUI - Call C from JavaScript</h1>
-	        <p>Call C functions with arguments (<em>See the logs in your terminal</em>)</p>
-	        <button onclick="my_function_string('Hello', 'World');">Call my_function_string()</button>
-	        <br>
-	        <button onclick="my_function_integer(123, 456, 789, 12345.6789);">Call my_function_integer()</button>
-	        <br>
-	        <button onclick="my_function_boolean(true, false);">Call my_function_boolean()</button>
-	        <br>
-	        <button onclick="my_function_raw_binary(new Uint8Array([0x41,0x42,0x43]), big_arr);">
-	         Call my_function_raw_binary()</button>
-	        <br>
-	        <p>Call a C function that returns a response</p>
-	        <button onclick="MyJS();">Call my_function_with_response()</button>
-	        <div>Double: <input type="text" id="MyInputID" value="2"></div>
-	        <script>
-	          const arr_size = 512 * 1000;
-	          const big_arr = new Uint8Array(arr_size);
-	          big_arr[0] = 0xA1;
-	          big_arr[arr_size - 1] = 0xA2;
-	          function MyJS() {
-	            const MyInput = document.getElementById('MyInputID');
-	           const number = MyInput.value;
-	            my_function_with_response(number, 2).then((response) => {
-	                MyInput.value = response;
-	            });
-	          }
-	        </script>
-	      </body>
-	    </html>
+# Window events
+$app->on(
+    '' => sub ($e) {
+        my $type = $e->{event_type};
+        if ( $type == WebUI::WEBUI_EVENT_CONNECTED() ) {
+            $home = $app->url;
+            $app->log( 'Window connected - ' . $home );
+            $app->run( 'updateCount(' . $count . ');' );
+        }
+        elsif ( $type == WebUI::WEBUI_EVENT_DISCONNECTED() ) { $app->log('Window disconnected'); }
+        elsif ( $type == WebUI::WEBUI_EVENT_MOUSE_CLICK() )  { $app->log( 'Mouse click on "' . ( $e->{element} // '' ) . '"' ); }
+        elsif ( $type == WebUI::WEBUI_EVENT_NAVIGATION() ) {
+            $app->log( 'Navigation to ' . ( $app->url // '?' ) . ' - coming right back' );
+            $app->navigate($home) if $home;
+        }
+    }
+);
+
+# Synchronous element callbacks (void)
+$app->on( count_inc   => sub ($e) { $count++;   $app->log( 'count_inc() -> ' . $count ); $app->run( 'updateCount(' . $count . ');' ) } );
+$app->on( count_dec   => sub ($e) { $count--;   $app->log( 'count_dec() -> ' . $count ); $app->run( 'updateCount(' . $count . ');' ) } );
+$app->on( count_reset => sub ($e) { $count = 0; $app->log('count_reset() -> 0');         $app->run('updateCount(0);'); } );
+
+# Async, response-capable callbacks (Promise on the JS side)
+$app->on_call(
+    double_async => sub ( $win, $event_type, $element, $event_number, $bind_id ) {
+        my $n = $app->arg_i( $event_number, 0 );
+        $app->log( 'double_async( ' . $n . ' ) - arg0 is ' . $app->arg_size( $event_number, 0 ) . ' byte(s)' );
+        $app->respond( $event_number, $n * 2 );
+    }
+);
+$app->on_call(
+    shout_async => sub ( $win, $event_type, $element, $event_number, $bind_id ) {
+        my $text = $app->arg_s( $event_number, 0 ) // '';
+        $app->log( 'shout_async( "' . $text . '" )' );
+        $app->respond( $event_number, uc $text );
+    }
+);
+#
+my $html = <<~'HTML';
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WebUI - Modern Perl Demo</title>
+    <script src="webui.js"></script>
+    <style>
+      :root {
+        --bg: #0f1220;
+        --panel: #1a1f33;
+        --border: #2a3050;
+        --text: #e6e9f5;
+        --muted: #8b93b8;
+        --accent: #6c8cff;
+        --accent2: #ff9f6c;
+        --ok: #3ddc97;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        color: var(--text);
+        background: radial-gradient(1200px 600px at 20% -10%, #233056 0%, var(--bg) 55%);
+        display: grid; place-items: center; padding: 24px;
+      }
+      main { width: min(880px, 100%); }
+      h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: .5px; }
+      h1 span { color: var(--accent); }
+      p.sub { color: var(--muted); margin: 0 0 20px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .card {
+        background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0)), var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px; padding: 18px;
+      }
+      .card h2 { margin: 0 0 12px; font-size: .9rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); }
+      button, input {
+        font: inherit; color: var(--text);
+        border: 1px solid var(--border); border-radius: 8px;
+        background: #222846; padding: 8px 14px; cursor: pointer;
+        transition: filter .15s, transform .05s;
+      }
+      button:hover { filter: brightness(1.25); }
+      button:active { transform: translateY(1px); }
+      button.primary { background: var(--accent); border-color: transparent; }
+      input { width: 110px; }
+      .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+      #count { font-size: 2.4rem; font-weight: 700; color: var(--accent2); }
+      .result { color: var(--ok); min-height: 1.4em; font-family: Consolas, monospace; font-size: .95rem; }
+      code { color: var(--accent); }
+      #log {
+        list-style: none; margin: 0; padding: 8px; height: 240px; overflow: auto;
+        font-family: Consolas, "Cascadia Code", monospace; font-size: .82rem;
+        background: #0b0e1c; border: 1px solid var(--border); border-radius: 8px;
+      }
+      #log li { padding: 2px 0; border-bottom: 1px dashed #1e2439; }
+      #log .ev { color: var(--accent); }
+      #log .err { color: #ff6b6b; }
+      footer { margin-top: 14px; color: var(--muted); font-size: .8rem; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>WebUI <span>·</span> Modern Perl</h1>
+      <p class="sub">Synchronous callbacks, async Promises, and Perl with page events via Alien::Xrepo and Affix</p>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Counter · synchronous</h2>
+          <div class="row">
+            <button onclick="count_inc()">+1</button>
+            <button onclick="count_dec()">-1</button>
+            <button class="primary" onclick="count_reset()">reset</button>
+            <div id="count">0</div>
+          </div>
+          <p style="color:var(--muted);font-size:.85rem;margin:0">Each click calls C bound with <code>webui_bind()</code>; Perl writes the result back with <code>webui_run()</code>.</p>
+        </section>
+
+        <section class="card">
+          <h2>Async · Promises</h2>
+          <div class="row">
+            <input id="n" type="number" value="21">
+            <button onclick="callDouble()">double it</button>
+          </div>
+          <div class="result" id="double-out"></div>
+          <div class="row">
+            <input id="t" type="text" value="hello, webui">
+            <button onclick="callShout()">shout it</button>
+          </div>
+          <div class="result" id="shout-out"></div>
+          <p style="color:var(--muted);font-size:.85rem;margin:0">Resolved by C via <code>webui_interface_bind()</code> + <code>webui_interface_set_response()</code>.</p>
+        </section>
+      </div>
+
+      <section class="card" style="margin-top:16px">
+        <h2>Event log</h2>
+        <ul id="log"></ul>
+        <footer>Open an <a id="ext" href="https://example.com">external link</a> to trigger a navigation event - Perl sends you right back.</footer>
+      </section>
+    </main>
+
+    <script>
+      const logEl = document.getElementById('log');
+      function log(message, kind = '') {
+        const li = document.createElement('li');
+        if (kind) li.className = kind;
+        const t = new Date().toLocaleTimeString([], { hour12: false });
+        li.textContent = `${t}  ${message}`;
+        logEl.appendChild(li);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+      function updateCount(n) { document.getElementById('count').textContent = n; }
+
+      function callDouble() {
+        const n = Number(document.getElementById('n').value);
+        if (Number.isNaN(n)) return log('double: invalid number', 'err');
+        double_async(n)
+          .then(r => { document.getElementById('double-out').textContent = `${n} × 2 = ${r}`; })
+          .catch(e => log(`double_async() rejected: ${e}`, 'err'));
+      }
+      function callShout() {
+        const t = document.getElementById('t').value;
+        shout_async(t)
+          .then(r => { document.getElementById('shout-out').textContent = `"${t}" → "${r}"`; })
+          .catch(e => log(`shout_async() rejected: ${e}`, 'err'));
+      }
+
+      log('page ready - waiting for the C side to talk back', 'ev');
+    </script>
+  </body>
+  </html>
 HTML
-webui_set_size( $win, 800, 600 );
-webui_show( $win, $html );
-webui_wait();
-webui_clean();
+$app->set_size( 920, 800 );
+$app->show($html);
+$app->wait;
+$app->clean;

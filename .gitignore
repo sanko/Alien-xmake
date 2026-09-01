@@ -5,6 +5,7 @@
 /blib
 /Makefile
 /pm_to_blib
+/_Inline/
 
 /carton.lock
 /.carton/
@@ -21,6 +22,8 @@ cover_db/
 *.swp
 *.o
 *.obj
+*.dll
+*.so
 
 !LICENSE
 
@@ -40,6 +43,8 @@ share/bin
 *.session
 xmake.*
 .xmake/*
+xmake-*
+xmake/*
 xmake_installer*
 MANIFEST
 
@@ -52,3 +57,18 @@ eg/eg/
 eg/lib/
 eg/alien*
 t/test_alien_*
+
+eg-/
+t/packages
+get.*
+tmp/
+apio.pl
+.tmp-workflow-testing/
+run-direct.yml
+*.ps1
+xrepo-*
+msvc-env.txt
+article.md
+/eg/nuklear/.xmake/
+/eg/_Inline/
+/eg/.xmake/
