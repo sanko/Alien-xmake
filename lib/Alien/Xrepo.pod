@@ -78,6 +78,8 @@ header files, abstracting away operating system filesystem differences.
 This eliminates the need for manual compilation steps or hard coding paths in your Perl scripts, making your FFI
 bindings or XS wrappers portable and reproducible.
 
+Discover easily installed packages at https://packages.xmake.io/.
+
 =head1 CONSTRUCTOR
 
 =head2 C<new>
@@ -236,16 +238,17 @@ Scans C<includedirs> for the given filename and returns the absolute path if fou
 
 =head1 SEE ALSO
 
-L<Affix::Wrap>, L<Alien::Xmake>, L<https://xrepo.xmake.io>
+L<Affix::Wrap>, L<Alien::Xmake>, L<https://xrepo.xmake.io>, L<https://packages.xmake.io/>
+
+=head1 LICENSE
+
+Copyright (C) Sanko Robinson.
+
+This library is free software; you can redistribute it and/or modify it under the terms found in the Artistic License
+2. Other copyrights, terms, and conditions may apply to data transmitted through this module.
 
 =head1 AUTHOR
 
-Sanko Robinson E<lt>sanko@cpan.orgE<gt>
-
-=head1 COPYRIGHT
-
-Copyright (C) 2026 by Sanko Robinson.
-
-This library is free software; you can redistribute it and/or modify it under the terms of the Artistic License 2.0.
+Sanko Robinson L<https://github.com/sanko>
 
 =cut

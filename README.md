@@ -248,4 +248,4 @@ This library is free software; you can redistribute it and/or modify it under th
 
 # AUTHOR
 
-Sanko Robinson <sanko@cpan.org>
+Sanko Robinson [https://github.com/sanko](https://github.com/sanko)

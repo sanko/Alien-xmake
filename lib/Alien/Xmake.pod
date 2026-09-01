@@ -217,7 +217,7 @@ This library is free software; you can redistribute it and/or modify it under th
 
 =head1 AUTHOR
 
-Sanko Robinson E<lt>sanko@cpan.orgE<gt>
+Sanko Robinson L<https://github.com/sanko>
 
 =for stopwords xmake macOS wxWidgets CMake gotta FreeBSD MacOS
 

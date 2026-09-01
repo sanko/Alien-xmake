@@ -1,5 +1,7 @@
 =pod
 
+=encoding utf-8
+
 =head1 NAME
 
 Alien::Xrepo::Base - Base class for Alien distributions using Xrepo
@@ -191,14 +193,15 @@ The entry point for the C<Build> script. Orchestrates the C<build>, C<test>, C<i
 
 L<Alien::Xrepo>, L<Alien::Xmake>, L<xmake|https://xmake.io>, L<xrepo|https://xrepo.xmake.io>
 
+=head1 LICENSE
+
+Copyright (C) Sanko Robinson.
+
+This library is free software; you can redistribute it and/or modify it under the terms found in the Artistic License
+2. Other copyrights, terms, and conditions may apply to data transmitted through this module.
+
 =head1 AUTHOR
 
-Sanko Robinson <https://github.com/sanko>
-
-=head1 COPYRIGHT
-
-Copyright (C) 2026 by Sanko Robinson.
-
-This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+Sanko Robinson L<https://github.com/sanko>
 
 =cut
