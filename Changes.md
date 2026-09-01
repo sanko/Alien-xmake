@@ -13,6 +13,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Automatic confirmation for xmake/xrepo prompts: both `Alien::Xmake` and
+  `Alien::Xrepo` accept new constructor options `yes` and `confirm` (auto-prompt
+  answered with `-y` / `--confirm=...`), with per-call `yes`/`confirm` overrides
+  on `Alien::Xrepo` methods. Prevents installs from hanging when output is
+  captured (e.g. Capture::Tiny) because the confirmation never reaches a TTY.
+- Two example CPAN-style dists under `eg/examples/` demonstrating how to build a
+  thin `Alien::` module on `Alien::Xrepo::Base`:
+  - `Alien-Zstandard`: a runnable example with three demo scripts (Affix, Affix
+    with compression, and FFI::Platypus) and unit tests; installed via xrepo as
+    the `zstd` package
+  - `Alien-Lsquic`: the plumbing for a heavy `lsquic` install with unit tests
+- Unit tests (`t/`) under each example dist covering `isa`, `package_name`, the
+  pre-install delegation defaults, and (when the package is resolved)
+  `libpath`/`ffi_lib`/`version`/`kind`/`cflags`/`libs`/`find_header`/`bin_dir`
+- `.gitignore` rules so building the example dists never tracks `Build`,
+  `Build.bat`, `blib/`, `_build_params`, or `MYMETA.*`
+- `eg/nuklear.pl` demo + `eg/nuklear/` shim: builds the header-only Nuklear GUI
+  library via xmake/nuklear into a shared library (GDI backend on Windows, Xlib
+  on Unix) in a temp dir, then installs it into the script's own directory and
+  drives it entirely from Perl through Affix (`eg/nuklear.pl # RUNS A GUI`).
+  The shim auto-confirms first-run package installs by piping "y" to xmake's
+  stdin, since that particular prompt ignores the global `-y`/`--confirm` flag.
+  `.gitignore` now force-excludes the built `nk_win.<dll|so|dylib>` and the
+  `eg/nuklear/.xmake/` cache while keeping the shim sources tracked.
+
 - Alien::Xrepo::Base
 - A "QUICK START EXAMPLES" section in the Alien::Xrepo docs with copy-paste examples
   for FFI::Platypus, Affix, and Affix::Wrap, getting build flags, discovering packages,
@@ -60,6 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   running the `ninja` binary (direct exe or shunt onto `PATH`); `eg/xrepo_inline_c.pl` (requires `Inline::C`) and
   `eg/xrepo_binary.pl` mirror them
 - Alien::Xrepo POD describes binary/tool installs in NAME/SYNOPSIS/DESCRIPTION, not just FFI libraries
+- New `theme` constructor option (default `plain`) so xmake/xrepo output carries no ANSI color codes; passed as
+  `$ENV{XMAKE_THEME}` on every store-touching method, overridable per-call with `theme =>`
 
 ## [0.08] - 2026-01-11
 
