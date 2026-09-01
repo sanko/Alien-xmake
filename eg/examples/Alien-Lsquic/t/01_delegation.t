@@ -1,12 +1,8 @@
 use v5.40;
-
-BEGIN {
-    require lib;
-    lib->import('lib');
-    eval { require blib; 1 };    # add blib/lib + blib/arch if a build exists
-}
+use blib;
 use Test2::V0;
 use Alien::lsquic;
+#
 my $lsquic = Alien::lsquic->new;
 
 # Pre-install: safe defaults before the package is resolved. Only applies to a
@@ -35,4 +31,5 @@ SKIP: {
     ok $lsquic->cflags,                  'cflags resolved';
     ok $lsquic->find_header('lsquic.h'), 'lsquic.h findable';
 }
+#
 done_testing;

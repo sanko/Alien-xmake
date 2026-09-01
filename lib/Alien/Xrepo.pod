@@ -55,8 +55,8 @@ L<NuGet|https://www.nuget.org/> for .NET,
 L<Zypper|https://documentation.suse.com/smart/systems-management/html/concept-zypper/index.html> on openSUSE, and even
 your own custom repositories with smart prerequisite management.
 
-With a single line, you can fetch B<shared libraries> as well as B<binary tools and interpreters> without touching
-a system package manager:
+With a single line, you can fetch B<shared libraries> as well as B<binary tools and interpreters> without touching a
+system package manager:
 
 =over
 

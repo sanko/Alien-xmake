@@ -1,7 +1,5 @@
 use v5.40;
 use Affix;
-use FindBin;
-use lib "$FindBin::Bin/../lib", "$FindBin::Bin/../blib/lib", "$FindBin::Bin/../../../../lib";
 use Alien::Zstandard;
 $|++;
 my $zstd = Alien::Zstandard->new;
@@ -33,9 +31,7 @@ my $compressed_buffer = "\0" x $bound;
 my $result_size = ZSTD_compress(
     $compressed_buffer, $bound, $data, $data_len, 1    # Compression level
 );
-if ( ZSTD_isError($result_size) ) {
-    die "Zstd compression failed!";
-}
+die 'Zstd compression failed!' if ZSTD_isError($result_size);
 say "Original Size:   $data_len bytes";
 say "Compressed Size: $result_size bytes";
 

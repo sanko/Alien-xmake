@@ -1,7 +1,7 @@
 {
    "abstract" : "Build & install zstd (Zstandard) via xrepo",
    "author" : [
-      "Sanko Robinson <sanko@cpan.org>"
+      "Sanko Robinson"
    ],
    "dynamic_config" : 1,
    "generated_by" : "Alien-Xmake example",
@@ -22,13 +22,13 @@
    "prereqs" : {
       "configure" : {
          "requires" : {
-            "Alien::Xrepo" : "0.08",
+            "Alien::Xrepo::Base" : "0",
             "perl" : "v5.40.0"
          }
       },
       "runtime" : {
          "requires" : {
-            "Alien::Xrepo" : "0.08",
+            "Alien::Xrepo::Base" : "0",
             "File::ShareDir" : "1.00",
             "perl" : "v5.40.0"
          }

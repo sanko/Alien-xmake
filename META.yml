@@ -2,7 +2,7 @@
 X_No_Archive: Yes
 abstract: 'Locate, Download, or Build and Install Xmake'
 author:
-  - 'Sanko Robinson <sanko@cpan.org>'
+  - 'Sanko Robinson'
 build_requires:
   Capture::Tiny: '0'
   Exporter: '5.57'

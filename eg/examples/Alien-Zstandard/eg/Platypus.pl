@@ -1,16 +1,14 @@
 use v5.40;
 use FFI::Platypus 2.00;
-use FindBin;
-use lib "$FindBin::Bin/../lib", "$FindBin::Bin/../blib/lib", "$FindBin::Bin/../../../../lib";
 use Alien::Zstandard;
 
-# 1. Instantiate the Alien module
+# Instantiate the Alien module
 my $alien = Alien::Zstandard->new;
 
 # Install on first run if the dist isn't built yet (no ConfigData)
 $alien->install unless $alien->ffi_lib;
 
-# 2. Initialize Platypus using api version 2
+# Initialize Platypus using api version 2
 my $lib_path = $alien->ffi_lib;
 die "Could not find Zstd library path" unless $lib_path;
 my $ffi = FFI::Platypus->new(
@@ -19,11 +17,11 @@ my $ffi = FFI::Platypus->new(
 );
 say "Loaded Zstd from: " . $lib_path;
 
-# 3. Attach the function to Perl space
+# Attach the function to Perl space
 # unsigned ZSTD_versionNumber(void);
 $ffi->attach( 'ZSTD_versionNumber' => [] => 'unsigned int' );
 
-# 4. Call it!
+# Call it!
 my $version_int = ZSTD_versionNumber();
 
 # Formatting the version number

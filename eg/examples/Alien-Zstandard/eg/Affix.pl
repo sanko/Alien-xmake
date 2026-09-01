@@ -1,7 +1,5 @@
 use v5.40;
 use Affix;
-use FindBin;
-use lib "$FindBin::Bin/../lib", "$FindBin::Bin/../blib/lib", "$FindBin::Bin/../../../../lib";
 use Alien::Zstandard;
 
 # Instantiate the Alien module
@@ -12,7 +10,7 @@ $zstd_alien->install unless $zstd_alien->ffi_lib;
 
 # Get the path to the dynamic library (.so, .dll, or .dylib)
 my $lib_path = $zstd_alien->ffi_lib;
-die "Could not find Zstd library path" unless $lib_path;
+die 'Could not find Zstd library path' unless $lib_path;
 say "Loaded Zstd from: $lib_path";
 
 # Bind the C function to Perl space

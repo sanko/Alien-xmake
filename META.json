@@ -2,7 +2,7 @@
    "X_No_Archive" : "Yes",
    "abstract" : "Locate, Download, or Build and Install Xmake",
    "author" : [
-      "Sanko Robinson <sanko@cpan.org>"
+      "Sanko Robinson"
    ],
    "description" : "Xmake is a cross-platform build utility based on Lua. With it comes a powerful package management system.",
    "dynamic_config" : 0,
@@ -119,7 +119,7 @@
          "version" : "v0.0.9"
       }
    },
-   "release_status" : "testing",
+   "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
          "web" : "https://github.com/sanko/Alien-Xmake/issues"

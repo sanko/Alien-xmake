@@ -1,12 +1,8 @@
 use v5.40;
-
-BEGIN {
-    require lib;
-    lib->import('lib');
-    eval { require blib; 1 };    # add blib/lib + blib/arch if a build exists
-}
+use blib;
 use Test2::V0;
 use Alien::Zstandard;
+#
 my $zstd = Alien::Zstandard->new;
 
 # Pre-install: safe defaults before the package is resolved. Only applies to a
@@ -38,4 +34,5 @@ SKIP: {
     like $zstd->libs,   qr{-l}, 'libs has a link flag';
     ok $zstd->find_header('zstd.h'), 'zstd.h findable';
 }
+#
 done_testing;
