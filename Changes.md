@@ -29,6 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `uninstall` supports `--all` and `--force`
   - `_build_args` now understands jobs, force/shallow/build, VS/NDK/SDK/MingW
     toolchain switches, and `--toolchain_host`
+- Full coverage of xmake actions and plugins in Alien::Xmake
+  - New constructor option `verbose` to echo commands as they run
+  - Actions: `build`, `clean`, `create`, `configure`, `global`, `install`, `uninstall`,
+    `package`, `pack`, `require`, `run`, `test`, `update`, `service`, `addon`
+  - Plugins: `check`, `doxygen`, `format`, `lua`, `macro`, `project`, `repo`, `show`, `watch`
+  - Generic escape hatch `task( $name, %options )` for tasks without a dedicated method
+  - `show` strips ANSI codes, splits listings, and decodes `--format=json` into a data structure
+  - The xmake `f`-style config switches are mapped to options like `plat`, `arch`, `mode`,
+    `kind`, `vs`, `ndk`, `mingw`, `sdk`, `toolchain`, ... (plus a `set` hash for any `--key=value`)
+  - `global` gets only the config keys xmake actually accepts there (`vs`, `ndk`, `qt`, ...)
+  - Version-build accessor renamed `build()` to `buildid()` so `build` is the build action;
+    the xmake `config` action is exposed as `configure()` to keep `config( $key )` as the
+    install-time data accessor
 
 ## [0.08] - 2026-01-11
 
