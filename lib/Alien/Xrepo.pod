@@ -103,7 +103,8 @@ Optional semantic version string (C<1.2.x>, C<latest>). Pass C<undef> or an empt
 
 =item B<%options>
 
-Optional configuration options passed to C<xrepo> (shared by most other methods and missing options are filled in automatically):
+Optional configuration options passed to C<xrepo> (shared by most other methods and missing options are filled in
+automatically):
 
 =over
 
@@ -356,8 +357,8 @@ care of the rest.
 
 =head2 Hello World (install then call)
 
-C<install( ... )> downloads and builds the library for you, then C<libpath> points L<Affix> or L<FFI::Platypus> to the matching shared
-C<.dll> / C<.so> / C<.dylib>.
+C<install( ... )> downloads and builds the library for you, then C<libpath> points L<Affix> or L<FFI::Platypus> to the
+matching shared C<.dll> / C<.so> / C<.dylib>.
 
 Affix first:
 

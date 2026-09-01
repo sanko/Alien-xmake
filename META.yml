@@ -58,16 +58,14 @@ no_index:
 provides:
   Alien::Xmake:
     file: lib/Alien/Xmake.pm
-    version: '0.08'
+    version: v0.9.0
   Alien::Xrepo:
     file: lib/Alien/Xrepo.pm
-    version: '0.08'
+    version: v0.9.0
   Alien::Xrepo::Base:
     file: lib/Alien/Xrepo/Base.pm
   Alien::Xrepo::Base::Builder:
     file: lib/Alien/Xrepo/Base.pm
-  Alien::Xrepo::PackageInfo:
-    file: lib/Alien/Xrepo.pm
 requires:
   perl: v5.40.0
 resources:
@@ -75,7 +73,7 @@ resources:
   homepage: https://github.com/sanko/Alien-Xmake
   license: http://www.perlfoundation.org/artistic_license_2_0
   repository: https://github.com/sanko/Alien-Xmake.git
-version: '0.08'
+version: v0.9.0
 x_authority: cpan:SANKO
 x_ignore:
   - .tidyallrc

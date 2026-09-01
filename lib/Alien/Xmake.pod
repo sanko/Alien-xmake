@@ -45,10 +45,10 @@ the L<community|https://xmake.io/about/contact.html>.
 
 =head1 METHODS
 
-A thin wrapper around the C<xmake> command line. Methods named after C<xmake> actions (C<build>, C<clean>, C<create>, ...)
-stream the command's output to your terminal and return true on success. Query-style methods (C<show>, C<lua -l>, ...)
-capture the output and return it to you instead. Most methods accept C<%options>; unrecognized extra arguments can be
-passed with C<targets =E<gt> [...]> and C<args =E<gt> [...]> and are appended to the command line verbatim.
+A thin wrapper around the C<xmake> command line. Methods named after C<xmake> actions (C<build>, C<clean>, C<create>,
+...) stream the command's output to your terminal and return true on success. Query-style methods (C<show>, C<lua -l>,
+...) capture the output and return it to you instead. Most methods accept C<%options>; unrecognized extra arguments can
+be passed with C<targets =E<gt> [...]> and C<args =E<gt> [...]> and are appended to the command line verbatim.
 
 =head2 C<new( ... )>
 
@@ -150,14 +150,13 @@ Alternate project path (C<-P>).
 
     $xmake->configure(mode => 'debug', plat => 'windows', arch => 'x64');
 
-Configures the current project (clone of C<xmake config>). Accepts the shared platform/toolchain options
-(C<plat>, C<arch>, C<mode>, C<kind>, C<toolchain>, C<toolchain_host>, C<cross>, C<target_os>, C<sdk>, C<runtimes>,
-C<vs>, C<vs_toolset>, C<vs_sdkver>, C<vs_runtime>, C<ndk>, C<ndk_stdcxx>, C<ndk_sdkver>, C<android_sdk>, C<mingw>,
-C<emsdk>, C<cuda>, C<qt>, C<qt_host>, C<vcpkg>, C<wdk>, C<build_toolver>, C<ccache>, C<ccachedir>, C<debugger>,
-C<trybuild>, C<tryconfigs>, C<require>, C<includedirs>, C<linkdirs>, C<links>, C<syslinks>, C<rc*>, C<fc*>, ...) as
-well as the compiler/flag subtables C<cflags>, C<cxflags>, C<cxxflags>, C<mflags>, C<mmflags>, C<mxflags>,
-C<ldflags>, C<arflags>, C<asflags>, C<shflags>, and C<cuflags>. Any C<--key=value> pair can be passed via
-C<set =E<gt> { key =E<gt> value }>.
+Configures the current project (clone of C<xmake config>). Accepts the shared platform/toolchain options (C<plat>,
+C<arch>, C<mode>, C<kind>, C<toolchain>, C<toolchain_host>, C<cross>, C<target_os>, C<sdk>, C<runtimes>, C<vs>,
+C<vs_toolset>, C<vs_sdkver>, C<vs_runtime>, C<ndk>, C<ndk_stdcxx>, C<ndk_sdkver>, C<android_sdk>, C<mingw>, C<emsdk>,
+C<cuda>, C<qt>, C<qt_host>, C<vcpkg>, C<wdk>, C<build_toolver>, C<ccache>, C<ccachedir>, C<debugger>, C<trybuild>,
+C<tryconfigs>, C<require>, C<includedirs>, C<linkdirs>, C<links>, C<syslinks>, C<rc*>, C<fc*>, ...) as well as the
+compiler/flag subtables C<cflags>, C<cxflags>, C<cxxflags>, C<mflags>, C<mmflags>, C<mxflags>, C<ldflags>, C<arflags>,
+C<asflags>, C<shflags>, and C<cuflags>. Any C<--key=value> pair can be passed via C<set =E<gt> { key =E<gt> value }>.
 
 =over
 
@@ -188,9 +187,9 @@ Alternate build directory (C<-o>).
     $xmake->global(network => 'y', theme => 'default');
     $xmake->global(vs => '2022');
 
-Reads/writes global (user-level) configuration. Shares the platform/toolchain options from C<configure( ... )> that exist
-on C<global> (C<android_sdk>, C<build_toolver>, C<cuda>, C<emsdk>, C<mingw>, C<ndk>, C<ndk_sdkver>, C<qt>, C<qt_host>,
-C<vcpkg>, C<vs>, C<wdk>).
+Reads/writes global (user-level) configuration. Shares the platform/toolchain options from C<configure( ... )> that
+exist on C<global> (C<android_sdk>, C<build_toolver>, C<cuda>, C<emsdk>, C<mingw>, C<ndk>, C<ndk_sdkver>, C<qt>,
+C<qt_host>, C<vcpkg>, C<vs>, C<wdk>).
 
 =over
 
@@ -314,9 +313,9 @@ unused packages, B<build> always build from source, and B<addon> manages addon p
     $xmake->run;
     $xmake->run('hello', args => [qw[--flag value]]);
 
-Runs the build target (or the C<run> script). C<debug> attaches a debugger, C<all>/C<group> select targets,
-C<workdir> sets the working directory (C<-w>), C<jobs> sets the parallelism and C<detach> runs the target in the
-background. Extra program arguments go in C<args>.
+Runs the build target (or the C<run> script). C<debug> attaches a debugger, C<all>/C<group> select targets, C<workdir>
+sets the working directory (C<-w>), C<jobs> sets the parallelism and C<detach> runs the target in the background. Extra
+program arguments go in C<args>.
 
 =head2 C<test( [$target], %options )>
 
@@ -330,9 +329,9 @@ Runs the project's tests. C<group>, C<workdir>, C<jobs> and C<rebuild> behave as
     $xmake->update;                           # update xmake itself
     $xmake->update('v3.0.6', scriptonly => 1);
 
-Updates the C<xmake> installation. C<version> optionally pins a version. C<scriptonly> only updates the scripts (C<-s>),
-C<integrate> re-integrates the shell environment, C<force> downloads even when up to date and C<uninstall> flags the
-previous version for removal.
+Updates the C<xmake> installation. C<version> optionally pins a version. C<scriptonly> only updates the scripts
+(C<-s>), C<integrate> re-integrates the shell environment, C<force> downloads even when up to date and C<uninstall>
+flags the previous version for removal.
 
 =head2 C<service( %options )>
 
@@ -405,9 +404,9 @@ C<lsp> writes LSP-friendly output (C<compile_flags.txt> or C<compile_commands.js
     my $repos = $xmake->repo( list => 1 );
     $xmake->repo('local_extra', add => 1, url => 'git@github.com:me/xmake-repo.git');
 
-Manages custom package repositories. C<add>, C<remove>, C<update>, C<clear> and C<list> select the operation
-(C<list> returns captured output); C<global> restricts the change to the global config; C<url> and C<branch> are used
-when adding.
+Manages custom package repositories. C<add>, C<remove>, C<update>, C<clear> and C<list> select the operation (C<list>
+returns captured output); C<global> restricts the change to the global config; C<url> and C<branch> are used when
+adding.
 
 =head2 C<show( [$list], %options )>
 
@@ -453,9 +452,9 @@ Legacy flags (C<--json>) and pretty formatting.
     $xmake->watch( commands => 'xmake build' );
     $xmake->watch( script => 'my_script.lua' );
 
-Rebuilds (or runs) the project whenever source files change. C<commands> holds the command to rerun (C<-c>),
-C<script> the path of the script to watch, C<watchdirs>/C<plaindirs> add extra watched/ignored directories, C<run>
-reruns the given target and C<target> the target to build. Arbitrary program arguments are passed via C<argv>.
+Rebuilds (or runs) the project whenever source files change. C<commands> holds the command to rerun (C<-c>), C<script>
+the path of the script to watch, C<watchdirs>/C<plaindirs> add extra watched/ignored directories, C<run> reruns the
+given target and C<target> the target to build. Arbitrary program arguments are passed via C<argv>.
 
 =head2 C<task( $name, %options )>
 
@@ -512,13 +511,13 @@ Returns the full path to the L<xrepo|https://github.com/xmake-io/xmake-repo> exe
     use Env qw[@PATH];
     unshift @PATH, $xmake->bin_dir;
 
-Returns the directory containing the Xmake executable; push it onto your C<PATH>. For a 'system' install this step
-will not be required.
+Returns the directory containing the Xmake executable; push it onto your C<PATH>. For a 'system' install this step will
+not be required.
 
 =head2 C<cflags( )>, C<libs( )>, C<dynamic_libs( )>
 
-Stubs returning empty values. Provided for compatibility with consumers that expect the standard Alien API surface;
-use C<pkg_config( )> or L<Alien::Xrepo> for real flags.
+Stubs returning empty values. Provided for compatibility with consumers that expect the standard Alien API surface; use
+C<pkg_config( )> or L<Alien::Xrepo> for real flags.
 
 =head2 C<alien_helper( )>
 
