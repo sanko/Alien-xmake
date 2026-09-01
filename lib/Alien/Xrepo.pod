@@ -137,9 +137,9 @@ L<Alien::Xrepo::Base> and the dist builder to keep a distribution's native depen
 
 =item B<theme>
 
-Optional xmake output theme, passed to xmake as C<$ENV{XMAKE_THEME}>. Defaults to C<plain>, which suppresses ANSI
-color codes from xmake/xrepo output (clean CPAN test reports, CI logs, and captures). Set C<theme =E<gt> 'default'>
-to restore xmake's colored output. May be overridden per-call with C<theme =E<gt> ...> on any store-touching method.
+Optional xmake output theme, passed to xmake as C<$ENV{XMAKE_THEME}>. Defaults to C<plain>, which suppresses ANSI color
+codes from xmake/xrepo output (clean CPAN test reports, CI logs, and captures). Set C<theme =E<gt> 'default'> to
+restore xmake's colored output. May be overridden per-call with C<theme =E<gt> ...> on any store-touching method.
 
 =item B<yes>
 
@@ -269,7 +269,8 @@ Per-call xmake output theme override. Defaults to the C<theme> constructor value
 =item B<yes>, B<confirm>
 
 Per-call auto-confirmation overrides for the constructor C<yes =E<gt> ...> / C<confirm =E<gt> ...> options, applied as
-C<-y> or C<--confirm=...> to the underlying C<xrepo> invocation. Defaults to the constructor values. See L</"new( ... )">.
+C<-y> or C<--confirm=...> to the underlying C<xrepo> invocation. Defaults to the constructor values. See L</"new( ...
+)">.
 
 =back
 

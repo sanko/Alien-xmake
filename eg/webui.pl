@@ -195,7 +195,7 @@ my $html = <<~'HTML';
   <body>
     <main>
       <h1>WebUI <span>·</span> Modern Perl</h1>
-      <p class="sub">Synchronous callbacks, async Promises, and Perl → page events via Alien::Xrepo + Affix</p>
+      <p class="sub">Synchronous callbacks, async Promises, and Perl with page events via Alien::Xrepo and Affix</p>
 
       <div class="grid">
         <section class="card">

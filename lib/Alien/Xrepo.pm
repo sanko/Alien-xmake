@@ -12,6 +12,7 @@ class Alien::Xrepo v0.9.0 {
     field $verbose : param //= 0;
     field $root    : param //= undef;
     field $theme   : param //= 'plain';
+
     # Auto-confirm interactive xrepo/xmake prompts (e.g. -y / --confirm=yes). Useful when
     # output is captured (Capture::Tiny) so a prompting install never hangs waiting on stdin.
     field $yes     : param //= 0;
@@ -72,7 +73,7 @@ class Alien::Xrepo v0.9.0 {
         #
         method install ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
-        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
+        local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
 
@@ -101,7 +102,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method uninstall ( $pkg_spec, %opts ) {
-        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
+        local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @args = $self->_build_args( \%opts );
@@ -121,7 +122,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method clean (%opts) {
-        local $ENV{XMAKE_THEME}               = $self->_theme(%opts);
+        local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         say '[*] xrepo: cleaning cache...' if $verbose;
@@ -159,7 +160,7 @@ class Alien::Xrepo v0.9.0 {
         my $yes_c     = $opts->{yes}     // $yes;
         my $confirm_c = $opts->{confirm} // $confirm;
         push @args, '--confirm=' . $confirm_c if defined $confirm_c && length $confirm_c;
-        push @args, '-y'          if $yes_c && !( defined $confirm_c && length $confirm_c );
+        push @args, '-y'                      if $yes_c             && !( defined $confirm_c && length $confirm_c );
 
         # Standard xmake/xrepo flags
         push @args, '-p', $opts->{plat} if $opts->{plat};                                  # platform (iphoneos, android, etc)
@@ -219,7 +220,7 @@ class Alien::Xrepo v0.9.0 {
     # Run `xrepo fetch` and return a parsed PackageInfo (or raw flags).
     method fetch ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
-        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
+        local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
@@ -249,7 +250,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method info ( $pkg_spec, %opts ) {
-        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
+        local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
@@ -271,7 +272,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method scan ( $pkg //= (), %opts ) {
-        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
+        local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @args = $self->_build_args( { %opts, no_kind => 1 } );
@@ -286,7 +287,7 @@ class Alien::Xrepo v0.9.0 {
 
     method download ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
-        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
+        local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
@@ -312,7 +313,7 @@ class Alien::Xrepo v0.9.0 {
 
     method import_pkg ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
-        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
+        local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
@@ -329,7 +330,7 @@ class Alien::Xrepo v0.9.0 {
 
     method export ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
-        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
+        local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
@@ -345,7 +346,7 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method env ( $program //= (), %opts ) {
-        local $ENV{XMAKE_THEME}            = $self->_theme(%opts);
+        local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;

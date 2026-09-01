@@ -6,7 +6,6 @@
 /Makefile
 /pm_to_blib
 /_Inline/
-eg/_Inline/
 
 /carton.lock
 /.carton/
@@ -23,6 +22,8 @@ cover_db/
 *.swp
 *.o
 *.obj
+*.dll
+*.so
 
 !LICENSE
 
@@ -61,7 +62,6 @@ eg-/
 t/packages
 get.*
 tmp/
-eg/nuklear
 apio.pl
 .tmp-workflow-testing/
 run-direct.yml
@@ -69,3 +69,6 @@ run-direct.yml
 xrepo-*
 msvc-env.txt
 article.md
+/eg/nuklear/.xmake/
+/eg/_Inline/
+/eg/.xmake/

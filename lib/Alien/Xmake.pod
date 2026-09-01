@@ -66,14 +66,14 @@ Constructor option. Boolean. If true, prints the command being run to C<STDOUT> 
 
 Constructor option. Boolean. Auto-confirms any interactive C<xmake>/C<xrepo> prompt by passing C<-y> (equivalent to
 C<confirm =E<gt> 'yes'>). Useful when a build is driven programmatically or its output is captured (e.g.
-L<Capture::Tiny>) so an install that would normally prompt never hangs waiting on C<STDIN>. C<confirm =E<gt> ...>
-takes precedence when both are set.
+L<Capture::Tiny>) so an install that would normally prompt never hangs waiting on C<STDIN>. C<confirm =E<gt> ...> takes
+precedence when both are set.
 
 =item B<confirm>
 
 Constructor option. Supplies an explicit answer (C<yes>, C<no>, or C<def>) to any prompt xmake asks, passed through as
-C<--confirm=...>. Takes precedence over C<yes =E<gt> 1>. May be terse:
-C<Alien::Xmake-E<gt>new( confirm =E<gt> 'yes' )>.
+C<--confirm=...>. Takes precedence over C<yes =E<gt> 1>. May be terse: C<Alien::Xmake-E<gt>new( confirm =E<gt> 'yes'
+)>.
 
 =back
 

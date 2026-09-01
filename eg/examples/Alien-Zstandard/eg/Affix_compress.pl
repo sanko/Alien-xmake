@@ -8,8 +8,7 @@ my $zstd = Alien::Zstandard->new;
 
 # Install on first run if the dist isn't built yet (no ConfigData)
 $zstd->install unless $zstd->ffi_lib;
-
-my $lib  = $zstd->ffi_lib;
+my $lib = $zstd->ffi_lib;
 die "Could not find Zstd library path" unless $lib;
 say "Loaded Zstd from: $lib";
 
