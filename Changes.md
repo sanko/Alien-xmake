@@ -7,53 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The docs have been greatly expanded since January but the stars of this release are Alien::Xrepo and Alien::Xrepo::Base, an Alien::Base stand-in for installing tools and libraries from [xrepo](https://packages.xmake.io/), [vcpkg](https://vcpkg.io/en/packages), [conan](https://conan.io/center), [brew](https://brew.sh/) (homebrew/linuxbrew), [conda](https://anaconda.org/), [dub](https://dub.pm/) (Dlang libs), [pacman](https://wiki.archlinux.org/title/Pacman#Installing_packages) (if you use arch, btw) [clib](https://github.com/clibs/clib/), [apt](https://www.debian.org/distrib/packages) on Debian/Ubuntu, [Cargo](https://crates.io/) for Rust crates, [Portage](https://packages.gentoo.org/) on Gentoo, [Nimble](https://nimpackages.com/) for nimlang, [NuGet](https://www.nuget.org/) for .NET, [Zypper](https://documentation.suse.com/smart/systems-management/html/concept-zypper/index.html) on openSUSE, and even your own custom repositories with smart prerequisite management in just a few lines of Perl.
+
 ### Changed
 
-- We install the latest tagged release of xmake rather than hardcoding a version.
+- We install the latest tagged release of xmake rather than hardcoding a version. If the system install is older, we leave it alone and create a local install in our <share/> dir.
 
 ### Fixed
 
-- `Alien::Xrepo` no longer chokes when xrepo prefixes its `--json` fetch/info
-  output with non-JSON "checking for ..." chatter (e.g. the MSVC/compiler probe
-  on a first install on Windows CI). Fetch/install/info now skip leading prose
-  lines and decode starting at the first JSON value.
-- `bin_dir` semantics in `t/05_xrepo_base.t`: a pure library such as zlib only
-  reports a `bin_dir` when its install root actually has a `bin/` subdir (DLLs
-  on Windows). The test no longer requires one on Unix, where the shared lib
-  lives in `lib/` and `bin_dir` is legitimately empty; the non-empty guarantee
-  is asserted for binary tools (ninja) instead.
+- `Alien::Xrepo` shouldn't choke when xrepo sends chatter to `STDOUT` like the compiler probe before the actual JSON we're looking for
 
 ### Added
 
-- Automatic confirmation for xmake/xrepo prompts: both `Alien::Xmake` and
-  `Alien::Xrepo` accept new constructor options `yes` and `confirm` (auto-prompt
-  answered with `-y` / `--confirm=...`), with per-call `yes`/`confirm` overrides
-  on `Alien::Xrepo` methods. Prevents installs from hanging when output is
-  captured (e.g. Capture::Tiny) because the confirmation never reaches a TTY.
-- Two example CPAN-style dists under `eg/examples/` demonstrating how to build a
-  thin `Alien::` module on `Alien::Xrepo::Base`:
-  - `Alien-Zstandard`: a runnable example with three demo scripts (Affix, Affix
-    with compression, and FFI::Platypus) and unit tests; installed via xrepo as
-    the `zstd` package
-  - `Alien-Lsquic`: the plumbing for a heavy `lsquic` install with unit tests
-- Unit tests (`t/`) under each example dist covering `isa`, `package_name`, the
-  pre-install delegation defaults, and (when the package is resolved)
-  `libpath`/`ffi_lib`/`version`/`kind`/`cflags`/`libs`/`find_header`/`bin_dir`
-- `.gitignore` rules so building the example dists never tracks `Build`,
-  `Build.bat`, `blib/`, `_build_params`, or `MYMETA.*`
-- `eg/nuklear.pl` demo + `eg/nuklear/` shim: builds the header-only Nuklear GUI
-  library via xmake/nuklear into a shared library (GDI backend on Windows, Xlib
-  on Unix) in a temp dir, then installs it into the script's own directory and
-  drives it entirely from Perl through Affix (`eg/nuklear.pl # RUNS A GUI`).
-  The shim auto-confirms first-run package installs by piping "y" to xmake's
-  stdin, since that particular prompt ignores the global `-y`/`--confirm` flag.
-  `.gitignore` now force-excludes the built `nk_win.<dll|so|dylib>` and the
-  `eg/nuklear/.xmake/` cache while keeping the shim sources tracked.
-
-- Alien::Xrepo::Base
-- A "QUICK START EXAMPLES" section in the Alien::Xrepo docs with copy-paste examples
-  for FFI::Platypus, Affix, and Affix::Wrap, getting build flags, discovering packages,
-  cross-compiling, and dropping into a package environment
+- Alien::Xrepo::Base.
+- New examples:
+  - `eg/webui.pl` wraps [webUI](https://webui.me/) for fast, local, browser based GUIs
+  - `eg/nuklear/` builds the header-only [Nuklear](https://github.com/immediate-mode-ui/nuklear) GUI library via xmake into a shared library (GDI backend on Windows, Xlib on Unix) and uses Affix to wrap that lib
+  - `eg/repo_features.pl` is a feature tour covering third-party package manager support (`vcpkg::`, `conan::`, `brew::`, `pacman::`, `dub::`, ...) and creation of dependency graphs (`info( ..., depgraph => 1, format => 'dot' )` for   Graphviz
+  - `eg/xrepo_inline_c.pl` an Inline::C walkthrough for downloading and linking `libpng` and `zlib`
+  - `eg/xrepo_binary.pl` demonstrates using xrepo to install and run binaries; in this case `ninja`
+  - Two example CPAN-style dists under `eg/examples/` demonstrating how to build a thin `Alien::` module on `Alien::Xrepo::Base`:
+    - `Alien-Zstandard`: a runnable example with three demo scripts (Affix, Affix with compression, and FFI::Platypus) and unit tests; installed via xrepo as the `zstd` package
+    - `Alien-Lsquic`: the plumbing for a heavy `lsquic` install with unit tests
+- Automatic confirmation for xmake/xrepo prompts: both `Alien::Xmake` and `Alien::Xrepo` accept new constructor options `yes` and `confirm` with per-call `yes`/`confirm` overrides.
 - Full coverage of xrepo actions in Alien::Xrepo
   - `fetch` returns parsed package info (or raw `--cflags`/`--ldflags`) without reinstalling
   - `info` supports `--depgraph` and `--format=json`
@@ -64,41 +40,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `env` sets up a package environment and runs a program (or `--show` it)
   - `search` supports `--addon`
   - `uninstall` supports `--all` and `--force`
-  - `_build_args` now understands jobs, force/shallow/build, VS/NDK/SDK/MingW
-    toolchain switches, and `--toolchain_host`
+  - `_build_args` now understands jobs, force/shallow/build, VS/NDK/SDK/MingW toolchain switches, and `--toolchain_host`
 - Full coverage of xmake actions and plugins in Alien::Xmake
   - New constructor option `verbose` to echo commands as they run
-  - Actions: `build`, `clean`, `create`, `configure`, `global`, `install`, `uninstall`,
-    `package`, `pack`, `require`, `run`, `test`, `update`, `service`, `addon`
+  - Actions: `build`, `clean`, `create`, `configure`, `global`, `install`, `uninstall`, `package`, `pack`, `require`, `run`, `test`, `update`, `service`, `addon`
   - Plugins: `check`, `doxygen`, `format`, `lua`, `macro`, `project`, `repo`, `show`, `watch`
   - Generic escape hatch `task( $name, %options )` for tasks without a dedicated method
   - `show` strips ANSI codes, splits listings, and decodes `--format=json` into a data structure
-  - The xmake `f`-style config switches are mapped to options like `plat`, `arch`, `mode`,
-    `kind`, `vs`, `ndk`, `mingw`, `sdk`, `toolchain`, ... (plus a `set` hash for any `--key=value`)
+  - The xmake `f`-style config switches are mapped to options like `plat`, `arch`, `mode`, `kind`, `vs`, `ndk`, `mingw`, `sdk`, `toolchain`, ... (plus a `set` hash for any `--key=value`)
   - `global` gets only the config keys xmake actually accepts there (`vs`, `ndk`, `qt`, ...)
-  - Version-build accessor renamed `build()` to `buildid()` so `build` is the build action;
-    the xmake `config` action is exposed as `configure()` to keep `config( $key )` as the
-    install-time data accessor
-- `install`, `fetch`, `scan`, `info`, `uninstall`, `download`, `import_pkg`, `export`, `env`, and
-  `clean` accept `installdir`/`cachedir` options to force a project-local package store (via
-  `XMAKE_PKG_INSTALLDIR` / `XMAKE_PKG_CACHEDIR`) for reproducible, isolated builds
-- Document third-party package manager support (`vcpkg::`, `conan::`, `brew::`, `pacman::`, `dub::`, ...) in the
-  Alien::Xrepo docs and add `eg/xrepo_features.pl`, a feature tour covering every method including
-  dependency graphs (`info( ..., depgraph => 1, format => 'dot' )` for Graphviz)
-- `PackageInfo` gains an `installdir` accessor (from fetch `artifacts.installdir`, else derived from the first
-  libfile/include dir) and `bin_dir` falls back to `<installdir>/bin`, so tool packages (ninja, python, ...) can be
-  installed and run as binaries
-- `Alien::Xrepo->new( root => $dir )` becomes the default `installdir` for every store-touching method, so one
-  install call can run against a project-local store; used by `Alien::Xrepo::Base` and the dist builder
-- `PackageInfo` gains a `kind` accessor (`library` vs `binary`), surfaced by `print`/`dump`/`_data_printer`
-- `Alien::Xrepo::Base::bin_dir()` returns an empty list (not `[undef]`) before install, keeping callers that
-  interpolate `@bin_dir` from warnings
-- New docs examples: an Inline::C walkthrough linking both `libpng` and `zlib` into one XS function, and installing &
-  running the `ninja` binary (direct exe or shunt onto `PATH`); `eg/xrepo_inline_c.pl` (requires `Inline::C`) and
-  `eg/xrepo_binary.pl` mirror them
-- Alien::Xrepo POD describes binary/tool installs in NAME/SYNOPSIS/DESCRIPTION, not just FFI libraries
-- New `theme` constructor option (default `plain`) so xmake/xrepo output carries no ANSI color codes; passed as
-  `$ENV{XMAKE_THEME}` on every store-touching method, overridable per-call with `theme =>`
+  - Version-build accessor renamed `build()` to `buildid()` so `build` is the build action; the xmake `config` action is exposed as `configure()` to keep config( $key )` as the install-time data accessor
+- New `installdir`/`cachedir` options to force a project-local package store (via `XMAKE_PKG_INSTALLDIR` / `XMAKE_PKG_CACHEDIR`) for reproducible, isolated builds
+- `::PackageInfo` gains...
+  - an `installdir` accessor (from fetch `artifacts.installdir`, else derived from the first libfile/include dir) and `bin_dir` falls back to `<installdir>/bin`, so tool packages (ninja, python, ...) can be installed and run as binaries
+  - a `kind` accessor (`library` vs `binary`), surfaced by `print`/`dump`/`_data_printer`
+- `Alien::Xrepo->new( root => $dir )` becomes the default `installdir` for every store-touching method, so one install call can run against a project-local store; used by `Alien::Xrepo::Base`
+- Alien::Xrepo POD now describes binary/tool installs and not just shared libs for FFI
+- New `theme` constructor option (default `plain`) so xmake/xrepo output carries no ANSI color codes; passed as `$ENV{XMAKE_THEME}` on every store-touching method, overridable per-call with `theme => ...`
 
 ## [0.08] - 2026-01-11
 

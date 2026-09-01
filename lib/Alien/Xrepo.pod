@@ -44,8 +44,19 @@ Alien::Xrepo - Install shared libraries and third-party binaries (tools, interpr
 
 =head1 DESCRIPTION
 
-This module acts as an intelligent bridge between Perl and the C<xrepo> package manager. With a single C<install> you
-can fetch B<shared libraries> as well as B<binary tools and interpreters> without touching a system package manager:
+This module acts as an intelligent bridge between Perl and a wide range of package systems:
+L<xrepo|https://packages.xmake.io/>, L<vcpkg|https://vcpkg.io/en/packages>, L<conan|https://conan.io/center>,
+L<brew|https://brew.sh/> (homebrew/linuxbrew), L<conda|https://anaconda.org/>, L<dub|https://dub.pm/> (Dlang libs),
+L<apt|https://www.debian.org/distrib/packages> on Debian,
+L<pacman|https://wiki.archlinux.org/title/Pacman#Installing_packages> (if you use arch, btw),
+L<clib|https://github.com/clibs/clib/>, L<Cargo|https://crates.io/> for Rust crates,
+L<Portage|https://packages.gentoo.org/> on Gentoo, L<Nimble|https://nimpackages.com/> for nimlang,
+L<NuGet|https://www.nuget.org/> for .NET,
+L<Zypper|https://documentation.suse.com/smart/systems-management/html/concept-zypper/index.html> on openSUSE, and even
+your own custom repositories with smart prerequisite management.
+
+With a single line, you can fetch B<shared libraries> as well as B<binary tools and interpreters> without touching
+a system package manager:
 
 =over
 
@@ -57,10 +68,10 @@ your Perl code or to drive your build.
 =back
 
 You are free to install B<both kinds into the same store>: C<ninja> next to C<libpng>. Use L<Affix>, L<FFI::Platypus>,
-or L<Inline::C> to bind the libraries, and C<bin_dir>/C<installdir> to locate and run the binaries.
+L<Inline>, or plain XS to bind the libraries, and C<bin_dir>/C<installdir> to locate and run the binaries.
 
-While L<Affix> or L<FFI::Platypus> or L<Inline::C> can handle the binding or linking to native functions, Alien::Xrepo
-handles the B<acquisition> of the libraries and binaries. It automates the entire dependency lifecycle:
+While FFI or XS can handle the binding or linking to native functions, Alien::Xrepo handles the B<acquisition> of the
+libraries and binaries. It automates the entire dependency lifecycle:
 
 =over
 
@@ -85,8 +96,6 @@ away operating system filesystem differences.
 This eliminates the need for manual compilation steps or hard coding paths in your Perl scripts, making your FFI
 bindings or XS wrappers portable and reproducible.
 
-Discover packages at L<https://packages.xmake.io/>.
-
 =head1 THIRD-PARTY PACKAGE MANAGERS
 
 xrepo can install from external C/C++ package managers instead of (or alongside) the official xmake-repo. You select
@@ -108,8 +117,6 @@ Searching and flag fetching work against them too:
 
 The installed results (C<libpath>, C<includedirs>, C<links>, ...) are decoded into an L<Alien::Xrepo::PackageInfo>
 exactly like any xmake-repo package, so your wrapper code does not care where the library came from.
-
-I<The underlying manager (vcpkg, conan, brew, ...) must be installed and reachable on PATH for the namespace to work.>
 
 See the C<xmake-repo> integration notes at L<https://github.com/xmake-io/xrepo-docs/blob/master/getting_started.md> for
 the corresponding C<add_requires> syntax inside an xmake project.
