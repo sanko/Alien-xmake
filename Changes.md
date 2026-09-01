@@ -51,6 +51,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PackageInfo` gains an `installdir` accessor (from fetch `artifacts.installdir`, else derived from the first
   libfile/include dir) and `bin_dir` falls back to `<installdir>/bin`, so tool packages (ninja, python, ...) can be
   installed and run as binaries
+- `Alien::Xrepo->new( root => $dir )` becomes the default `installdir` for every store-touching method, so one
+  install call can run against a project-local store; used by `Alien::Xrepo::Base` and the dist builder
+- `PackageInfo` gains a `kind` accessor (`library` vs `binary`), surfaced by `print`/`dump`/`_data_printer`
+- `Alien::Xrepo::Base::bin_dir()` returns an empty list (not `[undef]`) before install, keeping callers that
+  interpolate `@bin_dir` from warnings
+- New docs examples: an Inline::C walkthrough linking both `libpng` and `zlib` into one XS function, and installing &
+  running the `ninja` binary (direct exe or shunt onto `PATH`); `eg/xrepo_inline_c.pl` (requires `Inline::C`) and
+  `eg/xrepo_binary.pl` mirror them
+- Alien::Xrepo POD describes binary/tool installs in NAME/SYNOPSIS/DESCRIPTION, not just FFI libraries
 
 ## [0.08] - 2026-01-11
 

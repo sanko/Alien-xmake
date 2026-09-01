@@ -53,7 +53,7 @@ class Alien::Xrepo::Base {
     # Delegation methods
     method libpath () { $info ? $info->libpath : undef }
     method ffi_lib () { $self->libpath }
-    method bin_dir () { $info ? $info->bin_dir : [] }
+    method bin_dir () { $info ? $info->bin_dir : () }
     method version () { $info ? $info->version : undef }
     method kind ()    { $info ? $info->kind    : undef }
 

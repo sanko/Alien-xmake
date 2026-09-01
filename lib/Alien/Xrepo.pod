@@ -4,12 +4,13 @@
 
 =head1 NAME
 
-Alien::Xrepo - Eases the Headache of Finding and Building Shared Libraries and 3rd Party Binaries for FFI and XS
+Alien::Xrepo - Install shared libraries and third-party binaries (tools, interpreters) for FFI, XS, and build systems
 
 =head1 SYNOPSIS
 
     use v5.40;
     use Alien::Xrepo;
+    use Path::Tiny;
 
     # Initialize
     my $repo = Alien::Xrepo->new( );
@@ -30,6 +31,11 @@ Alien::Xrepo - Eases the Headache of Finding and Building Shared Libraries and 3
     );
     die 'Install failed' unless $pkg;
 
+    # Or install a binary tool and run it (ninja, cmake, python, node, ...)
+    my $ninja = $repo->install('ninja');
+    my ($ninja_exe) = map { path($_)->child($^O eq 'MSWin32' ? 'ninja.exe' : 'ninja') } $ninja->bin_dir;
+    system $ninja_exe, '--version';
+
     # Wrap a single function from sqlite3 with Affix
     use Affix;
     my $sqlite3 = $repo->install('sqlite3');
@@ -38,17 +44,31 @@ Alien::Xrepo - Eases the Headache of Finding and Building Shared Libraries and 3
 
 =head1 DESCRIPTION
 
-This module acts as an intelligent bridge between Perl and the C<xrepo> package manager.
+This module acts as an intelligent bridge between Perl and the C<xrepo> package manager. With a single
+C<install> you can fetch B<shared libraries> as well as B<binary tools and interpreters> without touching a system
+package manager:
+
+=over
+
+=item * B<Libraries> (C<zlib>, C<libpng>, C<sqlite3>, ...) to bind with FFI or link from XS.
+
+=item * B<Tools and interpreters> (C<ninja>, C<cmake>, C<meson>, C<python>, C<node>, C<go>, C<rust>, ...) to run from
+your Perl code or to drive your build.
+
+=back
+
+You are free to install B<both kinds into the same store>: C<ninja> next to C<libpng>. Use L<Affix>, L<FFI::Platypus>,
+or L<Inline::C> to bind the libraries, and C<bin_dir>/C<installdir> to locate and run the binaries.
 
 While L<Affix> or L<FFI::Platypus> or L<Inline::C> can handle the binding or linking to native functions, Alien::Xrepo
-handles the B<acquisition> of the libraries containing those functions. It automates the entire dependency lifecycle:
+handles the B<acquisition> of the libraries and binaries. It automates the entire dependency lifecycle:
 
 =over
 
 =item 1. Provisioning:
 
-Downloads and installs libraries (C<libpng>, C<openssl>, etc.) via C<xrepo>, handling version constraints and custom
-repository lookups.
+Downloads and installs both libraries (C<libpng>, C<openssl>, ...) and binary tools (C<ninja>, C<python>, ...) via
+C<xrepo>, handling version constraints and custom repository lookups.
 
 =item 2. Configuration:
 
@@ -58,7 +78,8 @@ supports cross-compilation parameters (platform, architecture, toolchains).
 =item 3. Introspection:
 
 Parses the build metadata to locate the exact absolute paths to the runtime binaries (C<.dll>, C<.so>, C<.dylib>) and
-header files, abstracting away operating system filesystem differences.
+header files, the C<bin_dir> of any installed tool, and the C<-I> / C<-L> / C<-l> flags a compiler needs, abstracting
+away operating system filesystem differences.
 
 =back
 
@@ -107,6 +128,13 @@ Creates a new instance.
 =item B<verbose>
 
 Boolean. If true, prints command output and status messages to C<STDOUT>. Defaults to C<0>.
+
+=item B<root>
+
+Optional default installation root (package store) for this instance. Every store-touching method (C<install>,
+C<fetch>, C<scan>, C<uninstall>, ...) uses C<installdir =E<gt> $root> unless a per-call C<installdir> is given, so the
+instance is confined to its own project-local directory instead of the shared per-user store. Used by
+L<Alien::Xrepo::Base> and the dist builder to keep a distribution's native dependencies inside its C<share> directory.
 
 =back
 
@@ -453,6 +481,78 @@ use L<Affix::Wrap>:
     )->wrap( $zlib->libpath );
     say 'zlib ' . zlibVersion();
 
+=head2 Link an XS extension with Inline::C (multiple libraries)
+
+Same idea for an actual C extension, compiled with L<Inline::C>. Install every library you want to link; merge their
+include and link directories, hand them to Inline::C, and write plain C that uses whichever header you need. Here we
+bind both C<libpng> and C<zlib> (installed together into one store) into a single XS function:
+
+    use v5.40;
+    use Alien::Xrepo;
+    use Config;
+
+    my $repo = Alien::Xrepo->new;
+    my $png   = $repo->install('libpng');       # shared lib
+    my $zlib  = $repo->install('zlib');         # second shared lib
+
+    # The compiled XS loads png.dll / libpng.so at runtime, so put both native
+    # "bin" dirs on PATH before calling into it (Windows especially).
+    my @png_bins  = $png->bin_dir;
+    my @zlib_bins = $zlib->bin_dir;
+    local $ENV{PATH} = join $Config{path_sep}, (@png_bins, @zlib_bins, $ENV{PATH});
+
+    # Merge include and link directories into plain flag strings.
+    my $incs = join ' ', map { "-I$_" } (@{ $png->includedirs }, @{ $zlib->includedirs });
+    my $libs = join ' ',
+        map { "-L$_" } (@{ $png->linkdirs }, @{ $zlib->linkdirs }),
+        map { "-l$_" } (@{ $png->links },    @{ $zlib->links });
+
+    use Inline ();
+    Inline->bind(
+        'C',
+        <<'C',
+    #include <png.h>
+    #include <zlib.h>
+    const char *versions () {
+        return "libpng " PNG_LIBPNG_VER_STRING ", zlib " ZLIB_VERSION;
+    }
+C
+        INC  => $incs,
+        LIBS => $libs,
+    );
+    say versions();
+
+The I<eg/xrepo_inline_c.pl> script is the runnable copy of this example. C<Inline::C> is not installed with this
+distribution - install it once with C<cpanm Inline::C>.
+
+=head2 Install and run a binary tool
+
+C<xrepo> does not build only shared libraries - it also ships ready-to-run B<binaries> (C<ninja>, C<cmake>, C<meson>,
+C<node>, C<python>, C<go>, C<rust>, ...). C<install> returns the package C<installdir>, and C<bin_dir> tells you where
+the executables live. Run one directly, or stick C<bin_dir> in front of C<PATH> so all the children you spawn find the
+tool:
+
+    use v5.40;
+    use Alien::Xrepo;
+    use Path::Tiny;
+    use Config;
+
+    my $repo    = Alien::Xrepo->new;
+    my $ninja   = $repo->install('ninja');
+    my @bins    = $ninja->bin_dir;
+
+    # Option A: run a single binary from bin_dir
+    my ($ninja_exe) = map { path($_)->child($^O eq 'MSWin32' ? 'ninja.exe' : 'ninja') } @bins;
+    system $ninja_exe, '--version';
+
+    # Option B: put bin_dir first on PATH, then plain 'ninja' resolves
+    local $ENV{PATH} = join $Config{path_sep}, (@bins, $ENV{PATH});
+    system 'ninja', '--version';
+
+Use C<installdir> for everything the tool ships, not just C<bin>:
+
+    say 'ninja install root: ' . $ninja->installdir;
+
 =head2 Build a C program against a library
 
 C<install> builds the library once; C<fetch> tells you the C<-I...> and C<-L.../-l...> flags if you are building with
@@ -511,7 +611,7 @@ shell) or just prints it with C<show>.
 
 L<https://xrepo.xmake.io>, L<https://packages.xmake.io/>
 
-L<Affix>, L<Affix::Wrap>, L<Alien::Xmake>, L<FFI::Platypus>
+L<Affix>, L<Affix::Wrap>, L<Alien::Xmake>, L<FFI::Platypus>, L<Inline::C>; subclass the base class with L<Alien::Xrepo::Base>
 
 =head1 LICENSE
 

@@ -97,8 +97,9 @@ appended to the C<xrepo> install spec.
 
 =item B<root>
 
-Optional path to an isolated, local installation root for packages and configuration. When set, C<XMAKE_CONFIGDIR> and
-C<XMAKE_PKG_INSTALLDIR> point inside this directory so the package does not touch the global C<~/.xmake> environment.
+Optional path to an isolated, local installation root for packages. When set it is handed to L<Alien::Xrepo> as the
+default C<installdir>, so every package you install through this alien lives under C<root> instead of the shared
+per-user store. That gives reproducible builds that an unrelated C<xrepo> run cannot upgrade or remove.
 
 =item B<verbose>
 
@@ -163,7 +164,12 @@ An alias for C<libpath()>, provided for compatibility with C<FFI::Platypus>.
 
 =head2 C<bin_dir( )>
 
-Returns an array reference of directories containing executables.
+Returns a list of directories containing executables (C<bin> of a tool package, or wherever the runtime DLLs of a
+library live). Prepend them to C<PATH> to run an installed tool:
+
+    my @bins = $alien->bin_dir;
+    local $ENV{PATH} = join( $Config{path_sep}, @bins, $ENV{PATH} );
+    system 'ninja', '--version';
 
 =head2 C<kind( )>
 
