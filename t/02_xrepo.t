@@ -25,5 +25,17 @@ diag 'Header:  ' . $pkg->find_header('png.h');
 diag 'Include dirs: ';
 diag '     - ' . $_ for @{ $pkg->includedirs };
 diag 'Lib:     ' . $pkg->libpath;
+
+# Refetch an already-installed package without reinstalling
+ok my $refetched = $repo->fetch('libpng'), 'fetch installed libpng';
+is $refetched->version, $pkg->version, 'fetch agrees on version';
+ok length( $refetched->libpath ),                          'fetch found a runtime lib';
+ok length( $repo->fetch( 'libpng', undef, cflags => 1 ) ), 'fetch --cflags works';
+
+# Query-only / metadata operations
+ok scalar( $repo->list_repo ) > 0, 'list_repo returns repos';
+ok( scalar( grep {/libpng/} $repo->scan('libpng') ), 'scan finds libpng' );
+ok my $info = $repo->info( 'libpng', format => 'json' ), 'info --format=json works';
+is ref $info, 'ARRAY', 'info json is an array';
 #
 done_testing;

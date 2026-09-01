@@ -21,33 +21,20 @@ Alien::Xrepo - Eases the Headache of Finding and Building Shared Libraries for F
 
     # Install a library with specific configuration
     # equivalent to: xrepo install -p windows -a x86_64 -m debug --configs='shared=true,vs_runtime=MD' libpng
-    my $pkg = $repo->install( 'libpng', '1.6.x', plat => 'windows', arch => 'x64', mode => 'debug', configs => { vs_runtime => 'MD' } );
+    my $pkg = $repo->install(
+        'libpng', '1.6.x',
+        plat    => 'windows',
+        arch    => 'x64',
+        mode    => 'debug',
+        configs => { vs_runtime => 'MD' }
+    );
     die 'Install failed' unless $pkg;
-
-    # Automatically wrap zlib as a whole with Affix::Wrap
-    use Affix;
-    use Affix::Wrap;
-    my $zlib = $repo->install('zlib');
-    Affix::Wrap->new(
-        project_files => [ $zlib->find_header('zlib.h') ],
-        include_dirs  => [ $zlib->includedirs ],
-        types         => { gzFile_s => Pointer [Void] }
-    )->wrap( $zlib->libpath );
-    say 'zlib version:   ' . zlibVersion();
 
     # Wrap a single function from sqlite3 with Affix
     use Affix;
     my $sqlite3 = $repo->install('sqlite3');
     affix $sqlite3->libpath, 'sqlite3_libversion', [], String;
     say 'SQLite version: ' . sqlite3_libversion();
-
-    # Wrap a single function from libpng with FFI::Platypus
-    use FFI::Platypus;
-    my $lz4 = $repo->install('lz4');
-    my $ffi = FFI::Platypus->new;
-    $ffi->lib( $lz4->libpath );
-    $ffi->attach( 'LZ4_versionString', [] => 'string' );
-    say 'LZ4 version:    ' . LZ4_versionString();
 
 =head1 DESCRIPTION
 
@@ -78,11 +65,11 @@ header files, abstracting away operating system filesystem differences.
 This eliminates the need for manual compilation steps or hard coding paths in your Perl scripts, making your FFI
 bindings or XS wrappers portable and reproducible.
 
-Discover easily installed packages at https://packages.xmake.io/.
+Discover packages at L<https://packages.xmake.io/>.
 
 =head1 CONSTRUCTOR
 
-=head2 C<new>
+=head2 C<new( ... )>
 
     my $repo = Alien::Xrepo->new( verbose => 1 );
 
@@ -116,7 +103,7 @@ Optional semantic version string (C<1.2.x>, C<latest>). Pass C<undef> or an empt
 
 =item B<%options>
 
-Configuration options passed to C<xrepo>:
+Optional configuration options passed to C<xrepo> (shared by most other methods and missing options are filled in automatically):
 
 =over
 
@@ -143,9 +130,49 @@ XS module.>
 
 Specify a toolchain (e.g., C<llvm>, C<zig>, C<mingw>).
 
-=item B<configs>
+=item B<toolchain_host>
 
-A hashsef or string of package-specific configurations.
+Specify the host toolchain for cross compilation.
+
+=item B<vs>, B<vs_toolset>, B<vs_sdkver>
+
+Visual Studio toolset/sdk selection (e.g., C<--vs=2017>, C<--vs_toolset=14.0>).
+
+=item B<ndk>
+
+The Android NDK directory.
+
+=item B<sdk>
+
+The SDK directory of a cross toolchain.
+
+=item B<mingw>
+
+The MinGW SDK directory.
+
+=item B<jobs>, B<linkjobs>
+
+Parallel compilation/link job counts.
+
+=item B<force>
+
+I<install/download>: force reinstall/redownload all packages. I<remove>: force removal even when still depended on.
+
+=item B<shallow>
+
+Do not install/download dependent packages.
+
+=item B<build>
+
+Always build and install from source.
+
+=item B<debugdir>
+
+Source directory used for debugging; enables C<force> and C<shallow> by default.
+
+=item B<configs( ... )>
+
+A hashref or string of package-specific configurations.
 
     configs => { openssl => 'true', shared => 'true' }
     # becomes --configs='openssl=true,shared=true'
@@ -160,17 +187,103 @@ A list or string of extra dependencies to include in the environment.
 
 Returns an L<Alien::Xrepo::PackageInfo> object.
 
-=head2 C<uninstall( ... )>
+=head2 C<fetch( $pkg, $version, %options )>
 
-    $repo->uninstall('zlib');
+    my $pkg_info = $repo->fetch( 'libpng' );
+    my $cflags   = $repo->fetch( 'zlib', undef, cflags => 1 );
 
-Removes the specified package from the local cache. Accepts the same C<%options> as C<install( ... )>.
+Fetches metadata for an already-installed package without installing it again. Returns an L<Alien::Xrepo::PackageInfo>
+object, or a raw flag string when C<cflags> or C<ldflags> is requested.
 
-=head2 C<search>
+=over
 
-    $repo->search( 'png' );
+=item B<cflags>
 
-Runs `xrepo search` and prints the results to STDOUT.
+Fetch C<-I...> include flags as a string.
+
+=item B<ldflags>
+
+Fetch C<-L.../-l...> link flags as a string.
+
+=item B<deps>
+
+Fetch packages together with their dependencies.
+
+=item B<system>
+
+Only fetch the package on the current system.
+
+=item B<external>
+
+Show C<cflags> as external packages (with C<-isystem>).
+
+=back
+
+=head2 C<info( $pkg, %options )>
+
+    my $json = $repo->info( 'zlib', format => 'json' );
+    my $text = $repo->info( 'libpng' );
+
+Shows package information. Pass C<format =E<gt> 'json'> to receive the decoded data structure (array of hashes),
+C<format =E<gt> 'dot'> for a dependency-graph rendering, or C<depgraph =E<gt> 1> to include the dependency graph.
+Returns the plain output text otherwise.
+
+=head2 C<scan( [$pkg], %options )>
+
+    my @installed = $repo->scan( 'libpng' );
+    my @all       = $repo->scan( );
+
+Lists installed packages (optionally filtered by a lua pattern). Returns the output lines as a list.
+
+=head2 C<download( $pkg, $version, %options )>
+
+    $repo->download( 'zlib', undef, outputdir => './dl', shallow => 1 );
+
+Only downloads the package source archives without building them. C<outputdir> selects the destination directory
+(default C<packages>). Supports C<force>, C<shallow> and the standard C<%options>.
+
+=head2 C<import_pkg( $pkg, $version, %options )>
+
+    $repo->import_pkg( 'zlib', undef, packagedir => './packages' );
+
+Imports pre-downloaded package archives into the local cache. C<packagedir> selects the source directory.
+
+=head2 C<export( $pkg, $version, %options )>
+
+    $repo->export( 'zlib', undef, packagedir => './packages', shallow => 1 );
+
+Exports installed package files for offline use. C<packagedir> selects the destination directory.
+
+=head2 C<env( [$program], %options )>
+
+    $repo->env( 'bash', bind => 'zlib' );   # run a program inside the package env
+    $repo->env( undef, show => 1 );         # only print the environment
+
+Sets up the package environment and either prints it (C<show>) or executes C<$program> (default C<shell>) inside it.
+C<bind> selects which environment config or package to bind, C<list> lists global configs, and C<add>/C<remove> manage
+global environment config files.
+
+=head2 C<list_repo( )>
+
+    my @repos = $repo->list_repo( );
+
+Lists all configured remote repositories (output lines).
+
+=head2 C<uninstall( $lib, %options )>
+
+    $repo->uninstall( 'zlib' );
+    $repo->uninstall( 'zl*', all => 1 );
+
+Removes the specified package from the local cache. Accepts the same C<%options> as C<install( ... )>. C<all> removes
+all matching packages (ignoring extra configs, lua patterns allowed) and C<force> removes addon packages even when they
+are still depended upon.
+
+=head2 C<search( $query, %options )>
+
+    $repo->search( $query );
+    $repo->search( $query, addon => 1 );
+
+Runs C<xrepo search> and prints the results to STDOUT. C<addon> searches the C<addons/> sub-repository.
 
 =head2 C<clean( )>
 
@@ -180,7 +293,7 @@ Cleans the cached packages and downloads.
 
 =head2 C<add_repo( ... )>
 
-    $repo->add_repo($name, $git_url, $branch);
+    $repo->add_repo( $name, $git_url, $branch );
 
 Adds a custom xmake repository.
 
@@ -190,7 +303,7 @@ Adds a custom xmake repository.
 
 Removes a custom repository.
 
-=head2 C<update_repo( [...] )>
+=head2 C<update_repo( [$repo] )>
 
     $repo->update_repo( );        # Update all
     $repo->update_repo( 'main' ); # Update specific repo
@@ -236,9 +349,113 @@ The installed version.
 
 Scans C<includedirs> for the given filename and returns the absolute path if found. Returns C<undef> otherwise.
 
+=head1 Examples
+
+If you just want to use a library, copy one of these. Each one installs whatever is missing on the first run and takes
+care of the rest.
+
+=head2 Hello World (install then call)
+
+C<install( ... )> downloads and builds the library for you, then C<libpath> points L<Affix> or L<FFI::Platypus> to the matching shared
+C<.dll> / C<.so> / C<.dylib>.
+
+Affix first:
+
+    use v5.40;
+    use Alien::Xrepo;
+    use Affix;
+
+    my $zlib = Alien::Xrepo->new->install('zlib');
+    affix $zlib->libpath, 'zlibVersion', [], String;
+    say 'zlib ' . zlibVersion();
+
+The same simple demo with FFI::Platypus:
+
+    use v5.40;
+    use Alien::Xrepo;
+    use FFI::Platypus;
+
+    my $zlib = Alien::Xrepo->new->install('zlib');
+
+    my $ffi = FFI::Platypus->new;
+    $ffi->lib( $zlib->libpath );
+    $ffi->attach( zlibVersion => [] => 'string' );
+    say 'zlib ' . zlibVersion();
+
+And if you want the whole library wrapped (prototypes generated from the headers) instead of one function at a time,
+use L<Affix::Wrap>:
+
+    use v5.40;
+    use Alien::Xrepo;
+    use Affix::Wrap;
+
+    my $zlib = Alien::Xrepo->new->install('zlib');
+    Affix::Wrap->new(
+        project_files => [ $zlib->find_header('zlib.h') ],
+        include_dirs  => [ $zlib->includedirs ],
+        types         => { gzFile_s => Pointer [Void] }
+    )->wrap( $zlib->libpath );
+    say 'zlib ' . zlibVersion();
+
+=head2 Build a C program against a library
+
+C<install> builds the library once; C<fetch> tells you the C<-I...> and C<-L.../-l...> flags if you are building with
+something other than xmake (e.g. MakeMaker or a plain C<cc>):
+
+    use v5.40;
+    use Alien::Xrepo;
+
+    my $repo = Alien::Xrepo->new;
+    $repo->install( 'libpng' );                       # build it once
+    my $cflags  = $repo->fetch( 'libpng', undef, cflags  => 1 );
+    my $ldflags = $repo->fetch( 'libpng', undef, ldflags => 1 );
+    say "cc $cflags $ldflags pngprog.c -o pngprog";
+
+=head2 What can I install? What do I already have?
+
+    use v5.40;
+    use Alien::Xrepo;
+    my $repo = Alien::Xrepo->new;
+
+    say '[What is available?]';
+    $repo->search('sqlite');
+
+    say '[Already installed:]';
+    say for $repo->scan;
+
+C<search> prints matching packages from every configured repository and C<scan> lists everything already on disk.
+
+=head2 Cross-compile without memorizing SDK paths
+
+All of xrepo's platform switches become named options. C<ndk> is just one example, alongside C<toolchain>, C<sdk>,
+C<mingw> and the rest.
+
+    use v5.40;
+    use Alien::Xrepo;
+
+    my $pkg = Alien::Xrepo->new->install(
+        'zlib', '1.3.x',
+        plat => 'android',
+        arch => 'arm64',
+        ndk  => 'C:/Android/Sdk/ndk/26.1.10909125'  # adapt to your NDK
+    );
+    say $pkg->libpath;
+
+=head2 Drop into a shell inside the library's environment
+
+C<env> sets up the environment for a package (PATH, etc.) and either runs C<$program> inside it (default: the system
+shell) or just prints it with C<show>.
+
+    use v5.40;
+    use Alien::Xrepo;
+    Alien::Xrepo->new->env( 'bash', bind => 'zlib' ); # or env( undef, bind => 'zlib' )
+    # Alien::Xrepo->new->env( undef, show => 1 );     # just print the environment
+
 =head1 SEE ALSO
 
-L<Affix::Wrap>, L<Alien::Xmake>, L<https://xrepo.xmake.io>, L<https://packages.xmake.io/>
+L<https://xrepo.xmake.io>, L<https://packages.xmake.io/>
+
+L<Affix>, L<Affix::Wrap>, L<Alien::Xmake>, L<FFI::Platypus>
 
 =head1 LICENSE
 

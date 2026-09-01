@@ -4,6 +4,20 @@ use Alien::Xrepo;
 # Initialize
 my $repo = Alien::Xrepo->new();
 
+# List configured remote repositories
+say 'Remote repositories';
+say for $repo->list_repo;
+
+# Search for a package (addon => search <repository>/addons/)
+# $repo->search( 'sqlite', addon => 1 );
+# Show info about an installed package (as JSON)
+# my $info = $repo->info( 'zlib', format => 'json' );
+# Scan installed packages (optional lua-pattern filter)
+say 'Installed libpng';
+say for $repo->scan('libpng');
+
+# Fetch info for an already-installed package without installing again
+# my $pkg = $repo->fetch('zlib');
 # Add a custom repository (optional)
 # $repo->add_repo( 'my-repo', 'https://github.com/my/repo.git' );
 # Install a shared lib with an automatic configuration

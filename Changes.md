@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Alien::Xrepo::Base
+- A "QUICK START EXAMPLES" section in the Alien::Xrepo docs with copy-paste examples
+  for FFI::Platypus, Affix, and Affix::Wrap, getting build flags, discovering packages,
+  cross-compiling, and dropping into a package environment
+- Full coverage of xrepo actions in Alien::Xrepo
+  - `fetch` returns parsed package info (or raw `--cflags`/`--ldflags`) without reinstalling
+  - `info` supports `--depgraph` and `--format=json`
+  - `scan` lists installed packages (optional lua-pattern filter)
+  - `download` fetches package source archives
+  - `import_pkg` / `export` handle offline package distribution
+  - `list_repo` lists configured remote repositories
+  - `env` sets up a package environment and runs a program (or `--show` it)
+  - `search` supports `--addon`
+  - `uninstall` supports `--all` and `--force`
+  - `_build_args` now understands jobs, force/shallow/build, VS/NDK/SDK/MingW
+    toolchain switches, and `--toolchain_host`
 
 ## [0.08] - 2026-01-11
 

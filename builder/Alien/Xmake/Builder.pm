@@ -4,9 +4,8 @@
 use v5.40;
 use feature 'class';
 no warnings 'experimental::class';
-
-class #
-Alien::Xmake::Builder {
+class    #
+    Alien::Xmake::Builder {
     use CPAN::Meta;
     use ExtUtils::Install qw[pm_to_blib install];
     use ExtUtils::InstallPaths;
@@ -181,14 +180,16 @@ use %s;
         if ( $res->{status} == 403 || $res->{status} == 429 ) {
             if ( $rl{'x-ratelimit-remaining'} eq '0' ) {
                 my $when = $rl{'x-ratelimit-reset'} =~ /^\d+$/ ? '; resets at ' . scalar gmtime( $rl{'x-ratelimit-reset'} + 0 ) : '';
-                die 'GitHub API rate limit exceeded (limit='. $rl{'x-ratelimit-limit'}.$when . ').' .
+                die 'GitHub API rate limit exceeded (limit=' .
+                    $rl{'x-ratelimit-limit'} .
+                    $when . ').' .
                     " Recommend setting GITHUB_TOKEN (5,000 req/hr) to raise the 60 req/hr unauth limit\n";
             }
-            my $retry = $rl{'retry-after'}       =~ /^\d+$/ ? '; retry after '.$rl{'retry-after'}.'s'                                      : '';
+            my $retry = $rl{'retry-after'}       =~ /^\d+$/ ? '; retry after ' . $rl{'retry-after'} . 's'                              : '';
             my $reset = $rl{'x-ratelimit-reset'} =~ /^\d+$/ ? '; remaining resets at ' . scalar gmtime( $rl{'x-ratelimit-reset'} + 0 ) : '';
-            die 'GitHub API rate limited (status '.$res->{status}.$retry.$reset ."). Set GITHUB_TOKEN to raise the limit\n";
+            die 'GitHub API rate limited (status ' . $res->{status} . $retry . $reset . "). Set GITHUB_TOKEN to raise the limit\n";
         }
-        die 'GitHub releases API failed ('.$res->{status}. ' ' . $res->{reason}. " ) for $url\n" unless $res->{success};
+        die 'GitHub releases API failed (' . $res->{status} . ' ' . $res->{reason} . " ) for $url\n" unless $res->{success};
         $gh_release = decode_json( $res->{content} );
         return $gh_release;
     }

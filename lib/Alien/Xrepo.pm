@@ -1,7 +1,8 @@
 use v5.40;
 use feature 'class';
 no warnings 'experimental::class';
-class Alien::Xrepo 0.08 {
+#
+class Alien::Xrepo v0.9.0 {
     use Alien::Xmake;
     use JSON::PP;
     use Path::Tiny;
@@ -12,7 +13,8 @@ class Alien::Xrepo 0.08 {
     field $xmake = Alien::Xmake->new;
     method blah ($msg) { return unless $verbose; say $msg; }
     #
-    class Alien::Xrepo::PackageInfo {
+    class    #
+        Alien::Xrepo::PackageInfo v0.9.0 {
         use Path::Tiny;
         field $includedirs : param : reader;
         field $libfiles    : param : reader;
@@ -52,9 +54,9 @@ class Alien::Xrepo 0.08 {
                 bindirs     => $bindirs
             }
         }
-    }
-    #
-    method install ( $pkg_spec, $version //= (), %opts ) {
+        }
+        #
+        method install ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
 
         # Build common arguments for both install and fetch
@@ -83,13 +85,18 @@ class Alien::Xrepo 0.08 {
 
     method uninstall ( $pkg_spec, %opts ) {
         my @args = $self->_build_args( \%opts );
+        push @args, '--all'   if $opts{all};
+        push @args, '--force' if $opts{force};
         say "[*] xrepo: uninstalling $pkg_spec..." if $verbose;
         system $xmake->exe, qw[lua private.xrepo], 'remove', '-y', @args, $pkg_spec;
     }
 
-    method search ($query) {
+    method search ( $query, %opts ) {
         say "[*] xrepo: searching for $query..." if $verbose;
-        system $xmake->exe, qw[lua private.xrepo], 'search', $query;
+        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'search' );
+        push @cmd, '--addon' if $opts{addon};
+        push @cmd, $query;
+        system @cmd;
     }
 
     method clean () {
@@ -118,15 +125,38 @@ class Alien::Xrepo 0.08 {
         system @cmd;
     }
     #
-    method _build_args ($opts) {
+    method _build_args ( $opts, $extra //= [] ) {
         my @args;
 
         # Standard xmake/xrepo flags
-        push @args, '-p', $opts->{plat} if $opts->{plat};                        # platform (iphoneos, android, etc)
-        push @args, '-a', $opts->{arch} if $opts->{arch};                        # architecture (arm64, x86_64)
-        push @args, '-m', $opts->{mode} if $opts->{mode};                        # debug/release
-        push @args, '-k', ( $opts->{kind} // 'shared' );                         # static/shared (Default to shared for FFI)
-        push @args, '--toolchain=' . $opts->{toolchain} if $opts->{toolchain};
+        push @args, '-p', $opts->{plat} if $opts->{plat};                                  # platform (iphoneos, android, etc)
+        push @args, '-a', $opts->{arch} if $opts->{arch};                                  # architecture (arm64, x86_64)
+        push @args, '-m', $opts->{mode} if $opts->{mode};                                  # debug/release
+        push @args, '-k', ( $opts->{kind} // 'shared' ) unless exists $opts->{no_kind};    # static/shared (Default to shared for FFI)
+        push @args, '--toolchain=' . $opts->{toolchain}           if $opts->{toolchain};
+        push @args, '--toolchain_host=' . $opts->{toolchain_host} if $opts->{toolchain_host};
+
+        # Visual Studio
+        push @args, '--vs=' . $opts->{vs}                 if $opts->{vs};
+        push @args, '--vs_toolset=' . $opts->{vs_toolset} if $opts->{vs_toolset};
+        push @args, '--vs_sdkver=' . $opts->{vs_sdkver}   if $opts->{vs_sdkver};
+
+        # Android NDK
+        push @args, '--ndk=' . $opts->{ndk} if $opts->{ndk};
+
+        # Cross compilation
+        push @args, '--sdk=' . $opts->{sdk}     if $opts->{sdk};
+        push @args, '--mingw=' . $opts->{mingw} if $opts->{mingw};
+
+        # Parallel builds / linking
+        push @args, '-j', $opts->{jobs} if $opts->{jobs};
+        push @args, '--linkjobs=' . $opts->{linkjobs} if $opts->{linkjobs};
+
+        # Other configuration
+        push @args, '--force'                         if $opts->{force};
+        push @args, '--shallow'                       if $opts->{shallow};
+        push @args, '--build'                         if $opts->{build};
+        push @args, '--debugdir=' . $opts->{debugdir} if $opts->{debugdir};
 
         # Complex configs (passed as --configs='key=val,key2=val2')
         if ( my $c = $opts->{configs} ) {
@@ -143,7 +173,134 @@ class Alien::Xrepo 0.08 {
         if ( my $i = $opts->{includes} ) {
             push @args, '--includes=' . ( ref $i eq 'ARRAY' ? join( ',', @$i ) : $i );
         }
+
+        # Extra per-action flags (e.g. --json, --cflags, --ldflags)
+        push @args, @$extra;
         return @args;
+    }
+
+    # Run `xrepo fetch` and return a parsed PackageInfo (or raw flags).
+    method fetch ( $pkg_spec, $version //= (), %opts ) {
+        my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        my @extra;
+
+        # Raw flag modes: return the string directly instead of a PackageInfo
+        my $flags_mode = $opts{cflags} || $opts{ldflags};
+        push @extra, '--cflags'  if $opts{cflags};
+        push @extra, '--ldflags' if $opts{ldflags};
+        push @extra, '--deps'    if $opts{deps};
+        push @extra, '--system'  if $opts{system};
+        push @extra, '-e'        if $opts{external};
+        my @args      = $self->_build_args( \%opts, \@extra );
+        my @fetch_cmd = ( $xmake->exe, qw[lua private.xrepo], 'fetch', '--json', @args, $full_spec );
+        $self->blah("Running: @fetch_cmd");
+        my ( $json_out, $json_err, $json_exit ) = capture { system @fetch_cmd };
+        return if $json_exit != 0;
+
+        # cflags/ldflags mode: xrepo returns a plain flag string, not JSON
+        return $json_out if $flags_mode;
+        my $data;
+        try { $data = decode_json($json_out); } catch ($e) {
+            die "Failed to decode xrepo JSON output: $e\nOutput was: $json_out";
+        };
+
+        # xrepo might return a single object or a list.
+        return $self->_process_info( ( ref $data eq 'ARRAY' ) ? $data->[0] : $data );
+    }
+
+    method info ( $pkg_spec, %opts ) {
+        my @extra;
+        push @extra, '--depgraph'                if $opts{depgraph};
+        push @extra, '--format=' . $opts{format} if $opts{format};
+        my @args = $self->_build_args( \%opts, \@extra );
+        say "[*] xrepo: showing info for $pkg_spec..." if $verbose;
+        my ( $out, $err, $exit ) = capture { system( $xmake->exe, qw[lua private.xrepo], 'info', @args, $pkg_spec ) };
+        return unless $exit == 0;
+
+        # If the caller asked for machine-readable output, parse and return it
+        if ( ( $opts{format} // '' ) eq 'json' && $out =~ /[\{\[]/ ) {
+            my $data;
+            try { $data = decode_json($out); } catch ($e) {
+            }
+            return $data if $data;
+        }
+        return $out;
+    }
+
+    method scan ( $pkg //= (), %opts ) {
+        my @args = $self->_build_args( { %opts, no_kind => 1 } );
+        say '[*] xrepo: scanning installed packages...' if $verbose;
+        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'scan', @args );
+        push @cmd, $pkg if defined $pkg && length $pkg;
+        my ( $out, $err, $exit ) = capture { system @cmd };
+        return () if $exit != 0;
+        $self->blah($out);
+        return split /\n/, $out;
+    }
+
+    method download ( $pkg_spec, $version //= (), %opts ) {
+        my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        my @extra;
+        push @extra, '-o', $opts{outputdir} if $opts{outputdir};
+        my @args = $self->_build_args( \%opts, \@extra );
+        say "[*] xrepo: downloading $full_spec..." if $verbose;
+        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'download', '-y', @args, $full_spec );
+        $self->blah("Running: @cmd");
+        my ( $out, $err, $exit ) = capture { system @cmd };
+        return 0 if $exit != 0;
+        $self->blah($out);
+        return 1;
+    }
+
+    method list_repo () {
+        say '[*] xrepo: listing remote repositories...' if $verbose;
+        my ( $out, $err, $exit ) = capture { system( $xmake->exe, qw[lua private.xrepo], 'list-repo' ) };
+        return () if $exit != 0;
+        $self->blah($out);
+        return split /\n/, $out;
+    }
+
+    method import_pkg ( $pkg_spec, $version //= (), %opts ) {
+        my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        my @extra;
+        push @extra, '-i', $opts{packagedir} if $opts{packagedir};
+        my @args = $self->_build_args( \%opts, \@extra );
+        say "[*] xrepo: importing $full_spec..." if $verbose;
+        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'import', '-y', @args, $full_spec );
+        $self->blah("Running: @cmd");
+        my ( $out, $err, $exit ) = capture { system @cmd };
+        return 0 if $exit != 0;
+        $self->blah($out);
+        return 1;
+    }
+
+    method export ( $pkg_spec, $version //= (), %opts ) {
+        my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        my @extra;
+        push @extra, '-o', $opts{packagedir} if $opts{packagedir};
+        my @args = $self->_build_args( \%opts, \@extra );
+        say "[*] xrepo: exporting $full_spec..." if $verbose;
+        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'export', '-y', @args, $full_spec );
+        $self->blah("Running: @cmd");
+        my ( $out, $err, $exit ) = capture { system @cmd };
+        return 0 if $exit != 0;
+        $self->blah($out);
+        return 1;
+    }
+
+    method env ( $program //= (), %opts ) {
+        my @extra;
+        push @extra, '--show' if $opts{show};
+        push @extra, '--add',    $opts{add}    if $opts{add};
+        push @extra, '--remove', $opts{remove} if $opts{remove};
+        push @extra, '-l' if $opts{list};
+        push @extra, '-b', $opts{bind} if $opts{bind};
+        my @args = $self->_build_args( { %opts, no_kind => 1 }, \@extra );
+        my @cmd  = ( $xmake->exe, qw[lua private.xrepo], 'env', @args );
+        push @cmd, $program if defined $program && length $program;
+        push @cmd, @{ $opts{arguments} // [] };
+        say "[*] xrepo: running in package environment..." if $verbose;
+        system @cmd;
     }
 
     method _process_info ($info) {
@@ -246,4 +403,5 @@ class Alien::Xrepo 0.08 {
         );
     }
 };
+#
 1;
