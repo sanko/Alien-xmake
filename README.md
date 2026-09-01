@@ -61,6 +61,19 @@ Creates a new instance.
 
     Constructor option. Boolean. If true, prints the command being run to `STDOUT` before executing it.
 
+- **yes**
+
+    Constructor option. Boolean. Auto-confirms any interactive `xmake`/`xrepo` prompt by passing `-y` (equivalent to
+    `confirm => 'yes'`). Useful when a build is driven programmatically or its output is captured (e.g.
+    [Capture::Tiny](https://metacpan.org/pod/Capture%3A%3ATiny)) so an install that would normally prompt never hangs waiting on `STDIN`. `confirm => ...`
+    takes precedence when both are set.
+
+- **confirm**
+
+    Constructor option. Supplies an explicit answer (`yes`, `no`, or `def`) to any prompt xmake asks, passed through as
+    `--confirm=...`. Takes precedence over `yes => 1`. May be terse:
+    `Alien::Xmake->new( confirm => 'yes' )`.
+
 ## `build( [$target], %options )`
 
 ```perl

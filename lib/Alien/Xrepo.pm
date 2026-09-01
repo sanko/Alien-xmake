@@ -12,6 +12,10 @@ class Alien::Xrepo v0.9.0 {
     field $verbose : param //= 0;
     field $root    : param //= undef;
     field $theme   : param //= 'plain';
+    # Auto-confirm interactive xrepo/xmake prompts (e.g. -y / --confirm=yes). Useful when
+    # output is captured (Capture::Tiny) so a prompting install never hangs waiting on stdin.
+    field $yes     : param //= 0;
+    field $confirm : param //= ();
     field $xmake = Alien::Xmake->new;
 
     # Resolve which package store a call should operate on. A per-call `installdir` wins, then the
@@ -150,6 +154,12 @@ class Alien::Xrepo v0.9.0 {
     #
     method _build_args ( $opts, $extra //= [] ) {
         my @args;
+
+        # Auto-confirm interactive xrepo/xmake prompts so captured installs never hang.
+        my $yes_c     = $opts->{yes}     // $yes;
+        my $confirm_c = $opts->{confirm} // $confirm;
+        push @args, '--confirm=' . $confirm_c if defined $confirm_c && length $confirm_c;
+        push @args, '-y'          if $yes_c && !( defined $confirm_c && length $confirm_c );
 
         # Standard xmake/xrepo flags
         push @args, '-p', $opts->{plat} if $opts->{plat};                                  # platform (iphoneos, android, etc)

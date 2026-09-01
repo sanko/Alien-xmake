@@ -141,6 +141,18 @@ Optional xmake output theme, passed to xmake as C<$ENV{XMAKE_THEME}>. Defaults t
 color codes from xmake/xrepo output (clean CPAN test reports, CI logs, and captures). Set C<theme =E<gt> 'default'>
 to restore xmake's colored output. May be overridden per-call with C<theme =E<gt> ...> on any store-touching method.
 
+=item B<yes>
+
+Boolean. Auto-confirms interactive xmake/xrepo prompts (e.g. "are you sure to install these packages?") by passing
+C<-y>, so an install never hangs waiting on C<STDIN>. This is important when output is captured with L<Capture::Tiny>,
+which would otherwise swallow the prompt. C<confirm =E<gt> ...> takes precedence when both are set.
+
+=item B<confirm>
+
+Supplies an explicit answer (C<yes>, C<no>, or C<def>) to any prompt, passed through as C<--confirm=...>. Takes
+precedence over C<yes =E<gt> 1>. Both may be overridden per-call with C<yes =E<gt> ...> or C<confirm =E<gt> ...> on any
+store-touching method.
+
 =back
 
 =head1 METHODS
@@ -252,7 +264,12 @@ C<scan>, C<uninstall>, and friends so they operate on the same store.
 
 =item B<theme>
 
-Per-call xmake output theme override. Defaults to the C<theme> constructor value (C<plain>). See L</new>.
+Per-call xmake output theme override. Defaults to the C<theme> constructor value (C<plain>). See L</"new( ... )">.
+
+=item B<yes>, B<confirm>
+
+Per-call auto-confirmation overrides for the constructor C<yes =E<gt> ...> / C<confirm =E<gt> ...> options, applied as
+C<-y> or C<--confirm=...> to the underlying C<xrepo> invocation. Defaults to the constructor values. See L</"new( ... )">.
 
 =back
 
