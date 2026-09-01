@@ -28,7 +28,7 @@ class Alien::Xmake::Builder {
     field $repo  = 'xmake';
     field $http  : reader = do {
         my %headers = (
-            'X-GitHub-Api-Version' => '2022-11-28',
+            'X-GitHub-Api-Version' => '2026-03-10',
             accept                => 'application/vnd.github+json',
         );
         my $token = $ENV{GITHUB_TOKEN} // $ENV{GH_TOKEN};
@@ -182,9 +182,21 @@ use %s;
             : "https://api.github.com/repos/$owner/$repo/releases/latest";
         say 'Resolving Xmake release info from the GitHub API...';
         my $res = $self->http->get($url);
-        my $remaining = $res->{headers}{'x-ratelimit-remaining'} // '1';
-        if ( $res->{status} == 403 && $remaining == 0 ) {
-            die "GitHub API rate limit exceeded; set GITHUB_TOKEN to raise the limit\n";
+        my %rl  = map { $_ => $res->{headers}{$_} // '' }
+            qw[x-ratelimit-remaining x-ratelimit-limit x-ratelimit-reset retry-after];
+        if ( $res->{status} == 403 || $res->{status} == 429 ) {
+            if ( $rl{'x-ratelimit-remaining'} eq '0' ) {
+                my $when = $rl{'x-ratelimit-reset'} =~ /^\d+$/
+                    ? '; resets at ' . scalar gmtime( $rl{'x-ratelimit-reset'} + 0 )
+                    : '';
+                die "GitHub API rate limit exceeded (limit=$rl{'x-ratelimit-limit'}$when)."
+                    . " Recommend setting GITHUB_TOKEN (5,000 req/hr) to raise the 60 req/hr unauth limit\n";
+            }
+            my $retry = $rl{'retry-after'} =~ /^\d+$/ ? "; retry after $rl{'retry-after'}s" : '';
+            my $reset = $rl{'x-ratelimit-reset'} =~ /^\d+$/
+                ? "; remaining resets at " . scalar gmtime( $rl{'x-ratelimit-reset'} + 0 )
+                : '';
+            die "GitHub API rate limited (status $res->{status}$retry$reset). Set GITHUB_TOKEN to raise the limit\n";
         }
         die "GitHub releases API failed ($res->{status} $res->{reason}) for $url\n" unless $res->{success};
         $gh_release = decode_json( $res->{content} );
@@ -450,25 +462,11 @@ use %s;
         my $asset  = $self->_find_asset( qr/\Q$filename\E\z/i );
         my $gh_url = $asset ? $asset->{browser_download_url}
                           : "https://github.com/$owner/$repo/releases/download/$version/$filename";
-        my $cdn_url  = "https://fastly.jsdelivr.net/gh/xmake-mirror/xmake-releases\@$version/$filename";
-        my @urls;
-        my $fasthost = $self->_get_fast_host();
-        if ( $fasthost eq 'gitee.com' ) {
-            @urls = ( $cdn_url, $gh_url );
+        my $outfile = $build_dir->child('xmake.run');
+        say "Attempting download from $gh_url...";
+        if ( !$self->_download_file( $gh_url, $outfile ) ) {
+            die "Download failed for $gh_url";
         }
-        else {
-            @urls = ( $gh_url, $cdn_url );
-        }
-        my $outfile    = $build_dir->child('xmake.run');
-        my $downloaded = 0;
-        for my $url (@urls) {
-            say "Attempting download from $url...";
-            if ( $self->_download_file( $url, $outfile ) ) {
-                $downloaded = 1;
-                last;
-            }
-        }
-        die 'All download attempts failed.' unless $downloaded;
         say 'Extracting source bundle...';
         $self->_run_cmd( 'sh', $outfile, '--noexec', '--quiet', '--target', $build_dir ) or die 'Failed to extract .run file';
         my $cwd = cwd();
@@ -503,34 +501,6 @@ use %s;
             system( $make_cmd, 'install', "prefix=$installdir" ) == 0 or die 'Make install failed';
         }
         chdir $cwd;
-    }
-
-    method _get_host_speed ($host) {
-        my $cmd;
-        if ( $^O eq 'darwin' ) {
-            $cmd = "ping -c 1 -t 1 $host 2>/dev/null";
-        }
-        else {
-            $cmd = "ping -c 1 -W 1 $host 2>/dev/null";
-        }
-        my $output = `$cmd`;
-        if ( $output =~ /time=(\d+)/ ) {
-            return $1;
-        }
-        return 65535;
-    }
-
-    method _get_fast_host ( ) {
-        if ( $ENV{GITHUB_ACTIONS} ) {
-            return 'github.com';
-        }
-        say 'Testing connection speed to github.com vs gitee.com...';
-        my $speed_gitee  = $self->_get_host_speed('gitee.com');
-        my $speed_github = $self->_get_host_speed('github.com');
-        if ( $speed_gitee <= $speed_github ) {
-            return 'gitee.com';
-        }
-        return 'github.com';
     }
 
     method _download_file ( $url, $dest ) {
