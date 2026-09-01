@@ -111,10 +111,12 @@
          "version" : "v0.9.0"
       },
       "Alien::Xrepo::Base" : {
-         "file" : "lib/Alien/Xrepo/Base.pm"
+         "file" : "lib/Alien/Xrepo/Base.pm",
+         "version" : "v0.0.9"
       },
       "Alien::Xrepo::Base::Builder" : {
-         "file" : "lib/Alien/Xrepo/Base.pm"
+         "file" : "lib/Alien/Xrepo/Base.pm",
+         "version" : "v0.0.9"
       }
    },
    "release_status" : "testing",

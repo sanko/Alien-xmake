@@ -1,5 +1,6 @@
 use v5.40;
 use experimental 'class';
+#
 class Alien::Xmake v0.9.0 {
     use File::Spec;
     use File::Basename qw[dirname];
@@ -16,9 +17,7 @@ class Alien::Xmake v0.9.0 {
 
             # The raw 'bin' value in config is a relative path string.
             # We must call the generated helper method to get the absolute path.
-            if ( Alien::Xmake::ConfigData->can('bin') ) {
-                $conf->{bin} = Alien::Xmake::ConfigData->bin;
-            }
+            $conf->{bin} = Alien::Xmake::ConfigData->bin if Alien::Xmake::ConfigData->can('bin');
         }
         catch ($e) {    # Fallback / manual install detection
             $conf = { install_type => 'system' };
@@ -27,8 +26,8 @@ class Alien::Xmake v0.9.0 {
         }
         ->();
 
-    # We don't really need $dir detection if ConfigData is working,
-    # but we keep it for fallback scenarios (running from blib/lib, etc).
+    # We don't really need $dir detection if ConfigData is working, but we keep it for fallback
+    # scenarios (running from blib/lib, etc).
     field $dir;
     ADJUST {
         if ( !$config->{bin} || !-e $config->{bin} ) {
@@ -55,32 +54,24 @@ class Alien::Xmake v0.9.0 {
     # Valuable
     method install_type () { $config->{install_type} }
 
-    method bin_dir () {
-
-        # Return the directory of the raw path (unquoted)
+    method bin_dir () {    # Return the directory of the raw path (unquoted)
         my $exe = $self->_resolve_path;
         return dirname($exe);
     }
 
-    method exe () {
-
-        # Return a potentially quoted path for execution
+    method exe () {        # Return a potentially quoted path for execution
         my $path = $self->_resolve_path;
         return $self->_quote_path($path);
     }
 
-    method xrepo () {
-
-        # xrepo is usually in the same folder as Xmake
+    method xrepo () {      # xrepo is usually in the same folder as Xmake
         my $exe_path   = $self->_resolve_path;
         my $parent     = dirname($exe_path);
         my $xrepo_name = 'xrepo' . ( $windows ? '.bat' : '' );
 
         # Check sibling
         my $try = File::Spec->catfile( $parent, $xrepo_name );
-        if ( -e $try ) {
-            return $self->_quote_path($try);
-        }
+        return $self->_quote_path($try) if -e $try;
 
         # Fallback to config path calculation if the sibling check failed
         if ( $config->{bin} ) {
@@ -109,9 +100,8 @@ class Alien::Xmake v0.9.0 {
     sub alien_helper () {
         { xmake => sub { __PACKAGE__->new->exe }, xrepo => sub { __PACKAGE__->new->xrepo } }
     }
-    #
-    # --- Task plumbing ---------------------------------------------------
-    #
+
+    # Task plumbing
     method _cmd ( $action, @args ) {
         my @cmd = ( $self->exe, $action, @args );
         $self->blah("Running: @cmd");
@@ -149,9 +139,8 @@ class Alien::Xmake v0.9.0 {
         my @args = $self->_extra_args( \%opts );
         $self->_run( $name, @args );
     }
-    #
-    # --- Actions ---------------------------------------------------------
-    #
+
+    # Actions
     method build ( $target //= (), %opts ) {
         my @args;
         push @args, '-r'        if $opts{rebuild};
@@ -373,9 +362,8 @@ class Alien::Xmake v0.9.0 {
         return $self->_out( 'addon', \%opts, @args ) if $opts{search} || $opts{list};
         $self->_run( 'addon', @args );
     }
-    #
-    # --- Plugins ---------------------------------------------------------
-    #
+
+    # Plugins
     method check ( $checker //= (), %opts ) {
         my @args;
         push @args, '-l'                    if $opts{list};
@@ -534,9 +522,8 @@ class Alien::Xmake v0.9.0 {
         push @args, "--$_=$opts->{set}{$_}" for sort keys %{ $opts->{set} // {} };
         @args;
     }
-    #
-    # --- Introspection helpers ------------------------------------------
-    #
+
+    # Introspection helpers
     method _getver() {
         my ( $ver, undef ) = $self->_getver_build;
         "v$ver";
@@ -571,10 +558,12 @@ class Alien::Xmake v0.9.0 {
         return qq{"$path"} if $windows && $path =~ /\s/;
         $path;
     }
-} 1;
+    }
+    #
+    1;
 __END__
 Copyright (C) Sanko Robinson.
 
-This library is free software; you can redistribute it and/or modify it under
-the terms found in the Artistic License 2. Other copyrights, terms, and
-conditions may apply to data transmitted through this module.
+This library is free software; you can redistribute it and/or modify it under the terms found in
+the Artistic License 2. Other copyrights, terms, and conditions may apply to data transmitted
+through this module.

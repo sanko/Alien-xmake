@@ -1,5 +1,7 @@
 use v5.40;
+use blib;
 use Alien::Xrepo;
+$|++;
 
 # Initialize
 my $repo = Alien::Xrepo->new();
@@ -27,28 +29,25 @@ my $ogg = $repo->install('libvorbis');
 # equivalent to: xrepo install -p windows -a x86_64 -m debug --configs='shared=true,vs_runtime=MD' libpng
 my $pkg = $repo->install( 'libpng', '1.6.x', plat => 'windows', arch => 'x64', mode => 'debug', configs => { vs_runtime => 'MD' } );
 die 'Install failed' unless $pkg;
+{    # Bind a single zlib function with Affix (fast; Affix::Wrap can block for
 
-# Automatically wrap zlib as a whole with Affix::Wrap
-use Affix;
-use Affix::Wrap;
-my $zlib = $repo->install('zlib');
-Affix::Wrap->new(
-    project_files => [ $zlib->find_header('zlib.h') ],
-    include_dirs  => [ $zlib->includedirs ],
-    types         => { gzFile_s => Pointer [Void] }
-)->wrap( $zlib->libpath );
-say 'zlib version:   ' . zlibVersion();
-
-# Wrap a single function from sqlite3 with Affix
-use Affix;
-my $sqlite3 = $repo->install('sqlite3');
-affix $sqlite3->libpath, 'sqlite3_libversion', [], String;
-say 'SQLite version: ' . sqlite3_libversion();
-
-# Wrap a single function from libpng with FFI::Platypus
-use FFI::Platypus;
-my $lz4 = $repo->install('lz4');
-my $ffi = FFI::Platypus->new;
-$ffi->lib( $lz4->libpath );
-$ffi->attach( 'LZ4_versionString', [] => 'string' );
-say 'LZ4 version:    ' . LZ4_versionString();
+    # a very long time parsing zlib.h on some platforms)
+    use Affix;
+    my $zlib = $repo->install('zlib');
+    affix $zlib->libpath, 'zlibVersion', [], String;
+    say 'zlib version:   ' . zlibVersion();
+}
+{    # Wrap a single function from sqlite3 with Affix
+    use Affix;
+    my $sqlite3 = $repo->install('sqlite3');
+    affix $sqlite3->libpath, 'sqlite3_libversion', [], String;
+    say 'SQLite version: ' . sqlite3_libversion();
+}
+{    # Wrap a single function from libpng with FFI::Platypus
+    use FFI::Platypus;
+    my $lz4 = $repo->install('lz4');
+    my $ffi = FFI::Platypus->new;
+    $ffi->lib( $lz4->libpath );
+    $ffi->attach( 'LZ4_versionString', [] => 'string' );
+    say 'LZ4 version:    ' . LZ4_versionString();
+}

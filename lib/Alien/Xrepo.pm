@@ -13,13 +13,10 @@ class Alien::Xrepo v0.9.0 {
     field $root    : param //= undef;
     field $xmake = Alien::Xmake->new;
 
-    # Resolve which package store a call should operate on. A per-call
-    # C<installdir> wins, then the C<root> handed to the constructor, then
-    # whatever xrepo/s the environment chooses (global store).
-    method _store_dir (%opts) {
-        return $opts{installdir} // $root;
-    }
-    method blah ($msg) { return unless $verbose; say $msg; }
+    # Resolve which package store a call should operate on. A per-call `installdir` wins, then the
+    # `root` handed to the constructor, then whatever xrepo/the environment chooses (global store).
+    method _store_dir (%opts) { return $opts{installdir} // $root }
+    method blah       ($msg)  { return unless $verbose; say $msg; }
     #
     class    #
         Alien::Xrepo::PackageInfo v0.9.0 {
@@ -71,7 +68,7 @@ class Alien::Xrepo v0.9.0 {
         method install ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
-        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
 
         # Build common arguments for both install and fetch
         my @args = $self->_build_args( \%opts );
@@ -99,7 +96,7 @@ class Alien::Xrepo v0.9.0 {
 
     method uninstall ( $pkg_spec, %opts ) {
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
-        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @args = $self->_build_args( \%opts );
         push @args, '--all'   if $opts{all};
         push @args, '--force' if $opts{force};
@@ -117,7 +114,7 @@ class Alien::Xrepo v0.9.0 {
 
     method clean (%opts) {
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
-        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         say '[*] xrepo: cleaning cache...' if $verbose;
         system $xmake->exe, qw[lua private.xrepo], 'clean', '-y';
     }
@@ -201,7 +198,7 @@ class Alien::Xrepo v0.9.0 {
     method fetch ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
-        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
 
         # Raw flag modes: return the string directly instead of a PackageInfo
@@ -230,7 +227,7 @@ class Alien::Xrepo v0.9.0 {
 
     method info ( $pkg_spec, %opts ) {
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
-        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
         push @extra, '--depgraph'                if $opts{depgraph};
         push @extra, '--format=' . $opts{format} if $opts{format};
@@ -251,7 +248,7 @@ class Alien::Xrepo v0.9.0 {
 
     method scan ( $pkg //= (), %opts ) {
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
-        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @args = $self->_build_args( { %opts, no_kind => 1 } );
         say '[*] xrepo: scanning installed packages...' if $verbose;
         my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'scan', @args );
@@ -265,7 +262,7 @@ class Alien::Xrepo v0.9.0 {
     method download ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
-        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
         push @extra, '-o', $opts{outputdir} if $opts{outputdir};
         my @args = $self->_build_args( \%opts, \@extra );
@@ -289,7 +286,7 @@ class Alien::Xrepo v0.9.0 {
     method import_pkg ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
-        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
         push @extra, '-i', $opts{packagedir} if $opts{packagedir};
         my @args = $self->_build_args( \%opts, \@extra );
@@ -305,7 +302,7 @@ class Alien::Xrepo v0.9.0 {
     method export ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
-        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
         push @extra, '-o', $opts{packagedir} if $opts{packagedir};
         my @args = $self->_build_args( \%opts, \@extra );
@@ -320,7 +317,7 @@ class Alien::Xrepo v0.9.0 {
 
     method env ( $program //= (), %opts ) {
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
-        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
         push @extra, '--show' if $opts{show};
         push @extra, '--add',    $opts{add}    if $opts{add};
@@ -366,7 +363,7 @@ class Alien::Xrepo v0.9.0 {
             $kind = ( defined $installdir && !@$libfiles && !@$incdirs ) ? 'binary' : 'library';
         }
 
-        # 1. Validate that we actually got files back
+        # Validate that we actually got files back
         unless (@$libfiles) {
             $self->blah('[!] xrepo returned no library files. Package might be header-only.');
 
@@ -387,7 +384,7 @@ class Alien::Xrepo v0.9.0 {
             );
         }
 
-        # 2. Heuristic to find the Runtime Library (DLL/SO/DyLib) for FFI
+        # Heuristic to find the Runtime Library (DLL/SO/DyLib) for FFI
         my $runtime_lib;
         if ( $^O eq 'MSWin32' ) {
 
@@ -439,9 +436,9 @@ class Alien::Xrepo v0.9.0 {
         # Fallback and Logging
         unless ($runtime_lib) {
 
-            # If we asked for shared but couldn't find a runtime binary, log a warning.
-            # We fall back to the first file (likely a static .a/.lib) so that
-            # XS builds might still work, even if Affix or FFI::Platypus will fail.
+            # If we asked for shared but couldn't find a runtime binary, log a warning. We fall
+            # back to the first file (likely a static .a/.lib) so that XS builds might still work,
+            # even if Affix or FFI::Platypus will fail.
             if ( $info->{shared} // 0 ) {
                 $self->blah('[!] Warning: Package is marked "shared" but no Runtime Binary (dll/so/dylib) was detected.');
                 $self->blah( '[!] Libfiles returned: ' . join( ', ', @$libfiles ) );
@@ -467,3 +464,9 @@ class Alien::Xrepo v0.9.0 {
 };
 #
 1;
+__END__
+Copyright (C) Sanko Robinson.
+
+This library is free software; you can redistribute it and/or modify it under the terms found in
+the Artistic License 2. Other copyrights, terms, and conditions may apply to data transmitted
+through this module.

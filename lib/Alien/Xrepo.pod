@@ -44,9 +44,8 @@ Alien::Xrepo - Install shared libraries and third-party binaries (tools, interpr
 
 =head1 DESCRIPTION
 
-This module acts as an intelligent bridge between Perl and the C<xrepo> package manager. With a single
-C<install> you can fetch B<shared libraries> as well as B<binary tools and interpreters> without touching a system
-package manager:
+This module acts as an intelligent bridge between Perl and the C<xrepo> package manager. With a single C<install> you
+can fetch B<shared libraries> as well as B<binary tools and interpreters> without touching a system package manager:
 
 =over
 
@@ -611,7 +610,8 @@ shell) or just prints it with C<show>.
 
 L<https://xrepo.xmake.io>, L<https://packages.xmake.io/>
 
-L<Affix>, L<Affix::Wrap>, L<Alien::Xmake>, L<FFI::Platypus>, L<Inline::C>; subclass the base class with L<Alien::Xrepo::Base>
+L<Affix>, L<Affix::Wrap>, L<Alien::Xmake>, L<FFI::Platypus>, L<Inline::C>; subclass the base class with
+L<Alien::Xrepo::Base>
 
 =head1 LICENSE
 

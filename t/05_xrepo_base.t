@@ -33,8 +33,8 @@ subtest 'pre-install delegation' => sub {
     is $fresh->libs,                  '',    'libs is empty before install';
     is $fresh->find_header('zlib.h'), undef, 'find_header is undef before install';
     my @bins0 = $fresh->bin_dir;
-    is [ @bins0 ],   [],    'bin_dir is empty before install';
-    is $fresh->package_info, undef, 'package_info is undef before install';
+    is [@bins0],             [ [] ], 'bin_dir is empty before install';
+    is $fresh->package_info, undef,  'package_info is undef before install';
 };
 
 # Test install
@@ -92,15 +92,15 @@ subtest 'with binary package' => sub {
     ok $info_bin, 'Installed ninja';
     is $alien_bin->kind, 'binary', 'Kind is binary';
     my @bin_dirs = $alien_bin->bin_dir;
-    ok @bin_dirs,                       'Got bin_dir';
+    ok @bin_dirs, 'Got bin_dir';
     is [ $alien_bin->bin_dir ], [ $alien_bin->package_info->bin_dir ], 'bin_dir matches package_info';
 
     # Upgrade (verify it runs without error)
     ok $alien_bin->upgrade, 'Upgrade ninja';
 };
 
-# install_opts is respected during the Builder phase; at runtime install
-# still succeeds with the explicit opts passed to install()
+# install_opts is respected during the Builder phase; at runtime install still succeeds with the
+# explicit opts passed to install()
 subtest install_opts => sub {
     my $with_opts = Alien::Xrepo::TestPackageWithOpts->new( root => $tmp, verbose => 0 );
     ok $with_opts->can('install_opts'), 'subclass implements install_opts';

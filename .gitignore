@@ -6,6 +6,7 @@
 /Makefile
 /pm_to_blib
 /_Inline/
+eg/_Inline/
 
 /carton.lock
 /.carton/

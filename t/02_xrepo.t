@@ -1,5 +1,5 @@
 use v5.40;
-use Test2::V0 '!subtest', -no_srand => 1;
+use Test2::V0 '!subtest';
 use Test2::Util::Importer 'Test2::Tools::Subtest' => ( subtest_streamed => { -as => 'subtest' } );
 use lib 'lib', '../lib', 'blib/lib', '../blib/lib';
 use Alien::Xmake;
@@ -11,6 +11,7 @@ ok $Alien::Xrepo::VERSION, 'Alien::Xrepo::VERSION';
 my $repo  = Alien::Xrepo->new( verbose => 0 );
 my $xmake = Alien::Xmake->new;
 my $exe   = $xmake->exe;
+diag `$exe g --theme=plain` if $ENV{AUTOMATED_TESTING};
 diag `$exe --help`;
 diag $exe;
 
@@ -35,7 +36,7 @@ ok length( $repo->fetch( 'libpng', undef, cflags => 1 ) ), 'fetch --cflags works
 
 # Query-only / metadata operations
 ok scalar( $repo->list_repo ) > 0, 'list_repo returns repos';
-ok( scalar( grep {/libpng/} $repo->scan('libpng') ), 'scan finds libpng' );
+ok scalar( grep {/libpng/} $repo->scan('libpng') ), 'scan finds libpng' ;
 ok my $info = $repo->info( 'libpng', format => 'json' ), 'info --format=json works';
 is ref $info, 'ARRAY', 'info json is an array';
 

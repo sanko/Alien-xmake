@@ -1,9 +1,9 @@
 use v5.40;
+use blib;
 use Alien::Xrepo;
 use Path::Tiny;
 
-# Alien::Xrepo feature tour. Each section is independent, so comment out the parts
-# you do not need. Optional flags:
+# Alien::Xrepo feature tour. Each section is independent, so comment out the parts you do not need. Optional flags:
 #   --third-party  install from vcpkg/conan/brew (needs the manager on PATH)
 #   --clean        run xrepo clean (it also removes installed packages)
 my $repo     = Alien::Xrepo->new();
@@ -12,17 +12,13 @@ my $do_clean = grep {/^--clean$/} @ARGV;
 my $store    = Path::Tiny->tempdir( CLEANUP => 1 );
 my $exe_name = $^O eq 'MSWin32' ? '.exe' : '';
 
-# ---------------------------------------------------------------------------
-# 1. Repositories and search
-# ---------------------------------------------------------------------------
+# Repositories and search
 say "# Repositories";
 say for $repo->list_repo;
 say "\n# Search 'sqlite' (xmake-repo)";
 say for $repo->search('sqlite');
 
-# ---------------------------------------------------------------------------
-# 2. Install + fetch (the core workflow)
-# ---------------------------------------------------------------------------
+# Install + fetch (the core workflow)
 say "\n# Install libpng (shared, default config)";
 my $libpng = $repo->install('libpng') or die 'libpng install failed';
 say '  libpath:   ' . $libpng->libpath;
@@ -33,9 +29,7 @@ say "\n# Fetch build flags (handy for MakeMaker / plain cc)";
 say '  cflags:  ' . $repo->fetch( 'libpng', undef, cflags  => 1 );
 say '  ldflags: ' . $repo->fetch( 'libpng', undef, ldflags => 1 );
 
-# ---------------------------------------------------------------------------
-# 3. Dependency graph (render with Graphviz:  dot -Tpng dep.dot -o dep.png)
-# ---------------------------------------------------------------------------
+# Dependency graph (render with Graphviz:  dot -Tpng dep.dot -o dep.png)
 say "\n# Dependency graph for libpng (Graphviz DOT)";
 my $dot     = $repo->info( 'libpng', depgraph => 1, format => 'dot' );
 my $dotfile = path($store)->child('libpng.dep.dot');
@@ -43,9 +37,7 @@ $dotfile->spew($dot);
 say $dot;
 say "\n  (graph also saved to $dotfile; render: dot -Tpng \"$dotfile\" -o dep.png)";
 
-# ---------------------------------------------------------------------------
-# 4. Isolated, reproducible package store
-# ---------------------------------------------------------------------------
+# Isolated, reproducible package store
 say "\n# Install pcre2 into a project-local store";
 my $pcre2 = $repo->install( 'pcre2', undef, installdir => $store ) or die 'pcre2 install failed';
 say '  store:    ' . $store;
@@ -58,9 +50,7 @@ say "\n# Fetch straight from that store (no install)";
 ( my $s = "$store" )        =~ s{\\}{/}g;
 say '  kept under store? ' . ( index( $p, $s ) == 0 ? 'yes' : 'no' );
 
-# ---------------------------------------------------------------------------
-# 5. Tools: install and run binaries (not just libraries)
-# ---------------------------------------------------------------------------
+# Tools: install and run binaries (not just libraries)
 say "\n# Install a build tool (ninja)";
 my $ninja = $repo->install('ninja') or die 'ninja install failed';
 say '  installdir: ' . $ninja->installdir;
@@ -73,11 +63,8 @@ say '  installdir: ' . $py->installdir;
 my ($pbin) = grep { -e $_ } map { path($_)->child("python$exe_name") } $py->bin_dir;
 say '  python version: ' . ( `"$pbin" --version` // '' );
 
-# ---------------------------------------------------------------------------
-# 6. Third-party package managers: vcpkg / conan / brew / ...
-#    Namespace the package spec; decode them like any other package. Requires
-#    the underlying manager to be installed and on PATH.
-# ---------------------------------------------------------------------------
+# Third-party package managers: vcpkg / conan / brew / ...
+# Namespace the package spec; decode them like any other package. Requires the underlying manager to be installed and on PATH.
 if ($show_3p) {
     say "\n# Search third-party namespaces";
     say for $repo->search('vcpkg::pcre');
@@ -95,26 +82,20 @@ else {
     say "#   \$repo->search('vcpkg::pcre');";
 }
 
-# ---------------------------------------------------------------------------
-# 7. Offline distribution: download / import / export
-# ---------------------------------------------------------------------------
+# Offline distribution: download / import / export
 my $dl = Path::Tiny->tempdir( CLEANUP => 1 );
 $repo->download( 'pcre2', undef, outputdir => $dl, shallow => 1 );
 say "\n# Downloaded sources:";
 say '  - ' . $_ for $dl->children;
 
-# ---------------------------------------------------------------------------
-# 8. Environment
-# ---------------------------------------------------------------------------
+# Environment
 say "\n# Package environment (--show)";
 $repo->env( undef, show => 1, bind => 'zlib' );
 say "";
 say "# To enter a shell with the package env configured:";
 say "#   \$repo->env( undef, bind => 'zlib' );";
 
-# ---------------------------------------------------------------------------
-# 9. Cleanup (uninstall + optional xrepo clean)
-# ---------------------------------------------------------------------------
+# Cleanup (uninstall + optional xrepo clean)
 say "\n# Uninstall pcre2 from the isolated store";
 $repo->uninstall( 'pcre2', installdir => $store );
 if ($do_clean) {
