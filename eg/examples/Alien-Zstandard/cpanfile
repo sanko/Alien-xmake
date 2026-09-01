@@ -1,0 +1,12 @@
+requires 'perl', '5.40.0';
+requires 'File::ShareDir', '1.00';
+
+on 'configure' => sub {
+    requires 'Alien::Xmake', '0.08';
+    requires 'Alien::Xrepo', '0.08'; # Assuming Base is shipped with this
+};
+
+on 'build' => sub {
+    requires 'ExtUtils::InstallPaths', '0.002';
+    requires 'ExtUtils::Install', '2.00';
+};
