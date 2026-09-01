@@ -4,7 +4,7 @@
 
 =head1 NAME
 
-Alien::Xrepo - Eases the Headache of Finding and Building Shared Libraries for FFI and XS
+Alien::Xrepo - Eases the Headache of Finding and Building Shared Libraries and 3rd Party Binaries for FFI and XS
 
 =head1 SYNOPSIS
 
@@ -66,6 +66,33 @@ This eliminates the need for manual compilation steps or hard coding paths in yo
 bindings or XS wrappers portable and reproducible.
 
 Discover packages at L<https://packages.xmake.io/>.
+
+=head1 THIRD-PARTY PACKAGE MANAGERS
+
+xrepo can install from external C/C++ package managers instead of (or alongside) the official xmake-repo. You select
+the manager with a package-spec namespace and every Alien::Xrepo method takes it verbatim:
+
+    # Vcpkg, Homebrew/Linuxbrew, Conan
+    my $zlib = $repo->install( 'vcpkg::zlib' );
+    my $zlib = $repo->install( 'brew::zlib'  );
+    my $zlib = $repo->install( 'conan::zlib/1.2.11' );
+
+    # Pacman (archlinux/msys2), Clib, Dub, Cargo, Conda, apt
+    $repo->install( 'pacman::libcurl' );
+    $repo->install( 'dub::log 0.4.3' );
+
+Searching and flag fetching work against them too:
+
+    $repo->search( 'vcpkg::pcre' );          # search the vcpkg namespace
+    my $flags = $repo->fetch( 'conan::zlib/1.2.11', undef, cflags => 1, ldflags => 1 );
+
+The installed results (C<libpath>, C<includedirs>, C<links>, ...) are decoded into an L<Alien::Xrepo::PackageInfo>
+exactly like any xmake-repo package, so your wrapper code does not care where the library came from.
+
+I<The underlying manager (vcpkg, conan, brew, ...) must be installed and reachable on PATH for the namespace to work.>
+
+See the C<xmake-repo> integration notes at L<https://github.com/xmake-io/xrepo-docs/blob/master/getting_started.md> for
+the corresponding C<add_requires> syntax inside an xmake project.
 
 =head1 CONSTRUCTOR
 
@@ -182,6 +209,14 @@ A hashref or string of package-specific configurations.
 
 A list or string of extra dependencies to include in the environment.
 
+=item B<installdir>, B<cachedir>
+
+Root directories for the installed packages and the download/build cache, applied per-call via the
+C<XMAKE_PKG_INSTALLDIR> / C<XMAKE_PKG_CACHEDIR> environment variables. This lets each wrapper keep its libraries in a
+project-local directory instead of the shared per-user store, which gives reproducible builds and protects against an
+unrelated C<xrepo> run upgrading or removing the packages your wrapper depends on. Pass the same values to C<fetch>,
+C<scan>, C<uninstall>, and friends so they operate on the same store.
+
 =back
 
 =back
@@ -218,16 +253,21 @@ Only fetch the package on the current system.
 
 Show C<cflags> as external packages (with C<-isystem>).
 
+=item B<installdir>, B<cachedir>
+
+Target the same isolated store used by C<install( ... )> (see there).
+
 =back
 
 =head2 C<info( $pkg, %options )>
 
     my $json = $repo->info( 'zlib', format => 'json' );
     my $text = $repo->info( 'libpng' );
+    my $dot  = $repo->info( 'libpng', depgraph => 1, format => 'dot' );   # dependency graph (Graphviz)
 
 Shows package information. Pass C<format =E<gt> 'json'> to receive the decoded data structure (array of hashes),
-C<format =E<gt> 'dot'> for a dependency-graph rendering, or C<depgraph =E<gt> 1> to include the dependency graph.
-Returns the plain output text otherwise.
+C<format =E<gt> 'dot'> for a Graphviz DOT dependency graph, or C<depgraph =E<gt> 1> to include the package dependency
+tree. A DOT graph can be rendered with C<dot -Tpng dep.dot -o dep.png>.
 
 =head2 C<scan( [$pkg], %options )>
 
@@ -286,11 +326,12 @@ are still depended upon.
 
 Runs C<xrepo search> and prints the results to STDOUT. C<addon> searches the C<addons/> sub-repository.
 
-=head2 C<clean( )>
+=head2 C<clean( %options )>
 
     $repo->clean( );
+    $repo->clean( installdir => './store' );   # clean an isolated store
 
-Cleans the cached packages and downloads.
+Cleans the cached packages and downloads. Pass C<installdir> and/or C<cachedir> to target an isolated store.
 
 =head2 C<add_repo( ... )>
 
@@ -327,6 +368,20 @@ header-only or the binary could not be identified.
 =item B<includedirs>
 
 List of include paths.
+
+=item B<installdir>
+
+The package install root. Packages that mostly exist as tools or runnable binaries (C<ninja>, C<python>, C<cmake>, ...)
+put their executables under C<< installdir/bin >>.
+
+=item B<bin_dir>
+
+List of directories holding executables. Comes from the C<bindirs> fetch metadata, or falls back to C<< installdir/bin
+>> when the package is a tool. Run a freshly installed binary like so:
+
+    my $ninja = $repo->install('ninja');
+    my ($exe) = grep { -e $_ } map { path($_)->child($^O eq 'MSWin32' ? 'ninja.exe' : 'ninja') } $ninja->bin_dir;
+    system $exe, '--version';
 
 =item B<libfiles>
 

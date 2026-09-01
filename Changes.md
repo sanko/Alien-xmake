@@ -42,6 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Version-build accessor renamed `build()` to `buildid()` so `build` is the build action;
     the xmake `config` action is exposed as `configure()` to keep `config( $key )` as the
     install-time data accessor
+- `install`, `fetch`, `scan`, `info`, `uninstall`, `download`, `import_pkg`, `export`, `env`, and
+  `clean` accept `installdir`/`cachedir` options to force a project-local package store (via
+  `XMAKE_PKG_INSTALLDIR` / `XMAKE_PKG_CACHEDIR`) for reproducible, isolated builds
+- Document third-party package manager support (`vcpkg::`, `conan::`, `brew::`, `pacman::`, `dub::`, ...) in the
+  Alien::Xrepo docs and add `eg/xrepo_features.pl`, a feature tour covering every method including
+  dependency graphs (`info( ..., depgraph => 1, format => 'dot' )` for Graphviz)
+- `PackageInfo` gains an `installdir` accessor (from fetch `artifacts.installdir`, else derived from the first
+  libfile/include dir) and `bin_dir` falls back to `<installdir>/bin`, so tool packages (ninja, python, ...) can be
+  installed and run as binaries
 
 ## [0.08] - 2026-01-11
 

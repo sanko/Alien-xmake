@@ -44,10 +44,10 @@ the [community](https://xmake.io/about/contact.html).
 
 # METHODS
 
-A thin wrapper around the `xmake` command line. Methods named after `xmake` actions (`build`, `clean`, `create`, ...)
-stream the command's output to your terminal and return true on success. Query-style methods (`show`, `lua -l`, ...)
-capture the output and return it to you instead. Most methods accept `%options`; unrecognized extra arguments can be
-passed with `targets => [...]` and `args => [...]` and are appended to the command line verbatim.
+A thin wrapper around the `xmake` command line. Methods named after `xmake` actions (`build`, `clean`, `create`,
+...) stream the command's output to your terminal and return true on success. Query-style methods (`show`, `lua -l`,
+...) capture the output and return it to you instead. Most methods accept `%options`; unrecognized extra arguments can
+be passed with `targets => [...]` and `args => [...]` and are appended to the command line verbatim.
 
 ## `new( ... )`
 
@@ -147,14 +147,13 @@ Generates a new project directory named `$name` (clone of `xmake create`).
 $xmake->configure(mode => 'debug', plat => 'windows', arch => 'x64');
 ```
 
-Configures the current project (clone of `xmake config`). Accepts the shared platform/toolchain options
-(`plat`, `arch`, `mode`, `kind`, `toolchain`, `toolchain_host`, `cross`, `target_os`, `sdk`, `runtimes`,
-`vs`, `vs_toolset`, `vs_sdkver`, `vs_runtime`, `ndk`, `ndk_stdcxx`, `ndk_sdkver`, `android_sdk`, `mingw`,
-`emsdk`, `cuda`, `qt`, `qt_host`, `vcpkg`, `wdk`, `build_toolver`, `ccache`, `ccachedir`, `debugger`,
-`trybuild`, `tryconfigs`, `require`, `includedirs`, `linkdirs`, `links`, `syslinks`, `rc*`, `fc*`, ...) as
-well as the compiler/flag subtables `cflags`, `cxflags`, `cxxflags`, `mflags`, `mmflags`, `mxflags`,
-`ldflags`, `arflags`, `asflags`, `shflags`, and `cuflags`. Any `--key=value` pair can be passed via
-`set => { key => value }`.
+Configures the current project (clone of `xmake config`). Accepts the shared platform/toolchain options (`plat`,
+`arch`, `mode`, `kind`, `toolchain`, `toolchain_host`, `cross`, `target_os`, `sdk`, `runtimes`, `vs`,
+`vs_toolset`, `vs_sdkver`, `vs_runtime`, `ndk`, `ndk_stdcxx`, `ndk_sdkver`, `android_sdk`, `mingw`, `emsdk`,
+`cuda`, `qt`, `qt_host`, `vcpkg`, `wdk`, `build_toolver`, `ccache`, `ccachedir`, `debugger`, `trybuild`,
+`tryconfigs`, `require`, `includedirs`, `linkdirs`, `links`, `syslinks`, `rc*`, `fc*`, ...) as well as the
+compiler/flag subtables `cflags`, `cxflags`, `cxxflags`, `mflags`, `mmflags`, `mxflags`, `ldflags`, `arflags`,
+`asflags`, `shflags`, and `cuflags`. Any `--key=value` pair can be passed via `set => { key => value }`.
 
 - **clean**
 
@@ -183,9 +182,9 @@ $xmake->global(network => 'y', theme => 'default');
 $xmake->global(vs => '2022');
 ```
 
-Reads/writes global (user-level) configuration. Shares the platform/toolchain options from `configure( ... )` that exist
-on `global` (`android_sdk`, `build_toolver`, `cuda`, `emsdk`, `mingw`, `ndk`, `ndk_sdkver`, `qt`, `qt_host`,
-`vcpkg`, `vs`, `wdk`).
+Reads/writes global (user-level) configuration. Shares the platform/toolchain options from `configure( ... )` that
+exist on `global` (`android_sdk`, `build_toolver`, `cuda`, `emsdk`, `mingw`, `ndk`, `ndk_sdkver`, `qt`,
+`qt_host`, `vcpkg`, `vs`, `wdk`).
 
 - **clean**
 
@@ -309,9 +308,9 @@ $xmake->run;
 $xmake->run('hello', args => [qw[--flag value]]);
 ```
 
-Runs the build target (or the `run` script). `debug` attaches a debugger, `all`/`group` select targets,
-`workdir` sets the working directory (`-w`), `jobs` sets the parallelism and `detach` runs the target in the
-background. Extra program arguments go in `args`.
+Runs the build target (or the `run` script). `debug` attaches a debugger, `all`/`group` select targets, `workdir`
+sets the working directory (`-w`), `jobs` sets the parallelism and `detach` runs the target in the background. Extra
+program arguments go in `args`.
 
 ## `test( [$target], %options )`
 
@@ -329,9 +328,9 @@ $xmake->update;                           # update xmake itself
 $xmake->update('v3.0.6', scriptonly => 1);
 ```
 
-Updates the `xmake` installation. `version` optionally pins a version. `scriptonly` only updates the scripts (`-s`),
-`integrate` re-integrates the shell environment, `force` downloads even when up to date and `uninstall` flags the
-previous version for removal.
+Updates the `xmake` installation. `version` optionally pins a version. `scriptonly` only updates the scripts
+(`-s`), `integrate` re-integrates the shell environment, `force` downloads even when up to date and `uninstall`
+flags the previous version for removal.
 
 ## `service( %options )`
 
@@ -422,9 +421,9 @@ my $repos = $xmake->repo( list => 1 );
 $xmake->repo('local_extra', add => 1, url => 'git@github.com:me/xmake-repo.git');
 ```
 
-Manages custom package repositories. `add`, `remove`, `update`, `clear` and `list` select the operation
-(`list` returns captured output); `global` restricts the change to the global config; `url` and `branch` are used
-when adding.
+Manages custom package repositories. `add`, `remove`, `update`, `clear` and `list` select the operation (`list`
+returns captured output); `global` restricts the change to the global config; `url` and `branch` are used when
+adding.
 
 ## `show( [$list], %options )`
 
@@ -470,9 +469,9 @@ $xmake->watch( commands => 'xmake build' );
 $xmake->watch( script => 'my_script.lua' );
 ```
 
-Rebuilds (or runs) the project whenever source files change. `commands` holds the command to rerun (`-c`),
-`script` the path of the script to watch, `watchdirs`/`plaindirs` add extra watched/ignored directories, `run`
-reruns the given target and `target` the target to build. Arbitrary program arguments are passed via `argv`.
+Rebuilds (or runs) the project whenever source files change. `commands` holds the command to rerun (`-c`), `script`
+the path of the script to watch, `watchdirs`/`plaindirs` add extra watched/ignored directories, `run` reruns the
+given target and `target` the target to build. Arbitrary program arguments are passed via `argv`.
 
 ## `task( $name, %options )`
 
@@ -545,13 +544,13 @@ use Env qw[@PATH];
 unshift @PATH, $xmake->bin_dir;
 ```
 
-Returns the directory containing the Xmake executable; push it onto your `PATH`. For a 'system' install this step
-will not be required.
+Returns the directory containing the Xmake executable; push it onto your `PATH`. For a 'system' install this step will
+not be required.
 
 ## `cflags( )`, `libs( )`, `dynamic_libs( )`
 
-Stubs returning empty values. Provided for compatibility with consumers that expect the standard Alien API surface;
-use `pkg_config( )` or [Alien::Xrepo](https://metacpan.org/pod/Alien%3A%3AXrepo) for real flags.
+Stubs returning empty values. Provided for compatibility with consumers that expect the standard Alien API surface; use
+`pkg_config( )` or [Alien::Xrepo](https://metacpan.org/pod/Alien%3A%3AXrepo) for real flags.
 
 ## `alien_helper( )`
 

@@ -26,6 +26,7 @@ class Alien::Xrepo v0.9.0 {
         field $version     : param : reader;
         field $libpath     : param : reader //= ();
         field $bindirs     : param : reader //= [];
+        field $installdir  : param : reader;
 
         # Helper to find a specific header inside the includedirs
         method find_header ($filename) {
@@ -51,13 +52,16 @@ class Alien::Xrepo v0.9.0 {
                 static      => $static,
                 version     => $version,
                 libpath     => $libpath,
-                bindirs     => $bindirs
+                bindirs     => $bindirs,
+                installdir  => $installdir
             }
         }
         }
         #
         method install ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        local $ENV{XMAKE_PKG_INSTALLDIR} = $opts{installdir} if defined $opts{installdir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
 
         # Build common arguments for both install and fetch
         my @args = $self->_build_args( \%opts );
@@ -84,6 +88,8 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method uninstall ( $pkg_spec, %opts ) {
+        local $ENV{XMAKE_PKG_INSTALLDIR} = $opts{installdir} if defined $opts{installdir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
         my @args = $self->_build_args( \%opts );
         push @args, '--all'   if $opts{all};
         push @args, '--force' if $opts{force};
@@ -99,7 +105,9 @@ class Alien::Xrepo v0.9.0 {
         system @cmd;
     }
 
-    method clean () {
+    method clean (%opts) {
+        local $ENV{XMAKE_PKG_INSTALLDIR} = $opts{installdir} if defined $opts{installdir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
         say '[*] xrepo: cleaning cache...' if $verbose;
         system $xmake->exe, qw[lua private.xrepo], 'clean', '-y';
     }
@@ -182,6 +190,8 @@ class Alien::Xrepo v0.9.0 {
     # Run `xrepo fetch` and return a parsed PackageInfo (or raw flags).
     method fetch ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        local $ENV{XMAKE_PKG_INSTALLDIR} = $opts{installdir} if defined $opts{installdir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
         my @extra;
 
         # Raw flag modes: return the string directly instead of a PackageInfo
@@ -209,6 +219,8 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method info ( $pkg_spec, %opts ) {
+        local $ENV{XMAKE_PKG_INSTALLDIR} = $opts{installdir} if defined $opts{installdir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
         my @extra;
         push @extra, '--depgraph'                if $opts{depgraph};
         push @extra, '--format=' . $opts{format} if $opts{format};
@@ -228,6 +240,8 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method scan ( $pkg //= (), %opts ) {
+        local $ENV{XMAKE_PKG_INSTALLDIR} = $opts{installdir} if defined $opts{installdir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
         my @args = $self->_build_args( { %opts, no_kind => 1 } );
         say '[*] xrepo: scanning installed packages...' if $verbose;
         my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'scan', @args );
@@ -240,6 +254,8 @@ class Alien::Xrepo v0.9.0 {
 
     method download ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        local $ENV{XMAKE_PKG_INSTALLDIR} = $opts{installdir} if defined $opts{installdir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
         my @extra;
         push @extra, '-o', $opts{outputdir} if $opts{outputdir};
         my @args = $self->_build_args( \%opts, \@extra );
@@ -262,6 +278,8 @@ class Alien::Xrepo v0.9.0 {
 
     method import_pkg ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        local $ENV{XMAKE_PKG_INSTALLDIR} = $opts{installdir} if defined $opts{installdir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
         my @extra;
         push @extra, '-i', $opts{packagedir} if $opts{packagedir};
         my @args = $self->_build_args( \%opts, \@extra );
@@ -276,6 +294,8 @@ class Alien::Xrepo v0.9.0 {
 
     method export ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
+        local $ENV{XMAKE_PKG_INSTALLDIR} = $opts{installdir} if defined $opts{installdir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
         my @extra;
         push @extra, '-o', $opts{packagedir} if $opts{packagedir};
         my @args = $self->_build_args( \%opts, \@extra );
@@ -289,6 +309,8 @@ class Alien::Xrepo v0.9.0 {
     }
 
     method env ( $program //= (), %opts ) {
+        local $ENV{XMAKE_PKG_INSTALLDIR} = $opts{installdir} if defined $opts{installdir};
+        local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}   if defined $opts{cachedir};
         my @extra;
         push @extra, '--show' if $opts{show};
         push @extra, '--add',    $opts{add}    if $opts{add};
@@ -305,10 +327,26 @@ class Alien::Xrepo v0.9.0 {
 
     method _process_info ($info) {
         return () unless defined $info;
-        my $libfiles = $info->{libfiles}    // [];
-        my $incdirs  = $info->{includedirs} // [];
-        my $linkdirs = $info->{linkdirs}    // [];
-        my $bindirs  = $info->{bindirs}     // [];
+        my $libfiles   = $info->{libfiles}    // [];
+        my $incdirs    = $info->{includedirs} // [];
+        my $linkdirs   = $info->{linkdirs}    // [];
+        my $bindirs    = $info->{bindirs}     // [];
+        my $installdir = $info->{artifacts}{installdir};
+        if ( !defined $installdir ) {
+            my ( $probe, $depth );
+            if    (@$libfiles) { ( $probe, $depth ) = ( $libfiles->[0], 2 ); }
+            elsif (@$incdirs)  { ( $probe, $depth ) = ( $incdirs->[0],  1 ); }
+            if    ( defined $probe ) {
+                my $p = path($probe);
+                $p          = $p->parent for 1 .. $depth;
+                $installdir = $p->stringify;
+            }
+        }
+        unless (@$bindirs) {
+            if ( $installdir && -d path( $installdir, 'bin' ) ) {
+                $bindirs = [ path( $installdir, 'bin' )->stringify ];
+            }
+        }
 
         # 1. Validate that we actually got files back
         unless (@$libfiles) {
@@ -324,7 +362,9 @@ class Alien::Xrepo v0.9.0 {
                 license     => $info->{license} // (),
                 shared      => $info->{shared}  // 0,
                 static      => $info->{static}  // 0,
-                version     => $info->{version} // ()
+                version     => $info->{version} // (),
+                bindirs     => $bindirs,
+                installdir  => $installdir
             );
         }
 
@@ -399,7 +439,9 @@ class Alien::Xrepo v0.9.0 {
             license     => $info->{license} // (),
             shared      => $info->{shared}  // 0,
             static      => $info->{static}  // 0,
-            version     => $info->{version} // ()
+            version     => $info->{version} // (),
+            bindirs     => $bindirs,
+            installdir  => $installdir
         );
     }
 };
