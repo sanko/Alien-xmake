@@ -137,6 +137,37 @@ refer to that package:
 
 This is the recommended way to access a non-primary package.
 
+=head2 C<package_info( [$pkg] )> and enumerating packages
+
+C<package_names> returns the names the module binds to, and each package's metadata lives in the
+L<Alien::Xrepo::PackageInfo> object returned by C<package_info( $name )> (or by the C<alt( $name )> delegate). Drive an
+C<install> first so every package is fetched and recorded, then iterate the names to build a report of what was
+installed, where, and at what version:
+
+    use Alien::SDL3;
+
+    my $alien = Alien::SDL3->new;
+    $alien->install;    # populate/refresh the per-package metadata
+
+    for my $name ( $alien->package_names ) {
+        my $alt = $alien->alt($name);
+        my $info = $alt->package_info;
+        next unless $info;               # package could not be located/installed
+
+        printf "%-16s v%-9s %-8s\n", $name, $info->version, $info->kind;
+        printf "  installdir : %s\n", $info->installdir // '(none)';
+        printf "  libpath    : %s\n", $info->libpath   // '(none)';
+        printf "  dynamic    : %s\n", join( '; ', @{ $info->libfiles // [] } ) || '(none)';
+        printf "  includes   : %s\n", join( '; ', @{ $info->includedirs // [] } ) || '(none)';
+        printf "  cflags     : %s\n", $alt->cflags;
+        printf "  libs       : %s\n", $alt->libs;
+    }
+
+B<Note>: C<package_info> (and the delegation methods) return C<undef>/empty for a package that is not installed or
+could not be resolved. You can tell a specific package is missing by checking that return value, e.g.
+C<Alien::SDL3->alt('libsdl3_ttf')->libpath> is C<undef> (or C<package_info> itself is C<undef>) when C<libsdl3_ttf>
+wasn't present. See the C<package_info> entry under L</METHODS>.
+
 =head2 C<install_opts( )>
 
 Optional. Returns a hash (or list) of options honored by the builder (C<Build_PL> / C<Build>) when it installs the
