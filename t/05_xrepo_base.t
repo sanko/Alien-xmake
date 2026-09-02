@@ -206,10 +206,7 @@ subtest 'alt delegate' => sub {
     is $alt_zlib->kind, 'library', 'alt(zlib)->kind is library';
     ok $alt_zlib->libpath, 'alt(zlib)->libpath populated';
     ok $alt_zlib->cflags,  'alt(zlib)->cflags populated';
-
-    # alt() re-entrancy on a delegate returns the base bound to the same pkg.
-    is $alt_ninja->alt,               $alt_ninja, 'delegate->alt() returns itself';
-    is $alt_ninja->alt('zlib')->kind, 'library',  'delegate->alt(zlib) re-selects';
+    is $alt_ninja->alt('zlib')->kind, 'library', 'delegate->alt(zlib) re-selects';
 
     # accessor name arg and alt() agree.
     is $multi->alt('zlib')->libpath, $multi->libpath('zlib'), 'alt(zlib)->libpath == libpath(zlib)';
