@@ -1,3 +1,7 @@
+requires 'Capture::Tiny';
+requires 'ExtUtils::Helpers',      '0.028';
+requires 'ExtUtils::InstallPaths', '0.002';
+requires 'Path::Tiny';
 requires 'perl', 'v5.40.0';
 on configure => sub {
     requires 'Archive::Tar';
