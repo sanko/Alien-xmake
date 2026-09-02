@@ -5,6 +5,27 @@ All notable changes to Alien::Xmake will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Multi-package support in `Alien::Xrepo::Base`, aligned with the `Alien::Build`/`Alien::Base` API so the module can act as a near drop-in replacement:
+  - The `package_name` method / constructor parameter is renamed to `pkg_name` to mirror `Alien::Build::Plugin::PkgConfig`. It may return a scalar or an array reference / list of package names; each is installed and recorded separately in `ConfigData`, and the first is the primary package used when none is selected.
+  - New `alt( [$pkg] )` accessor, modeled on `Alien::Base->alt`: without an argument (or with the primary name) it returns `$self`; with a non-primary name it returns a delegate whose `cflags`, `libs`, `libpath`, `bin_dir`, `kind`, `dynamic_libs`, `dist_dir`, `install_type`, `version`, and related accessors are pinned to that package. The delegate is the new `Alien::Xrepo::Base::Alt` class.
+  - New `Alien::Base`-style accessors: `cflags_static`, `libs_static`, `dynamic_libs`, `dist_dir`, `install_type`, and `split_flags`.
+  - `package_names` returns the bound package names, and `install` returns the list of package infos in list context.
+- A third example dist, `eg/examples/Alien-SDL3`, builds the whole SDL3 family (`libsdl3`, `libsdl3_image`, `libsdl3_ttf`, `libsdl3_mixer`) and exposes each library through the per-package accessors and `alt()`. It now ships FFI bindings across all three styles, each driving the shared libraries via `Alien::SDL3`:
+  - an Affix script
+  - an FFI::Platypus script
+  - an Inline::C walkthrough
+- New `SECURITY.md` and `CONTRIBUTING.md` with a security contact and a contribution workflow.
+
+### Changed
+
+- Bumped the version of every package and class in the distribution to a consistent `v0.9.1` to satisfy `consistent_version` (previously `Alien::Xrepo::Base`, `Alien::Xrepo::Base::Builder`, and `Alien::Xrepo::Base::Alt` lagged at `v0.0.9`).
+- Declared `Capture::Tiny`, `Path::Tiny`, `ExtUtils::Helpers`, and `ExtUtils::InstallPaths` as runtime prerequisites so runtime dependencies exactly match what the modules `use` (fixes CPANTS `prereq_matches_use`).
+- The `eg/examples/` dists (`Alien-Zstandard`, `Alien-Lsquic`) were updated for the `pkg_name` rename.
+
 ## [v0.9.0] - 2026-09-01
 
 The docs have been greatly expanded since January but the stars of this release are Alien::Xrepo and Alien::Xrepo::Base, an Alien::Base stand-in for installing tools and libraries from [xrepo](https://packages.xmake.io/), [vcpkg](https://vcpkg.io/en/packages), [conan](https://conan.io/center), [brew](https://brew.sh/) (homebrew/linuxbrew), [conda](https://anaconda.org/), [dub](https://dub.pm/) (Dlang libs), [pacman](https://wiki.archlinux.org/title/Pacman#Installing_packages) (if you use arch, btw) [clib](https://github.com/clibs/clib/), [apt](https://www.debian.org/distrib/packages) on Debian/Ubuntu, [Cargo](https://crates.io/) for Rust crates, [Portage](https://packages.gentoo.org/) on Gentoo, [Nimble](https://nimpackages.com/) for nimlang, [NuGet](https://www.nuget.org/) for .NET, [Zypper](https://documentation.suse.com/smart/systems-management/html/concept-zypper/index.html) on openSUSE, and even your own custom repositories with smart prerequisite management in just a few lines of Perl.
