@@ -714,8 +714,8 @@ system $x->xrepo, qw[info libpng];             # package details
 # Prerequisites
 
 Windows simply downloads an installer but elsewhere, you gotta have make and a C compiler installed to build and
-install Xmake. You **do not need to** (Alien::Xmake will install a local version) but, if you'd like Alien::Xmake to use a pre-built or system install of Xmake, install it yourself first with
-one of the following:
+install Xmake. You **do not need to** (Alien::Xmake will install a local version) but, if you'd like Alien::Xmake to use
+a pre-built or system install of Xmake, install it yourself first with one of the following:
 
 - Built from source
 

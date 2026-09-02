@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Trim the fat: distributed alien stores now install only what end users need.
+Aliens based on `xrepo` install only what end users need (libs, binaries, etc.) and not all the tools installed along the way (compilers, cmake, python, etc.).
 
 ### Added
 
@@ -15,7 +15,7 @@ Trim the fat: distributed alien stores now install only what end users need.
 
 ### Changed
 
-- `::Base::Builder::_resolve_alien` now re-exports installed packages with (`xrepo export -k shared --shallow`) to avoid extra toolchain clutter (cmake, ninja, etc.) in the sharedir install. This might not be the *best* place to do it but it's the current place.
+- `::Base::Builder::_resolve_alien` now re-exports installed packages with (`xrepo export -k shared --shallow`) to avoid extra toolchain clutter in the sharedir install. This might not be the *best* place to do it but it's the current place.
 - `::Base` avoids reinstalling everything when running unit tests
 
 ## [v0.9.1] - 2026-09-02
