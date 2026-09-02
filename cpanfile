@@ -17,6 +17,7 @@ on configure => sub {
     requires 'File::Spec::Functions';
     requires 'Getopt::Long', '2.36';
     requires 'HTTP::Tiny';
+    requires 'IO::Socket::SSL';
     requires 'JSON::PP', '2';
     requires 'Path::Tiny';
     requires 'perl', 'v5.40.0';
@@ -32,6 +33,7 @@ on build => sub {
     requires 'File::Spec::Functions';
     requires 'Getopt::Long', '2.36';
     requires 'HTTP::Tiny';
+    requires 'IO::Socket::SSL';
     requires 'JSON::PP', '2';
     requires 'Path::Tiny';
     requires 'perl', 'v5.40.0';
@@ -41,12 +43,15 @@ on test => sub {
     requires 'Capture::Tiny';
     requires 'File::Temp';
     requires 'Test2::V0';
+    recommends 'Affix';
+    recommends 'FFI::Platypus';
 };
 on develop => sub {
     requires 'CPAN::Uploader';
     requires 'Code::TidyAll';
     requires 'Code::TidyAll::Plugin::ClangFormat';
     requires 'Code::TidyAll::Plugin::PodTidy';
+    requires 'IO::Socket::SSL';
     requires 'Minilla';
     requires 'Perl::Tidy';
     requires 'Pod::Markdown::Github';

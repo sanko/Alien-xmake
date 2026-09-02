@@ -57,10 +57,10 @@ like $alien->cflags, qr{-I}, 'cflags include at least one -I include flag';
 my $cflag_inc_count = () = $alien->cflags =~ /-I/g;
 is $cflag_inc_count, scalar @{ $pi->includedirs }, 'one -I flag per includedir';
 
-# bin_dir lists the directories holding executables / DLLs. A pure library
-# (zlib) only carries one when its install root has a bin/ subdir (e.g. DLLs on
-# Windows); on Unix the shared lib sits in lib/ so bin_dir may be empty. What is
-# guaranteed is that it mirrors package_info and never lies about the layout.
+# bin_dir lists the directories holding executables / DLLs. A pure library (zlib) only carries one
+# when its install root has a bin/ subdir (e.g. DLLs on Windows); on Unix the shared lib sits in
+# lib/ so bin_dir may be empty. What is guaranteed is that it mirrors package_info and never lies
+# about the layout.
 my @zlib_bin_dirs = $alien->bin_dir;
 is [@zlib_bin_dirs], [ $alien->package_info->bin_dir ], 'zlib bin_dir matches package_info';
 if (@zlib_bin_dirs) {
@@ -119,8 +119,8 @@ subtest install_opts => sub {
     is $optinfo->kind, 'library', 'Shared library kind after install with opts';
 };
 
-# Multi-package: pkg_name may return a list/arrayref of names; each is installed and
-# recorded separately, mirroring Alien::Build's `pkg_name => [...]`.
+# Multi-package: pkg_name may return a list/arrayref of names; each is installed and recorded
+# separately, mirroring Alien::Build's `pkg_name => [...]`.
 subtest 'multiple packages' => sub {
 
     # zlib (library) is the primary; ninja (binary) is the secondary.
@@ -154,8 +154,8 @@ subtest 'multiple packages' => sub {
     ok $multi->find_header('zlib.h'),           'zlib.h findable on the primary package (no arg)';
 };
 
-# Alien::Build-aligned accessors: alt(), split_flags(), dynamic_libs(),
-# install_type(), dist_dir(), and the *_static aliases.
+# Alien::Build-aligned accessors: alt(), split_flags(), dynamic_libs(), install_type(), dist_dir(),
+# and the *_static aliases.
 subtest 'alien-style accessors' => sub {
     my $alien = Alien::Xrepo::TestPackage->new( root => $tmp, verbose => 0 );
     $alien->install;
@@ -207,9 +207,9 @@ subtest 'alt delegate' => sub {
     ok $alt_zlib->libpath, 'alt(zlib)->libpath populated';
     ok $alt_zlib->cflags,  'alt(zlib)->cflags populated';
 
-    # alt() re-entrancy on a delegate re-selects and keeps the target.
-    is $alt_ninja->alt->kind,         'binary',  'delegate->alt() stays on ninja (binary)';
-    is $alt_ninja->alt('zlib')->kind, 'library', 'delegate->alt(zlib) re-selects';
+    # alt() re-entrancy on a delegate returns the base bound to the same pkg.
+    is $alt_ninja->alt,               $alt_ninja, 'delegate->alt() returns itself';
+    is $alt_ninja->alt('zlib')->kind, 'library',  'delegate->alt(zlib) re-selects';
 
     # accessor name arg and alt() agree.
     is $multi->alt('zlib')->libpath, $multi->libpath('zlib'), 'alt(zlib)->libpath == libpath(zlib)';

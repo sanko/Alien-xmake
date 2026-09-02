@@ -44,6 +44,7 @@
             "File::Spec::Functions" : "0",
             "Getopt::Long" : "2.36",
             "HTTP::Tiny" : "0",
+            "IO::Socket::SSL" : "0",
             "JSON::PP" : "2",
             "Path::Tiny" : "0",
             "perl" : "v5.40.0"
@@ -64,6 +65,7 @@
             "File::Spec::Functions" : "0",
             "Getopt::Long" : "2.36",
             "HTTP::Tiny" : "0",
+            "IO::Socket::SSL" : "0",
             "JSON::PP" : "2",
             "Path::Tiny" : "0",
             "perl" : "v5.40.0"
@@ -75,6 +77,7 @@
             "Code::TidyAll" : "0",
             "Code::TidyAll::Plugin::ClangFormat" : "0",
             "Code::TidyAll::Plugin::PodTidy" : "0",
+            "IO::Socket::SSL" : "0",
             "Minilla" : "0",
             "Perl::Tidy" : "0",
             "Pod::Markdown::Github" : "0",
@@ -98,6 +101,10 @@
          }
       },
       "test" : {
+         "recommends" : {
+            "Affix" : "0",
+            "FFI::Platypus" : "0"
+         },
          "requires" : {
             "Capture::Tiny" : "0",
             "File::Temp" : "0",
@@ -131,7 +138,7 @@
          "version" : "v0.9.1"
       }
    },
-   "release_status" : "testing",
+   "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
          "web" : "https://github.com/sanko/Alien-Xmake/issues"
