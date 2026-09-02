@@ -1,7 +1,7 @@
 use v5.40;
 use experimental 'class';
 #
-class Alien::Xrepo::Base v0.9.1 {
+class Alien::Xrepo::Base v0.9.2 {
     use Alien::Xrepo;
     use Path::Tiny;
     use Exporter qw[import];
@@ -165,7 +165,8 @@ class Alien::Xrepo::Base v0.9.1 {
         }
         Alien::Xrepo::Base::Builder->new( alien_class => $alien_class, action => $action, argv => \@ARGV )->execute();
     }
-    class Alien::Xrepo::Base::Builder v0.9.1 {
+    class #
+    Alien::Xrepo::Base::Builder v0.9.2 {
         use CPAN::Meta;
         use ExtUtils::Install qw[install];
         use ExtUtils::InstallPaths;
@@ -271,7 +272,25 @@ class Alien::Xrepo::Base v0.9.1 {
                     static      => $info->static ? 1 : 0
                 };
             }
+            $self->_prune_store( $repo, $share_dir, \@pkgs, \%opts );
             return \%out;
+        }
+
+        # `xrepo install` pulls the whole build toolchain the package drags in (python, meson,
+        # ninja, cmake, pkgconf, etc.) but we only need the resulting shared libraries and headers.
+        method _prune_store ( $repo, $share_dir, $pkgs, $opts ) {
+            my $export_dir = path($share_dir)->parent->child( $share_dir->basename . '-prune' . $$ )->absolute;
+            $export_dir->remove_tree if $export_dir->exists;
+            $export_dir->mkpath;
+            say "Exporting shared @$pkgs into $export_dir";
+            $repo->export( $_, undef, %$opts, packagedir => $export_dir->stringify, shallow => 1 ) for @$pkgs;
+            return unless $export_dir->exists && $export_dir->children;
+            $share_dir->remove_tree;
+            $share_dir->mkpath;
+            for my $entry ( $export_dir->children ) {
+                $entry->move( $share_dir->child( $entry->basename ) ) or die "Could not move $entry: $!";
+            }
+            $export_dir->remove_tree;
         }
 
         method _write_config_data($data) {
@@ -332,7 +351,8 @@ class Alien::Xrepo::Base v0.9.1 {
             say "Generated $target_config";
         }
     };
-    class Alien::Xrepo::Base::Alt v0.9.1 {
+    class #
+    Alien::Xrepo::Base::Alt v0.9.2 {
         field $base : param;
         field $pkg  : param;
         method package_names ()      { $base->package_names }
