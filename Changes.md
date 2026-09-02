@@ -5,6 +5,8 @@ All notable changes to Alien::Xmake will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [v0.9.0] - 2026-09-01
 
 The docs have been greatly expanded since January but the stars of this release are Alien::Xrepo and Alien::Xrepo::Base, an Alien::Base stand-in for installing tools and libraries from [xrepo](https://packages.xmake.io/), [vcpkg](https://vcpkg.io/en/packages), [conan](https://conan.io/center), [brew](https://brew.sh/) (homebrew/linuxbrew), [conda](https://anaconda.org/), [dub](https://dub.pm/) (Dlang libs), [pacman](https://wiki.archlinux.org/title/Pacman#Installing_packages) (if you use arch, btw) [clib](https://github.com/clibs/clib/), [apt](https://www.debian.org/distrib/packages) on Debian/Ubuntu, [Cargo](https://crates.io/) for Rust crates, [Portage](https://packages.gentoo.org/) on Gentoo, [Nimble](https://nimpackages.com/) for nimlang, [NuGet](https://www.nuget.org/) for .NET, [Zypper](https://documentation.suse.com/smart/systems-management/html/concept-zypper/index.html) on openSUSE, and even your own custom repositories with smart prerequisite management in just a few lines of Perl.

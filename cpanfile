@@ -13,6 +13,7 @@ on configure => sub {
     requires 'File::Spec::Functions';
     requires 'Getopt::Long', '2.36';
     requires 'HTTP::Tiny';
+    requires 'IO::Socket::SSL';
     requires 'JSON::PP', '2';
     requires 'Path::Tiny';
     requires 'perl', 'v5.40.0';
