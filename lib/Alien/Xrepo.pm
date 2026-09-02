@@ -24,8 +24,7 @@ class Alien::Xrepo v0.9.1 {
     method _store_dir (%opts) { return $opts{installdir} // $root }
     method blah       ($msg)  { return unless $verbose; say $msg; }
     #
-    class    #
-        Alien::Xrepo::PackageInfo v0.9.1 {
+    class Alien::Xrepo::PackageInfo v0.9.1 {
         use Path::Tiny;
         field $includedirs : param : reader;
         field $libfiles    : param : reader;

@@ -7,24 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+More polish as I inch towards v1.0.0.
+
 ### Added
 
-- Multi-package support in `Alien::Xrepo::Base`, aligned with the `Alien::Build`/`Alien::Base` API so the module can act as a near drop-in replacement:
-  - The `package_name` method / constructor parameter is renamed to `pkg_name` to mirror `Alien::Build::Plugin::PkgConfig`. It may return a scalar or an array reference / list of package names; each is installed and recorded separately in `ConfigData`, and the first is the primary package used when none is selected.
+- Multi-package support in `Alien::Xrepo::Base` (borrowing from `Alien::Build`:
   - New `alt( [$pkg] )` accessor, modeled on `Alien::Base->alt`: without an argument (or with the primary name) it returns `$self`; with a non-primary name it returns a delegate whose `cflags`, `libs`, `libpath`, `bin_dir`, `kind`, `dynamic_libs`, `dist_dir`, `install_type`, `version`, and related accessors are pinned to that package. The delegate is the new `Alien::Xrepo::Base::Alt` class.
   - New `Alien::Base`-style accessors: `cflags_static`, `libs_static`, `dynamic_libs`, `dist_dir`, `install_type`, and `split_flags`.
   - `package_names` returns the bound package names, and `install` returns the list of package infos in list context.
-- A third example dist, `eg/examples/Alien-SDL3`, builds the whole SDL3 family (`libsdl3`, `libsdl3_image`, `libsdl3_ttf`, `libsdl3_mixer`) and exposes each library through the per-package accessors and `alt()`. It now ships FFI bindings across all three styles, each driving the shared libraries via `Alien::SDL3`:
-  - an Affix script
-  - an FFI::Platypus script
-  - an Inline::C walkthrough
-- New `SECURITY.md` and `CONTRIBUTING.md` with a security contact and a contribution workflow.
-
-### Changed
-
-- Bumped the version of every package and class in the distribution to a consistent `v0.9.1` to satisfy `consistent_version` (previously `Alien::Xrepo::Base`, `Alien::Xrepo::Base::Builder`, and `Alien::Xrepo::Base::Alt` lagged at `v0.0.9`).
-- Declared `Capture::Tiny`, `Path::Tiny`, `ExtUtils::Helpers`, and `ExtUtils::InstallPaths` as runtime prerequisites so runtime dependencies exactly match what the modules `use` (fixes CPANTS `prereq_matches_use`).
-- The `eg/examples/` dists (`Alien-Zstandard`, `Alien-Lsquic`) were updated for the `pkg_name` rename.
+  - This will allow me to merge Alien::SDL3_mixer, Alien::SDL3_image, Alien::SDL3_ttf into Alien::SDL3
+- Security and Contributing policy files
 
 ## [v0.9.0] - 2026-09-01
 

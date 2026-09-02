@@ -12,8 +12,8 @@ class Alien::Xrepo::Base v0.9.1 {
     field $root               : param = undef;
     field $verbose            : param = 0;
     field $repo;
-    field $packages          = [];    # normalized array ref of package names
-    field $infos             = {};    # package name => Alien::Xrepo::PackageInfo
+    field $packages = [];    # normalized array ref of package names
+    field $infos    = {};    # package name => Alien::Xrepo::PackageInfo
     ADJUST {
         my @names = $self->_normalize_names($pkg_name);
         die "pkg_name is required" unless @names;
@@ -46,8 +46,9 @@ class Alien::Xrepo::Base v0.9.1 {
 
     # pkg_name may be a scalar or an array ref / list of package names.
     method package_names () { return @$packages }
+
     method _normalize_names ($in) {
-        if ( ref $in eq 'ARRAY' ) { return @$in }
+        if ( ref $in eq 'ARRAY' )        { return @$in }
         if ( defined $in && length $in ) { return ($in) }
         if ( $self->can('pkg_name') ) {
             my $v = $self->pkg_name;
@@ -55,11 +56,11 @@ class Alien::Xrepo::Base v0.9.1 {
         }
         return ();
     }
-    method _pkg_info ($pkg = undef) { $infos->{ $pkg // $packages->[0] } }
+    method _pkg_info ( $pkg = undef ) { $infos->{ $pkg // $packages->[0] } }
 
     method install (%opts) {
         %$infos = ();
-        for my $name ( @$packages ) {
+        for my $name (@$packages) {
             $infos->{$name} = $repo->install( $name, $version_constraint, %opts );
         }
         return wantarray ? values %$infos : $self->_pkg_info;
@@ -70,73 +71,69 @@ class Alien::Xrepo::Base v0.9.1 {
         return $self->install(%opts);
     }
 
-    # Delegation methods. Each takes an optional package name; without one it
-    # refers to the first (primary) package, keeping single-package subclasses
-    # and existing callers working unchanged.
-    method libpath ($pkg = undef) { my $i = $self->_pkg_info($pkg); $i ? $i->libpath : undef }
-    method ffi_lib ($pkg = undef) { $self->libpath($pkg) }
-    method bin_dir ($pkg = undef) { my $i = $self->_pkg_info($pkg); $i ? $i->bin_dir : () }
-    method version ($pkg = undef) { my $i = $self->_pkg_info($pkg); $i ? $i->version : undef }
-    method kind ($pkg = undef)    { my $i = $self->_pkg_info($pkg); $i ? $i->kind    : undef }
+    # Delegation methods. Each takes an optional package name; without one it refers to the first
+    # (primary) package, keeping single-package subclasses and existing callers working unchanged.
+    method libpath ( $pkg = undef ) { my $i = $self->_pkg_info($pkg); $i ? $i->libpath : undef }
+    method ffi_lib ( $pkg = undef ) { $self->libpath($pkg) }
+    method bin_dir ( $pkg = undef ) { my $i = $self->_pkg_info($pkg); $i ? $i->bin_dir : () }
+    method version ( $pkg = undef ) { my $i = $self->_pkg_info($pkg); $i ? $i->version : undef }
+    method kind    ( $pkg = undef ) { my $i = $self->_pkg_info($pkg); $i ? $i->kind : undef }
 
-    method cflags ($pkg = undef) {
+    method cflags ( $pkg = undef ) {
         my $i = $self->_pkg_info($pkg);
         return '' unless $i;
         return join ' ', map {"-I$_"} @{ $i->includedirs };
     }
-    method cflags_static ($pkg = undef) { $self->cflags($pkg) }
+    method cflags_static ( $pkg = undef ) { $self->cflags($pkg) }
 
-    method libs ($pkg = undef) {
+    method libs ( $pkg = undef ) {
         my $i = $self->_pkg_info($pkg);
         return '' unless $i;
         my $libs = join ' ', map {"-L$_"} @{ $i->linkdirs // [] };
         $libs .= ' ' . join ' ', map {"-l$_"} @{ $i->links // [] };
         return $libs;
     }
-    method libs_static ($pkg = undef) { $self->libs($pkg) }
+    method libs_static ( $pkg = undef ) { $self->libs($pkg) }
 
     # Absolute paths to the shared libraries / objects of the package.
-    method dynamic_libs ($pkg = undef) {
+    method dynamic_libs ( $pkg = undef ) {
         my $i = $self->_pkg_info($pkg);
         return () unless $i;
         return map { $_ // () } @{ $i->libfiles // [] };
     }
 
     # Where the alien's files live (the xrepo install root for the package).
-    method dist_dir ($pkg = undef) {
+    method dist_dir ( $pkg = undef ) {
         my $i = $self->_pkg_info($pkg);
         return $i ? $i->installdir : undef;
     }
 
-    # 'share' once we have installed anything into our xrepo root; 'system' if
-    # nothing is installed yet (matches the Alien::Base install_type contract).
-    method install_type ($pkg = undef) { $self->_pkg_info($pkg) ? 'share' : 'system' }
+    # 'share' once we have installed anything into our xrepo root; 'system' if nothing is installed
+    # yet (matches the Alien::Base install_type contract).
+    method install_type ( $pkg = undef ) { $self->_pkg_info($pkg) ? 'share' : 'system' }
 
-    # Split a flags string into a list, mirroring Alien::Base::split_flags but
-    # splitting on whitespace so Windows paths (which use backslashes) survive.
-    method split_flags ($flags, $pkg = undef) {
+    # Split a flags string into a list, mirroring Alien::Base::split_flags but splitting on
+    # whitespace so Windows paths (which use backslashes) survive.
+    method split_flags ( $flags, $pkg = undef ) {
         return () unless defined $flags;
-        return grep { length } split ' ', $flags;
+        return grep {length} split ' ', $flags;
     }
 
-    # Alien::Base accessor to select a non-primary package. Without a name (or
-    # with the primary name) it returns $self; with a different name it returns
-    # a delegate object whose accessors are pinned to that package, e.g.
-    #   Alien::SDL3->alt('libsdl3_ttf')->cflags
-    method alt ($name = undef) {
+    # Alien::Base accessor to select a non-primary package. Without a name (or with the primary
+    # name) it returns $self; with a different name it returns a delegate object whose accessors
+    # are pinned to that package, e.g. Alien::SDL3->alt('libsdl3_ttf')->cflags
+    method alt ( $name = undef ) {
         my $pkg = $name // $packages->[0];
-        die "Unknown package '$pkg'. Known packages: @$packages"
-            unless grep { $_ eq $pkg } @$packages;
+        die "Unknown package '$pkg'. Known packages: @$packages" unless grep { $_ eq $pkg } @$packages;
         return $self if $pkg eq $packages->[0];
         return Alien::Xrepo::Base::Alt->new( base => $self, pkg => $pkg );
     }
 
-    method find_header ($filename, $pkg = undef) {
+    method find_header ( $filename, $pkg = undef ) {
         my $i = $self->_pkg_info($pkg);
         return $i ? $i->find_header($filename) : undef;
     }
-
-    method package_info ($pkg = undef) { $self->_pkg_info($pkg) }
+    method package_info ( $pkg = undef ) { $self->_pkg_info($pkg) }
 
     # Builder support
     sub Build_PL ($alien_class) {
@@ -147,13 +144,13 @@ class Alien::Xrepo::Base v0.9.1 {
         my $meta = CPAN::Meta->load_file('META.json');
         say sprintf 'Creating new Build script for %s %s (%s)', $meta->name, $meta->version, $alien_class;
         my $perl5lib = join( $Config{path_sep}, @INC );
-        path('Build')->spew_raw( sprintf <<'EOF', $^X, $perl5lib, __PACKAGE__, $alien_class );
-#!%s
-BEGIN { $ENV{PERL5LIB} = '%s' }
-use lib 'lib';
-use %s;
-Alien::Xrepo::Base::Build('%s');
-EOF
+        path('Build')->spew_raw( sprintf <<~'EOF', $^X, $perl5lib, __PACKAGE__, $alien_class );
+            #!%s
+            BEGIN { $ENV{PERL5LIB} = '%s' }
+            use lib 'lib';
+            use %s;
+            Alien::Xrepo::Base::Build('%s');
+            EOF
         make_executable('Build');
         path('_build_params')->spew_raw( encode_json( [ \@ARGV, $alien_class ] ) );
         $meta->save(@$_) for ['MYMETA.json'];
@@ -333,27 +330,27 @@ EOF
             $target_config->spew_utf8($content);
             say "Generated $target_config";
         }
-    }
+    };
     class Alien::Xrepo::Base::Alt v0.9.1 {
         field $base : param;
         field $pkg  : param;
-        method package_names ()        { $base->package_names }
-        method package_info ()         { $base->package_info($pkg) }
-        method install (%opts)         { $base->install(%opts) }
-        method pkg_name ()             { $pkg }
-        method alt ($name = undef)     { $base->alt( $name // $pkg ) }
-        method libpath ()              { $base->libpath($pkg) }
-        method ffi_lib ()              { $base->libpath($pkg) }
-        method bin_dir ()              { $base->bin_dir($pkg) }
-        method version ()              { $base->version($pkg) }
-        method kind ()                 { $base->kind($pkg) }
-        method cflags ()               { $base->cflags($pkg) }
-        method cflags_static ()        { $base->cflags($pkg) }
-        method libs ()                 { $base->libs($pkg) }
-        method libs_static ()          { $base->libs($pkg) }
-        method dynamic_libs ()         { $base->dynamic_libs($pkg) }
-        method dist_dir ()             { $base->dist_dir($pkg) }
-        method install_type ()         { $base->install_type($pkg) }
+        method package_names ()      { $base->package_names }
+        method package_info ()       { $base->package_info($pkg) }
+        method install (%opts)       { $base->install(%opts) }
+        method pkg_name ()           {$pkg}
+        method alt ( $name = undef ) { $base->alt( $name // $pkg ) }
+        method libpath ()            { $base->libpath($pkg) }
+        method ffi_lib ()            { $base->libpath($pkg) }
+        method bin_dir ()            { $base->bin_dir($pkg) }
+        method version ()            { $base->version($pkg) }
+        method kind ()               { $base->kind($pkg) }
+        method cflags ()             { $base->cflags($pkg) }
+        method cflags_static ()      { $base->cflags($pkg) }
+        method libs ()               { $base->libs($pkg) }
+        method libs_static ()        { $base->libs($pkg) }
+        method dynamic_libs ()       { $base->dynamic_libs($pkg) }
+        method dist_dir ()           { $base->dist_dir($pkg) }
+        method install_type ()       { $base->install_type($pkg) }
         method split_flags ($flags)    { $base->split_flags( $flags, $pkg ) }
         method find_header ($filename) { $base->find_header( $filename, $pkg ) }
     }

@@ -71,6 +71,9 @@ provides:
   Alien::Xrepo::Base::Builder:
     file: lib/Alien/Xrepo/Base.pm
     version: v0.9.1
+  Alien::Xrepo::PackageInfo:
+    file: lib/Alien/Xrepo.pm
+    version: v0.9.1
 requires:
   Capture::Tiny: '0'
   ExtUtils::Helpers: '0.028'
