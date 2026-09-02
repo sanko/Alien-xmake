@@ -199,7 +199,8 @@ class Alien::Xrepo::Base v0.9.1 {
         }
 
         method ACTION_test() {
-            $self->ACTION_build();
+            my $config_file = path('blib/lib')->child( ( split /::/, $alien_class ), 'ConfigData.pm' );
+            $self->ACTION_build() unless -e $config_file;
             say 'Running tests...';
             require Test::Harness;
             my @tests = glob('t/*.t');
