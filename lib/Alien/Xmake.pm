@@ -1,7 +1,7 @@
 use v5.40;
 use experimental 'class';
 #
-class Alien::Xmake v0.9.0 {
+class Alien::Xmake v0.9.1 {
     use File::Spec;
     use File::Basename qw[dirname];
     use JSON::PP       qw[decode_json];
@@ -9,11 +9,6 @@ class Alien::Xmake v0.9.0 {
     #
     field $windows = $^O eq 'MSWin32';
     field $verbose : param //= 0;
-
-    # Auto-confirm interactive xmake/xrepo prompts (e.g. -y / --confirm=yes). Useful when
-    # output is captured (Capture::Tiny) so a prompting install never hangs waiting on stdin.
-    field $yes     : param //= 0;
-    field $confirm : param //= ();
     field $config  : param //= sub {
         my $conf;
         try {
@@ -108,10 +103,6 @@ class Alien::Xmake v0.9.0 {
 
     # Task plumbing
     method _cmd ( $action, @args ) {
-
-        # Inject auto-confirm flags so captured/streamed installs never hang on a prompt.
-        unshift @args, '--confirm=' . $confirm if defined $confirm && length $confirm;
-        unshift @args, '-y'                    if $yes             && !( defined $confirm && length $confirm );
         my @cmd = ( $self->exe, $action, @args );
         $self->blah("Running: @cmd");
         @cmd;

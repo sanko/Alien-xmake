@@ -17,6 +17,33 @@ class Alien::Xrepo::TestPackageWithOpts : isa(Alien::Xrepo::Base) {
     method package_name {'zlib'}
     method install_opts { return ( kind => 'shared' ); }
 }
+
+# A subclass that installs multiple packages plus a fake ConfigData in which
+# one package recorded an install error (as the Builder does on failure).
+class Alien::Xrepo::TestMulti : isa(Alien::Xrepo::Base) {
+    method package_name  {'zlib'}
+    method package_names {qw[zlib zstd]}
+}
+
+package Alien::Xrepo::TestMulti::ConfigData {
+    use v5.40;
+    my %config = (
+        zlib => {
+            includedirs => [],
+            libfiles    => [],
+            license     => 'zlib',
+            linkdirs    => [],
+            links       => [qw[z]],
+            shared      => 1,
+            static      => 0,
+            version     => '1.3.1',
+            installdir  => 'C:/fake/zlib'
+        },
+        zstd => { error => 'install failed for zstd' },
+    );
+    sub config  ($class)                 { \%config }
+    sub package ( $class, $pkg = undef ) { $config{$pkg} }
+}
 my $tmp = path( tempdir( CLEANUP => 1 ) );
 #
 my $alien = Alien::Xrepo::TestPackage->new( root => $tmp, verbose => 1 );
@@ -117,6 +144,19 @@ subtest install_opts => sub {
     my $optinfo = $with_opts->install;
     ok $optinfo, 'Installed package with install_opts';
     is $optinfo->kind, 'library', 'Shared library kind after install with opts';
+};
+
+# A build that fails to install one package records it in ConfigData as `error`
+# instead of aborting; package_error()/missing_packages() surface it for wrappers.
+subtest 'failed package reporting' => sub {
+    my $multi = Alien::Xrepo::TestMulti->new;
+    is [ $multi->missing_packages ],  [qw[zstd]],                'missing_packages reports the failed package';
+    is $multi->package_error('zstd'), 'install failed for zstd', 'package_error carries the install error';
+    ok !defined $multi->package_error('zlib'), 'installed packages have no recorded error';
+};
+subtest 'no ConfigData' => sub {
+    is [ $alien->missing_packages ], [], 'single-package alien without ConfigData has no missing packages';
+    ok !defined $alien->package_error('zlib'), 'package_error is undef without ConfigData';
 };
 #
 done_testing;

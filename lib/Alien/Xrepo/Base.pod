@@ -60,7 +60,7 @@ It leverages Perl 5.40's native C<class> features and provides a C<Module::Build
 
 =over
 
-=item 1. Installs the requested package via C<xrepo> into a C<share> directory during the build phase.
+=item 1. Installs the requested package(s) via C<xrepo> into a C<share> directory during the build phase.
 
 =item 2. Captures all relevant metadata (include dirs, lib dirs, flags, etc.).
 
@@ -69,6 +69,10 @@ It leverages Perl 5.40's native C<class> features and provides a C<Module::Build
 =item 4. Handles portable path resolution both from C<blib> (during development/testing) and from the final installation directory.
 
 =back
+
+If a subclass implements C<package_names>, each listed package is installed in a single build. A package that fails to
+install does not abort the build: it is recorded in C<ConfigData> with an C<error> key so wrappers can detect the
+missing or unavailable library at runtime with L</package_error( $name )> and C<missing_packages( )>.
 
 =head1 CONSTRUCTOR
 
@@ -113,6 +117,13 @@ To create a new Alien module, inherit from this class and implement the followin
 =head2 C<package_name( )>
 
 B<Required>. Returns the name of the package as it appears in the C<xrepo> repository.
+
+=head2 C<package_names( )>
+
+Optional. When installing more than one C<xrepo> package in a single build, return the full list of package names; the
+builder installs every one of them during the C<build> action. A package that fails to install is recorded in
+C<ConfigData> as an entry carrying an C<error> key and the rest of the build continues, so optional or unbuildable
+libraries can be detected at runtime with L</package_error( $name )> and C<missing_packages( )>.
 
 =head2 C<install_opts( )>
 
@@ -176,6 +187,20 @@ Searches the package's include directories for the specified header and returns 
 =head2 C<package_info( )>
 
 Returns the raw L<Alien::Xrepo::PackageInfo> object containing all metadata.
+
+=head2 C<package_error( $name )>
+
+    my $error = $alien->package_error('libsdl3_ttf');
+
+Returns the recorded error message for the named package when its install failed during the build, or C<undef> if it
+installed successfully.
+
+=head2 C<missing_packages( )>
+
+    my @missing = $alien->missing_packages;
+
+Returns the names of the packages that failed to install during the build. With these, F<FFI> wrappers can skip (or
+degrade gracefully around) a shared library that is not available.
 
 =head1 BUILDER METHODS
 

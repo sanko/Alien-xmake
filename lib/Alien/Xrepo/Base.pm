@@ -1,7 +1,7 @@
 use v5.40;
 use experimental 'class';
 #
-class Alien::Xrepo::Base v0.0.9 {
+class Alien::Xrepo::Base v0.0.10 {
     use Alien::Xrepo;
     use Path::Tiny;
     use Exporter qw[import];
@@ -49,6 +49,21 @@ class Alien::Xrepo::Base v0.0.9 {
         return $self->install(%opts);
     }
     method package_info () {$info}
+
+    method package_error ($name) {
+        my $class = ref($self) . '::ConfigData';
+        return undef unless $class->can('config');
+        my $error = $class->config->{$name}{error};
+        return length $error ? $error : undef;
+    }
+
+    method missing_packages () {
+        my $class = ref($self) . '::ConfigData';
+        return () unless $class->can('config');
+        my $config = $class->config or return ();
+        my @pkgs   = $self->can('package_names') ? $self->package_names : $self->package_name;
+        grep { $config->{$_}{error} } @pkgs;
+    }
 
     # Delegation methods
     method libpath () { $info ? $info->libpath : undef }
@@ -103,7 +118,7 @@ EOF
         }
         Alien::Xrepo::Base::Builder->new( alien_class => $alien_class, action => $action, argv => \@ARGV )->execute();
     }
-    class Alien::Xrepo::Base::Builder v0.0.9 {
+    class Alien::Xrepo::Base::Builder v0.0.10 {
         use CPAN::Meta;
         use ExtUtils::Install qw[install];
         use ExtUtils::InstallPaths;
@@ -176,36 +191,45 @@ EOF
         method _resolve_alien() {
             eval "require $alien_class; 1" or die "Could not load $alien_class: $@";
             my $alien     = $alien_class->new;
-            my $pkg       = $alien->package_name;
             my %opts      = $alien->can('install_opts') ? $alien->install_opts : ();
             my $dist_name = $meta->name;
             my $share_dir = path('blib/lib/auto/share/dist')->child($dist_name)->absolute;
             $share_dir->mkpath;
-            my $repo = Alien::Xrepo->new( root => $share_dir->stringify, verbose => $verbose );
-            say "Installing $pkg via Xrepo into $share_dir";
-            my $info     = $repo->install( $pkg, undef, %opts );
+            my $repo     = Alien::Xrepo->new( root => $share_dir->stringify, verbose => $verbose );
+            my @packages = $alien->can('package_names') ? $alien->package_names : $alien->package_name;
             my $make_rel = sub ($p) {
                 return undef unless defined $p;
                 my $path = path($p);
                 return $path->relative($share_dir)->stringify if $share_dir->subsumes($path);
                 return $path->stringify;
             };
-            return {
-                $pkg => {
-                    version     => $info->version,
-                    kind        => $info->kind,
-                    links       => $info->links,
-                    libfiles    => [ map { $make_rel->($_) } @{ $info->libfiles    // [] } ],
-                    includedirs => [ map { $make_rel->($_) } @{ $info->includedirs // [] } ],
-                    linkdirs    => [ map { $make_rel->($_) } @{ $info->linkdirs    // [] } ],
-                    bindirs     => [ map { $make_rel->($_) } @{ $info->bindirs     // [] } ],
-                    libpath     => $make_rel->( $info->libpath ),
-                    installdir  => $make_rel->( $info->installdir ),
-                    license     => $info->license,
-                    shared      => $info->shared ? 1 : 0,
-                    static      => $info->static ? 1 : 0
+            my %data;
+            for my $pkg (@packages) {
+                say "Installing $pkg via Xrepo into $share_dir";
+                my $info = eval { $repo->install( $pkg, undef, %opts ) };
+                if ($info) {
+                    $data{$pkg} = {
+                        version     => $info->version,
+                        kind        => $info->kind,
+                        links       => $info->links,
+                        libfiles    => [ map { $make_rel->($_) } @{ $info->libfiles    // [] } ],
+                        includedirs => [ map { $make_rel->($_) } @{ $info->includedirs // [] } ],
+                        linkdirs    => [ map { $make_rel->($_) } @{ $info->linkdirs    // [] } ],
+                        bindirs     => [ map { $make_rel->($_) } @{ $info->bindirs     // [] } ],
+                        libpath     => $make_rel->( $info->libpath ),
+                        installdir  => $make_rel->( $info->installdir ),
+                        license     => $info->license,
+                        shared      => $info->shared ? 1 : 0,
+                        static      => $info->static ? 1 : 0
+                    };
                 }
-            };
+                else {
+                    my $err = $@;
+                    warn "Could not install $pkg: $err";
+                    $data{$pkg} = { error => $err };
+                }
+            }
+            return \%data;
         }
 
         method _write_config_data($data) {
