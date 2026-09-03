@@ -244,7 +244,7 @@ use %s;
 
         # Check existing shared installation for upgrading
         my $existing = $self->_check_existing_share();
-        if (0 && $existing) { # Disabled for now... I need to use the sharedir in a less dumb way.
+        if ( 0 && $existing ) {    # Disabled for now... I need to use the sharedir in a less dumb way.
             my $ex_ver = $existing->{version};
             my $ex_dir = path( $existing->{install_dir} )->absolute;
             if ( $self->_version_cmp( $ex_ver, $self->_desired_version ) >= 0 ) {
