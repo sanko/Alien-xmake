@@ -144,9 +144,10 @@ class Alien::Xrepo::Base v0.9.2 {
         my $meta = CPAN::Meta->load_file('META.json');
         say sprintf 'Creating new Build script for %s %s (%s)', $meta->name, $meta->version, $alien_class;
         my $perl5lib = join( $Config{path_sep}, @INC );
-        path('Build')->spew_raw( sprintf <<~'EOF', $^X, $perl5lib, __PACKAGE__, $alien_class );
+        my $sep      = $Config{path_sep};
+        path('Build')->spew_raw( sprintf <<~'EOF', $^X, $sep, $perl5lib, __PACKAGE__, $alien_class );
             #!%s
-            BEGIN { $ENV{PERL5LIB} = '%s' }
+            use lib split /\%s/, '%s';
             use lib 'lib';
             use %s;
             Alien::Xrepo::Base::Build('%s');
@@ -223,19 +224,29 @@ class Alien::Xrepo::Base v0.9.2 {
             path('MYMETA.yml')->remove;
         }
 
-        method ACTION_clean_cache() {
-            say 'Cleaning global Xrepo package cache...';
+        method _global_cache() {
             my $global_cache = $ENV{ALIEN_XREPO_CACHE};
             unless ($global_cache) {
                 require File::ShareDir;
-                $global_cache = eval { File::ShareDir::dist_dir('Alien-Xrepo') };
+                $global_cache = eval { File::ShareDir::dist_dir('Alien-Xmake') };
+                unless ($global_cache) {
+                    eval {
+                        require Alien::Xmake;
+                        $global_cache = Alien::Xmake->new->bin_dir;
+                    };
+                }
                 unless ($global_cache) {
                     require Config;
                     my $sitelib = $Config::Config{installsitelib} || $Config::Config{sitelib};
-                    $global_cache = path($sitelib)->child( 'auto', 'share', 'dist', 'Alien-Xrepo' )->stringify;
+                    $global_cache = path($sitelib)->child( 'auto', 'share', 'dist', 'Alien-Xmake' )->stringify;
                 }
             }
-            $global_cache = path($global_cache)->child('packages')->absolute;
+            return path($global_cache)->child('packages')->absolute;
+        }
+
+        method ACTION_clean_cache() {
+            say 'Cleaning global Xrepo package cache...';
+            my $global_cache = $self->_global_cache();
             if ( $global_cache->exists ) {
                 my $repo = Alien::Xrepo->new( root => $global_cache->stringify, verbose => $verbose );
                 $repo->clean();
@@ -291,17 +302,7 @@ class Alien::Xrepo::Base v0.9.2 {
             $share_dir->mkpath;
 
             # 1. Establish the global Build Cache for Alien::Xrepo
-            my $global_cache = $ENV{ALIEN_XREPO_CACHE};
-            unless ($global_cache) {
-                require File::ShareDir;
-                $global_cache = eval { File::ShareDir::dist_dir('Alien-Xrepo') };
-                unless ($global_cache) {
-                    require Config;
-                    my $sitelib = $Config::Config{installsitelib} || $Config::Config{sitelib};
-                    $global_cache = path($sitelib)->child('auto', 'share', 'dist', 'Alien-Xrepo')->stringify;
-                }
-            }
-            $global_cache = path($global_cache)->child('packages')->absolute;
+            my $global_cache = $self->_global_cache();
             $global_cache->mkpath;
 
             my $repo = Alien::Xrepo->new( root => $global_cache->stringify, verbose => $verbose );
