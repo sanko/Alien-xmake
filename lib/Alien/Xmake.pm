@@ -120,13 +120,21 @@ class Alien::Xmake v0.9.2 {
     # Stream a task to the terminal (builds, runs, installs ...) and return success.
     method _run ( $action, @args ) {
         my @cmd = $self->_cmd( $action, @args );
-        system(@cmd) == 0;
+        if ($windows) {
+            my $cmd_str = join ' ', $self->_escape_args(@cmd);
+            return system($cmd_str) == 0;
+        }
+        return system(@cmd) == 0;
     }
 
     # Run a task capturing output; returns ($out, $err, $exit).
     method _capture ( $action, @args ) {
         my @cmd = $self->_cmd( $action, @args );
-        capture { system @cmd };
+        if ($windows) {
+            my $cmd_str = join ' ', $self->_escape_args(@cmd);
+            return capture { system $cmd_str };
+        }
+        return capture { system @cmd };
     }
 
     # Slurp the extra trailing arguments out of %opts.
@@ -567,6 +575,17 @@ class Alien::Xmake v0.9.2 {
         return qq{"$path"} if $windows && $path =~ /\s/;
         $path;
     }
+
+    # Safely quote arguments for Windows cmd.exe
+    method _escape_args (@args) {
+        return @args unless $windows;
+        return map {
+            if ( /^".*"$/ ) { $_ }                  # Already quoted
+            elsif ( /[ \t\n\v"]/ ) { qq{"$_"} }     # Needs quoting
+            else { $_ }
+        } @args;
+    }
+
     }
     #
     1;
