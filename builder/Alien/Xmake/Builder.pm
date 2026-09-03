@@ -158,7 +158,7 @@ use %s;
             }
             else {
                 $p->copy($target) or die "Failed to copy $p to $target: $!";
-                $target->chmod( $p->stat->mode );
+                $target->chmod( $p->stat->mode | 0600 );
             }
         }
     }
@@ -226,7 +226,7 @@ use %s;
         }
 
         # Check build dir (idempotency)
-        my $install_dir = path('blib/lib/Alien/Xmake/share')->absolute;
+        my $install_dir = path('share')->absolute;
         $install_dir->mkpath;
         my $bin_name = ( $^O eq 'MSWin32' ) ? 'xmake.exe' : 'xmake';
         my $blib_bin = $install_dir->child( 'bin', $bin_name );
@@ -244,13 +244,13 @@ use %s;
 
         # Check existing shared installation for upgrading
         my $existing = $self->_check_existing_share();
-        if ($existing) {
+        if (0 && $existing) { # Disabled for now... I need to use the sharedir in a less dumb way.
             my $ex_ver = $existing->{version};
             my $ex_dir = path( $existing->{install_dir} )->absolute;
             if ( $self->_version_cmp( $ex_ver, $self->_desired_version ) >= 0 ) {
                 say "Found valid private Xmake ($ex_ver) in $ex_dir";
                 if ( $ex_dir->stringify ne $install_dir->stringify ) {
-                    say 'Copying existing installation to build directory...';
+                    say 'Copying existing installation to share directory...';
                     $self->_copy_directory( $ex_dir, $install_dir );
                 }
 
@@ -417,6 +417,13 @@ use %s;
         my $cmd = qq{"$outfile_str" /NOADMIN /S /D=$install_str};
         my $ret = system($cmd);
         die "Installer failed with code $ret" if $ret != 0;
+
+        # Ensure all extracted files/templates are writable (NSIS on Windows may set read-only attributes)
+        my $iter = $installdir->iterator( { recurse => 1 } );
+        while ( my $p = $iter->() ) {
+            next unless $p->is_file;
+            $p->chmod(0666);
+        }
 
         # Cleanup
         path('_build_xmake')->remove_tree;
