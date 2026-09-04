@@ -5,7 +5,19 @@ All notable changes to Alien::Xmake will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-[Unreleased]
+## [Unreleased]
+
+### Added
+
+- `Alien::Xmake::target_info( $name )` wraps the per-target detail of `xmake show -t <target>` as a hashref by default or the raw text with `plain => 1`.
+
+### Changed
+- Removed the deprecated `json =E<gt> 1` option from `Alien::Xmake::show`; the upstream bare `--json` flag is deprecated in favour of `--format=json`, so callers use `format =E<gt> 'json'`.
+
+### Fixed
+- v0.9.x has had a broken install step that just plain ignored the share directory.
+
+## [v0.9.3] - 2026-09-03
 
 ### Fixed
 
