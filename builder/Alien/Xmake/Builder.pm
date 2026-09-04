@@ -110,12 +110,12 @@ class    #
         my $auto = path('blib/lib/auto/share/dist')->child( $meta->name );
         ExtUtils::Install::install( { $src->stringify => $auto->stringify }, 0, 0, 0 );
 
-        # Keep staged files writable so a later `./Build clean` can remove them.
-        # (ExtUtils::Install marks installed files read-only by default.)
-        my $iter = $auto->iterator( { recurse => 1 } );
-        while ( my $p = $iter->() ) {
-            next unless $p->is_file;
-            $p->chmod(0666);
+        my $iter = $src->iterator( { recurse => 1 } );
+        while ( my $s = $iter->() ) {
+            next unless $s->is_file;
+            my $target = $auto->child( $s->relative($src) );
+            next unless $target->is_file;
+            $target->chmod( $s->stat->mode | 0600 );
         }
         say "Staged bundled xmake to $auto";
     }
