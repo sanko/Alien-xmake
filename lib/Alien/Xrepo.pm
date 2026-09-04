@@ -77,18 +77,20 @@ class Alien::Xrepo v0.9.4 {
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
 
-        # Build common arguments for both install and fetch
-        my @args = $self->_build_args( \%opts );
+        # Build common arguments for both install and fetch. The mutating install gets
+        # an implicit -y unless the caller opted out; fetch is query-only, so no confirm.
+        my @args = ( $self->_confirm_args(\%opts), $self->_build_args( \%opts ) );
         say "[*] xrepo: ensuring $full_spec is installed..." if $verbose;
 
-        # Install
-        my @install_cmd = ( $xmake->exe, qw[lua private.xrepo], 'install', '-y', @args, $full_spec );
+        # Install (flags precede the package spec -- see _argv)
+        my @install_cmd = $self->_argv( 'install', \@args, $full_spec );
         $self->blah("Running: @install_cmd");
         system(@install_cmd) == 0 or die "xrepo install failed for $full_spec";
 
         # Fetch (must use same args to get correct paths for arch/mode)
         warn "[*] xrepo: fetching paths...\n" if $verbose;
-        my @fetch_cmd = ( $xmake->exe, qw[lua private.xrepo], 'fetch', '--json', @args, $full_spec );
+        my @fetch_args  = $self->_build_args( \%opts );
+        my @fetch_cmd   = $self->_argv( 'fetch', [ '--json', @fetch_args ], $full_spec );
         $self->blah("Running: @fetch_cmd");
         my ( $json_out, $json_err, $json_exit ) = capture { system @fetch_cmd };
         die "xrepo fetch failed:\nCommand: @fetch_cmd\nError:\n$json_err" if $json_exit != 0;
@@ -103,19 +105,19 @@ class Alien::Xrepo v0.9.4 {
         local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
-        my @args = $self->_build_args( \%opts );
+        my @args = ( $self->_confirm_args(\%opts), $self->_build_args( \%opts ) );
         push @args, '--all'   if $opts{all};
         push @args, '--force' if $opts{force};
         say "[*] xrepo: uninstalling $pkg_spec..." if $verbose;
-        system $xmake->exe, qw[lua private.xrepo], 'remove', '-y', @args, $pkg_spec;
+        my @cmd = $self->_argv( 'remove', \@args, $pkg_spec );
+        system @cmd;
     }
 
     method search ( $query, %opts ) {
         local $ENV{XMAKE_THEME} = $self->_theme(%opts);
         say "[*] xrepo: searching for $query..." if $verbose;
-        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'search' );
-        push @cmd, '--addon' if $opts{addon};
-        push @cmd, $query;
+        my @flags = $opts{addon} ? ('--addon') : ();
+        my @cmd   = $self->_argv( 'search', \@flags, $query );
         system @cmd;
     }
 
@@ -124,14 +126,14 @@ class Alien::Xrepo v0.9.4 {
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         say '[*] xrepo: cleaning cache...' if $verbose;
-        system $xmake->exe, qw[lua private.xrepo], 'clean', '-y';
+        my @cmd = $self->_argv( 'clean', ['-y'] );
+        system @cmd;
     }
     #
     method add_repo ( $name, $url, $branch //= () ) {
         local $ENV{XMAKE_THEME} = $self->_theme;
         say "[*] xrepo: adding repo $name..." if $verbose;
-        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'add-repo', '-y', $name, $url );
-        push @cmd, $branch if defined $branch;
+        my @cmd = $self->_argv( 'add-repo', ['-y'], $name, $url, $branch );
         my ( $out, $err, $exit ) = capture { system @cmd };
         die "xrepo add-repo failed:\n$err" if $exit != 0;
         return 1;
@@ -140,14 +142,14 @@ class Alien::Xrepo v0.9.4 {
     method remove_repo ($name) {
         local $ENV{XMAKE_THEME} = $self->_theme;
         say "[*] xrepo: removing repo $name..." if $verbose;
-        system $xmake->exe, qw[lua private.xrepo], 'remove-repo', '-y', $name;
+        my @cmd = $self->_argv( 'remove-repo', ['-y'], $name );
+        system @cmd;
     }
 
     method update_repo ( $name //= () ) {
         local $ENV{XMAKE_THEME} = $self->_theme;
         say '[*] xrepo: updating repositories...' if $verbose;
-        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'update-repo', '-y' );
-        push @cmd, $name if defined $name;
+        my @cmd = $self->_argv( 'update-repo', ['-y'], $name );
         system @cmd;
     }
     #
@@ -203,7 +205,8 @@ class Alien::Xrepo v0.9.4 {
 
         # Build Includes (deps)
         if ( my $i = $opts->{includes} ) {
-            push @args, '--includes=' . ( ref $i eq 'ARRAY' ? join( ',', @$i ) : $i );
+            my $joined = ref $i eq 'ARRAY' ? join( $Config{path_sep}, @$i ) : $i;
+            push @args, '--includes=' . $joined;
         }
 
         # Extra per-action flags (e.g. --json, --cflags, --ldflags)
@@ -215,6 +218,16 @@ class Alien::Xrepo v0.9.4 {
     # `theme =>` per-call, or `theme =>` to the constructor. xmake reads $ENV{XMAKE_THEME}.
     method _theme (%opts) { $opts{theme} // $theme }
 
+    method _argv ( $action, $flags, @spec ) {
+        @spec = grep { defined } @spec;
+        return ( $xmake->exe, qw[lua private.xrepo], $action, @$flags, @spec );
+    }
+    method _confirm_args ($opts) {
+        return ( '-y' ) if !$yes
+            && !exists $opts->{yes}
+            && !( defined $opts->{confirm} && length $opts->{confirm} );
+        return ();
+    }
     # Run `xrepo fetch` and return a parsed PackageInfo (or raw flags).
     method fetch ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
@@ -230,8 +243,8 @@ class Alien::Xrepo v0.9.4 {
         push @extra, '--deps'    if $opts{deps};
         push @extra, '--system'  if $opts{system};
         push @extra, '-e'        if $opts{external};
-        my @args      = $self->_build_args( \%opts, \@extra );
-        my @fetch_cmd = ( $xmake->exe, qw[lua private.xrepo], 'fetch', '--json', @args, $full_spec );
+        my @args      = ( '--json', $self->_build_args( \%opts, \@extra ) );
+        my @fetch_cmd = $self->_argv( 'fetch', \@args, $full_spec );
         $self->blah("Running: @fetch_cmd");
         my ( $json_out, $json_err, $json_exit ) = capture { system @fetch_cmd };
         return if $json_exit != 0;
@@ -254,7 +267,8 @@ class Alien::Xrepo v0.9.4 {
         push @extra, '--format=' . $opts{format} if $opts{format};
         my @args = $self->_build_args( \%opts, \@extra );
         say "[*] xrepo: showing info for $pkg_spec..." if $verbose;
-        my ( $out, $err, $exit ) = capture { system( $xmake->exe, qw[lua private.xrepo], 'info', @args, $pkg_spec ) };
+        my @cmd = $self->_argv( 'info', \@args, $pkg_spec );
+        my ( $out, $err, $exit ) = capture { system @cmd };
         return unless $exit == 0;
 
         # If the caller asked for machine-readable output, parse and return it
@@ -273,8 +287,7 @@ class Alien::Xrepo v0.9.4 {
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @args = $self->_build_args( { %opts, no_kind => 1 } );
         say '[*] xrepo: scanning installed packages...' if $verbose;
-        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'scan', @args );
-        push @cmd, $pkg if defined $pkg && length $pkg;
+        my @cmd = $self->_argv( 'scan', \@args, ( defined $pkg && length $pkg ) ? $pkg : () );
         my ( $out, $err, $exit ) = capture { system @cmd };
         return () if $exit != 0;
         $self->blah($out);
@@ -288,9 +301,9 @@ class Alien::Xrepo v0.9.4 {
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
         push @extra, '-o', $opts{outputdir} if $opts{outputdir};
-        my @args = $self->_build_args( \%opts, \@extra );
+        my @args = ( $self->_confirm_args(\%opts), $self->_build_args( \%opts, \@extra ) );
         say "[*] xrepo: downloading $full_spec..." if $verbose;
-        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'download', '-y', @args, $full_spec );
+        my @cmd = $self->_argv( 'download', \@args, $full_spec );
         $self->blah("Running: @cmd");
         my ( $out, $err, $exit ) = capture { system @cmd };
         return 0 if $exit != 0;
@@ -314,9 +327,9 @@ class Alien::Xrepo v0.9.4 {
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
         push @extra, '-i', $opts{packagedir} if $opts{packagedir};
-        my @args = $self->_build_args( \%opts, \@extra );
+        my @args = ( $self->_confirm_args(\%opts), $self->_build_args( \%opts, \@extra ) );
         say "[*] xrepo: importing $full_spec..." if $verbose;
-        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'import', '-y', @args, $full_spec );
+        my @cmd = $self->_argv( 'import', \@args, $full_spec );
         $self->blah("Running: @cmd");
         my ( $out, $err, $exit ) = capture { system @cmd };
         return 0 if $exit != 0;
@@ -331,9 +344,9 @@ class Alien::Xrepo v0.9.4 {
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
         my @extra;
         push @extra, '-o', $opts{packagedir} if $opts{packagedir};
-        my @args = $self->_build_args( \%opts, \@extra );
+        my @args = ( $self->_confirm_args(\%opts), $self->_build_args( \%opts, \@extra ) );
         say "[*] xrepo: exporting $full_spec..." if $verbose;
-        my @cmd = ( $xmake->exe, qw[lua private.xrepo], 'export', '-y', @args, $full_spec );
+        my @cmd = $self->_argv( 'export', \@args, $full_spec );
         $self->blah("Running: @cmd");
         my ( $out, $err, $exit ) = capture { system @cmd };
         return 0 if $exit != 0;
@@ -352,9 +365,7 @@ class Alien::Xrepo v0.9.4 {
         push @extra, '-l' if $opts{list};
         push @extra, '-b', $opts{bind} if $opts{bind};
         my @args = $self->_build_args( { %opts, no_kind => 1 }, \@extra );
-        my @cmd  = ( $xmake->exe, qw[lua private.xrepo], 'env', @args );
-        push @cmd, $program if defined $program && length $program;
-        push @cmd, @{ $opts{arguments} // [] };
+        my @cmd  = $self->_argv( 'env', \@args, ( defined $program && length $program ) ? $program : (), @{ $opts{arguments} // [] } );
         say "[*] xrepo: running in package environment..." if $verbose;
         system @cmd;
     }
