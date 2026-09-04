@@ -109,7 +109,6 @@ class    #
         return unless $src->is_dir;
         my $auto = path('blib/lib/auto/share/dist')->child( $meta->name );
         ExtUtils::Install::install( { $src->stringify => $auto->stringify }, 0, 0, 0 );
-
         my $iter = $src->iterator( { recurse => 1 } );
         while ( my $s = $iter->() ) {
             next unless $s->is_file;
