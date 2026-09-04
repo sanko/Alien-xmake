@@ -7,15 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Previous dist is a good stable point but I'm making minor internal changes for `Alien::Xmake::Project`. This is probably the last bit of sugar I'll add before v1.0.0.
-
 ### Added
 
 - `Alien::Xmake::target_info( $name )` wraps the per-target detail of `xmake show -t <target>` as a hashref by default or the raw text with `plain => 1`.
 
 ### Changed
-
 - Removed the deprecated `json =E<gt> 1` option from `Alien::Xmake::show`; the upstream bare `--json` flag is deprecated in favour of `--format=json`, so callers use `format =E<gt> 'json'`.
+
+### Fixed
+- v0.9.x has had a broken install step that just plain ignored the share directory.
 
 ## [v0.9.3] - 2026-09-03
 

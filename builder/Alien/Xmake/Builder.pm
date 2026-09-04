@@ -28,7 +28,7 @@ class    #
     field $http : reader = do {
         my %headers = ( 'X-GitHub-Api-Version' => '2026-03-10', accept => 'application/vnd.github+json' );
         my $token   = $ENV{GITHUB_TOKEN} // $ENV{GH_TOKEN};
-        $headers{Authorization} = "Bearer $token" if $token && length $token;
+        $headers{Authorization} = 'Bearer ' . $token if $token && length $token;
         HTTP::Tiny->new( default_headers => \%headers, verify_SSL => 1 );
     };
     field $gh_release;          # decoded latest/pinned release hashref (lazy)
@@ -56,12 +56,12 @@ class    #
         # We must capture the current INC to ensure the builder finds itself
         # when running the generated script.
         my $inc_str = join( ' ', map {"-I$_"} @INC );
-        $self->write_file( 'Build', sprintf <<'', $^X, $inc_str, __PACKAGE__, __PACKAGE__ );
-#!%s %s
-use lib 'builder';
-use %s;
-%s->new( @ARGV && $ARGV[0] =~ /\A\w+\z/ ? ( action => shift @ARGV ) : (),
-    map { /^--/ ? ( shift(@ARGV) =~ s[^--][]r => 1 ) : /^-/ ? ( shift(@ARGV) =~ s[^-][]r => shift @ARGV ) : () } @ARGV )->Build();
+        $self->write_file( 'Build', sprintf <<~'', $^X, $inc_str, __PACKAGE__, __PACKAGE__ );
+            #!%s %s
+            use lib 'builder';
+            use %s;
+            %s->new( @ARGV && $ARGV[0] =~ /\A\w+\z/ ? ( action => shift @ARGV ) : (),
+                map { /^--/ ? ( shift(@ARGV) =~ s[^--][]r => 1 ) : /^-/ ? ( shift(@ARGV) =~ s[^-][]r => shift @ARGV ) : () } @ARGV )->Build();
 
         make_executable('Build');
         my @env = defined $ENV{PERL_MB_OPT} ? split_like_shell( $ENV{PERL_MB_OPT} ) : ();
@@ -102,6 +102,16 @@ use %s;
         say 'Installing...';
         require ExtUtils::Install;
         ExtUtils::Install::install( { 'blib/lib' => $Config{installprivlib}, 'blib/arch' => $Config{installarchlib} }, 1, 0, 0 );
+
+        # Sharedir install: ship the bundled xmake so Alien::Xmake is self-contained.
+        # The installed ConfigData->bin falls back to <inc>/auto/share/dist/Alien-Xmake/xmake.exe,
+        # so the whole share/ bundle must land there.
+        my $share_src = path('share');
+        if ( $share_src->is_dir ) {
+            my $share_dst = path( $Config{installprivlib} )->child( 'auto', 'share', 'dist', 'Alien-Xmake' );
+            $self->_copy_directory( $share_src, $share_dst );
+            say "Installed bundled xmake to $share_dst";
+        }
     }
 
     method ACTION_clean () {
@@ -311,10 +321,14 @@ use %s;
     }
 
     method _find_system_xmake ( ) {
-        my $sep = ( $^O eq 'MSWin32' ) ? ';' : ':';
+        my $sep       = ( $^O eq 'MSWin32' ) ? ';' : ':';
+        my $own_share = path('share')->absolute;
         for my $dir ( split /$sep/, $ENV{PATH} ) {
             next unless length $dir;
-            my $p    = path($dir);
+            my $p = path($dir);
+
+            # Don't treat our own share/ bundle (a future sharedir install) as a system install.
+            next if $p->absolute eq $own_share;
             my $exts = ( $^O eq 'MSWin32' ) ? [qw(.exe .cmd .bat)] : [''];
             for my $ext (@$exts) {
                 my $full = $p->child("xmake$ext");
@@ -352,18 +366,56 @@ use %s;
             use JSON::PP qw[decode_json];
             use File::Spec;
             use File::Basename qw[dirname];
+            my $DIST = 'Alien-Xmake';
 
             my $config = decode_json('%s');
 
             sub config ($s, $key //= ()) { defined $key ? $config->{$key} : $config }
             sub config_names { sort keys %%$config }
 
-            #
+            # Cribbed from File::ShareDir
             sub bin {
                 my $bin = $config->{bin};
                 return unless defined $bin;
-                return $bin if $config->{install_type} eq 'system';
-                File::Spec->rel2abs($bin, dirname(__FILE__))
+                return $bin                                     if $config->{install_type} eq 'system';
+                my $abs = File::Spec->rel2abs( $bin, dirname(__FILE__) );
+                return $config->{bin} = $abs if -e $abs;
+                return $config->{bin} = File::Spec->catfile( dist_dir(), basename($bin) );
+            }
+
+            sub firstres ( $test, @opts ) {
+                for (@opts) {
+                    my $testval = $test->();
+                    return $testval if $testval;
+                }
+                return undef;
+            }
+
+            sub dist_dir {
+                my $dir = _search_inc_path( File::Spec->catdir( 'auto', 'share', 'dist', $DIST ) ) ||
+                    _search_inc_path( File::Spec->catdir( 'auto', split( /-/, $DIST ) ) );
+                return $dir if defined $dir;
+                require Carp;
+                Carp::croak("Failed to find share dir for dist '$DIST'");
+            }
+
+            sub _search_inc_path ($path) {
+                my $dir = firstres(
+                    sub {
+                        my $d;
+                        $d = File::Spec->catdir( $_, $path ) if defined _STRING($_);
+                        defined $d and -d $d ? $d : 0;
+                    },
+                    @INC
+                    ) or
+                    return;
+                require Carp;
+                Carp::croak("Found directory '$dir', but no read permissions") unless -r $dir;
+                return $dir;
+            }
+
+            sub _STRING (@parts) {
+                ( defined $parts[0] and !ref $parts[0] and length( $parts[0] ) ) ? $parts[0] : undef;
             }
         };
         1;
