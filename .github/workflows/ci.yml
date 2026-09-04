@@ -65,9 +65,6 @@ jobs:
         curl -L https://cpanmin.us | perl - App::cpanminus
         command -v cpanm
         cpanm -v .
-        perl Build.PL
-        ./Build
-        pwsh -NoProfile -Command "./Build test --v; if (\$LASTEXITCODE) { exit \$LASTEXITCODE }"
 name: CI
 on:
   pull_request: ~

@@ -93,25 +93,40 @@ class    #
         # Alien Logic: Check or Install Xmake
         my $config_data = $self->_resolve_xmake();
 
+        # Stage the bundled xmake into the standard sharedir location so the
+        # regular install step ships it and tests find it via @INC. This is the
+        # Module::Build::Tiny 'dist_shared' model: build copies share/ into
+        # blib/lib/auto/share/dist/<Name>/ and install just moves blib/lib.
+        $self->_stage_sharedir();
+
         # Generate ConfigData.pm
         $self->_write_config_data($config_data);
         say 'Build complete';
     }
 
+    method _stage_sharedir () {
+        my $src = path('share');
+        return unless $src->is_dir;
+        my $auto = path('blib/lib/auto/share/dist')->child( $meta->name );
+        ExtUtils::Install::install( { $src->stringify => $auto->stringify }, 0, 0, 0 );
+
+        # Keep staged files writable so a later `./Build clean` can remove them.
+        # (ExtUtils::Install marks installed files read-only by default.)
+        my $iter = $auto->iterator( { recurse => 1 } );
+        while ( my $p = $iter->() ) {
+            next unless $p->is_file;
+            $p->chmod(0666);
+        }
+        say "Staged bundled xmake to $auto";
+    }
+
     method ACTION_install ( ) {
         say 'Installing...';
-        require ExtUtils::Install;
         ExtUtils::Install::install( { 'blib/lib' => $Config{installprivlib}, 'blib/arch' => $Config{installarchlib} }, 1, 0, 0 );
 
-        # Sharedir install: ship the bundled xmake so Alien::Xmake is self-contained.
-        # The installed ConfigData->bin falls back to <inc>/auto/share/dist/Alien-Xmake/xmake.exe,
-        # so the whole share/ bundle must land there.
-        my $share_src = path('share');
-        if ( $share_src->is_dir ) {
-            my $share_dst = path( $Config{installprivlib} )->child( 'auto', 'share', 'dist', 'Alien-Xmake' );
-            $self->_copy_directory( $share_src, $share_dst );
-            say "Installed bundled xmake to $share_dst";
-        }
+        # The bundled xmake was staged into blib/lib/auto/share/dist/Alien-Xmake during
+        # build, so the standard install of blib/lib above already ships it to
+        # <installprivlib>/auto/share/dist/Alien-Xmake. No extra sharedir copy needed.
     }
 
     method ACTION_clean () {
@@ -163,6 +178,7 @@ class    #
             }
             my $rel    = $p->relative($src_path);
             my $target = $dest_path->child($rel);
+            $p = $p->realpath if -l $p;
             if ( $p->is_dir ) {
                 $target->mkpath;
             }
@@ -365,7 +381,7 @@ class    #
             use v5.40;
             use JSON::PP qw[decode_json];
             use File::Spec;
-            use File::Basename qw[dirname];
+            use File::Basename qw[dirname basename];
             my $DIST = 'Alien-Xmake';
 
             my $config = decode_json('%s');
@@ -380,7 +396,9 @@ class    #
                 return $bin                                     if $config->{install_type} eq 'system';
                 my $abs = File::Spec->rel2abs( $bin, dirname(__FILE__) );
                 return $config->{bin} = $abs if -e $abs;
-                return $config->{bin} = File::Spec->catfile( dist_dir(), basename($bin) );
+                my $dist_bin = dist_dir();
+                $dist_bin = File::Spec->catdir( $dist_bin, 'bin' ) unless $^O eq 'MSWin32';
+                return $config->{bin} = File::Spec->catfile( $dist_bin, basename($bin) );
             }
 
             sub firstres ( $test, @opts ) {
