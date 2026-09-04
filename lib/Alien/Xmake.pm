@@ -1,7 +1,7 @@
 use v5.40;
 use experimental 'class';
 #
-class Alien::Xmake v0.9.3 {
+class Alien::Xmake v0.9.4 {
     use File::Spec;
     use File::Basename qw[dirname];
     use File::Temp     qw[tempdir];

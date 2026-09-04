@@ -24,7 +24,6 @@ my $macros = $xmake->macro( undef, list => 1 );
 ok defined $macros, 'macro list returns output';
 my $checks = $xmake->check( undef, list => 1 );
 ok defined $checks, 'check list returns output';
-
 subtest 'inline lua' => sub {
     my $json_ok = 0;
     for my $code ( q{print(os.host())}, q{import("core.base.json"); print(json.encode({host=os.host()}))}, ) {

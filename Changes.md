@@ -7,11 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Previous dist is a good stable point but I'm making minor internal changes for `Alien::Xmake::Project`. This is probably the last bit of sugar I'll add before v1.0.0.
+
 ### Added
 
 - `Alien::Xmake::target_info( $name )` wraps the per-target detail of `xmake show -t <target>` as a hashref by default or the raw text with `plain => 1`.
-- New `file => $path` constructor option which allows for projects whose build description lives at a non-default path.
-- `Alien::Xmake::Project`, a fluent DSL that composes an xmake project from Perl.
 
 ### Changed
 
