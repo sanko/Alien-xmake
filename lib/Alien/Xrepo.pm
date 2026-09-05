@@ -7,7 +7,7 @@ class Alien::Xrepo v0.9.5 {
     use JSON::PP;
     use Path::Tiny;
     use Config;
-    use Capture::Tiny qw[capture];
+    use Capture::Tiny qw[capture capture_merged];
     use Digest::MD5 ();
     use File::Spec;
     #
@@ -212,8 +212,8 @@ class Alien::Xrepo v0.9.5 {
         # recipe* (package() {...}) is NOT valid in that project scope -- prepending it
         # corrupts the project script and xmake dies with e.g. "unknown interface:
         # add_rules()". Package files are therefore materialized into a temporary local
-        # repository and an rc file that calls add_repositories() is emitted instead
-        # (locally-registered repos are consulted before the bundled xmake-repo).
+        # repository (registered both via an rc file and in xmake's global cache; see
+        # _recipe_override_rc) so the overridden recipe is actually resolved.
         my @rc;
         if ( my $i = $opts->{includes} ) {
             my @incs = ref $i eq 'ARRAY' ? @$i : split( /\Q$Config{path_sep}\E/, $i );
@@ -241,12 +241,14 @@ class Alien::Xrepo v0.9.5 {
     method _theme (%opts) { $opts{theme} // $theme }
 
     # Materialize vendored package recipe file(s) into a temporary local xmake repository
-    # and return an rc file that registers it call add_repositories(). xmake consults
-    # locally-registered repositories before the bundled xmake-repo, so the overridden
-    # recipe wins for the package(s) it defines. The repo lives under the OS temp dir in a
-    # subdir keyed by a hash of the concatenated recipe contents, so repeated install/fetch
-    # calls are idempotent and stale overrides are never (re)registered for a different
-    # recipe set.
+    # and return an rc file that registers it via add_repositories(). The override repo is
+    # ALSO registered in xmake's *global* repository cache (see _register_local_repo): the
+    # CLI require/fetch/install flow ignores an add_repositories() in an rc file / project
+    # scope, but it does resolve packages through the global cache, so a vendored recipe
+    # must be visible there to actually override the bundled xmake-repo's copy. The repo
+    # lives under the OS temp dir in a subdir keyed by a hash of the concatenated recipe
+    # contents, so repeated install/fetch calls are idempotent and stale overrides are
+    # never (re)registered for a different recipe set.
     method _recipe_override_rc ($recipes) {
         return unless $recipes && @$recipes;
         my $ctx = join( "\x00", map { path($_)->slurp_raw } @$recipes );
@@ -271,9 +273,42 @@ class Alien::Xrepo v0.9.5 {
 
         my $repopath = $root->absolute->stringify;
         $repopath =~ s{\\}{/}g;
+
+        # The overridden package must be resolvable by the xrepo action's own resolve
+        # phase, which reads only the *global* repository cache. Register there (and
+        # keep the rc too: some config-time flows honor it).
+        $self->_register_local_repo( $key, $repopath );
+
         my $rc = $root->child('rc.lua');
         $rc->spew(qq{add_repositories("$key", "$repopath")\n}) unless $rc->exists;
         return $rc->absolute->stringify;
+    }
+
+    # Register a local repository in xmake's global repository cache. We drive the core
+    # `repository` module through `xmake lua` rather than the `xmake repo --add
+    # --global` CLI action, whose C++ path can report success without persisting to
+    # the global cache file. The resolve phase reads that same global cache, so
+    # writing it directly is the robust, portable channel. The core module only loads
+    # in a project context, so we pass the materialized repo root (which has an
+    # xmake.lua) with `-P`. Name and URL are embedded in a per-key script file
+    # (avoids varargs and shell-hostile quoting; `capture_merged` + a plain script
+    # is the one spawn that is reliable under Capture::Tiny on Windows). The entry is
+    # keyed by the recipe content hash: re-registering the same recipe set is
+    # idempotent, and a changed recipe set adds a new, never-stale entry. (A
+    # pre-remove would be tidier, but `repository.remove` raises on a missing key and
+    # aborts the lua chunk, so we skip it: harmless residue in the global cache is
+    # preferable to a broken registration.)
+    method _register_local_repo ($name, $url) {
+        local $ENV{XMAKE_THEME} = $self->_theme;
+        die "unsafe repo name for lua embedding: $name"  if $name =~ /['"\\\n]/;
+        die "unsafe repo url for lua embedding: $url"    if $url  =~ /['"\\\n]/;
+        my $reg = path($url)->child('register.lua');
+        $reg->spew("import(\"core.package.repository\")\n"
+            . "repository.add('$name', '$url', \"master\", true)\n");
+        my @cmd = ( $xmake->exe, 'lua', '-P', $url, $reg->stringify );
+        $self->blah("Registering override repo $name => $url: @cmd");
+        capture_merged { system @cmd };
+        return;
     }
 
     # Assemble a full xrepo CLI argv. The bundled xrepo 3.1.1 option parser treats an

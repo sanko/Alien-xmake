@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `Alien::Xrepo` no longer feeds vendored *package recipes* through xrepo's `--includes` (rcfile) mechanism directly. xrepo textually prepends rcfile contents to the temp project `xmake.lua`, so a `package() {...}` recipe ran in project scope and died with e.g. `unknown interface: add_rules()`. Recipe files are now materialized into a temporary local xmake repository (keyed by a hash of their contents) and registered via an rc file that calls `add_repositories()`; genuine runtime-config rc files (`add_toolchains`, etc.) still pass through verbatim.
+- Recipe overrides previously never reached the package resolver: xrepo's require/fetch/install flow ignores an `add_repositories()` from an rc file / project scope, so the materialized override repo was never consulted and the vendored package resolved against the bundled xmake-repo (or not at all). The override repo is now ALSO registered directly in xmake's *global* repository cache (via the core `repository` module and `xmake lua -P`), which is the channel the resolver actually reads. The `xmake repo --add --global` CLI action is avoided because its C++ path can report success while failing to persist on Windows.
+- New `t/08_recipe_override_e2e.t` proves the override end-to-end: a canary package that exists in no public repository is installed purely from a vendored recipe (`install` style), and the installed artifact matches the overridden recipe.
 
 ## [v0.9.4] - 2026-09-04
 

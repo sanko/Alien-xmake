@@ -261,6 +261,11 @@ A hashref or string of package-specific configurations.
 
 A list or string of extra dependencies to include in the environment.
 
+If an include is a C<package>() {...} recipe file, it is treated as a *package override*: the recipe is placed in a
+temporary local xmake repository (keyed by a hash of its contents) that is registered in xmake's global repository
+cache, so it takes precedence over the bundled xmake-repo's copy of that package for the install/fetch it accompanies.
+Other include files (root-scope xmake config like C<add_toolchains>) are forwarded to xmake verbatim.
+
 =item B<installdir>, B<cachedir>
 
 Root directories for the installed packages and the download/build cache, applied per-call via the
