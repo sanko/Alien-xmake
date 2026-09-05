@@ -5,6 +5,8 @@ use Test2::Util::Importer 'Test2::Tools::Subtest' => ( subtest_streamed => { -as
 use Config;
 use Alien::Xrepo;
 use experimental 'class';
+use Path::Tiny;
+use File::Temp ();
 #
 my $repo = Alien::Xrepo->new( verbose => 0 );
 
@@ -65,21 +67,58 @@ subtest '_build_args includes uses the OS path separator' => sub {
     # path.joinenv -- both keyed off the platform path separator, never a comma.
     my $sep = $Config{path_sep};
 
+    # Nonexistent/plain includes pass through as absolute paths (xrepo silently
+    # drops anything that doesn't resolve, preserving the old no-op behavior).
     my @single = $repo->_build_args( { includes => 'recipe.lua' } );
     my ($flag_single) = grep {/^--includes=/} @single;
-    is $flag_single, '--includes=recipe.lua', 'scalar includes passed through verbatim';
+    is $flag_single, '--includes=' . path('recipe.lua')->absolute->stringify, 'scalar include normalized to an absolute path';
 
     my @multi = $repo->_build_args( { includes => [ 'a.lua', 'b.lua' ] } );
     my ($flag_multi) = grep {/^--includes=/} @multi;
-    is $flag_multi, "--includes=a.lua${sep}b.lua", "array includes joined with path separator ($sep)";
+    is $flag_multi, '--includes=' . join( $sep, map { path($_)->absolute->stringify } qw[a.lua b.lua] ), "array includes joined with path separator ($sep)";
     unlike $flag_multi, qr{,}, 'array includes never joined with a comma';
 
     # Paths containing the separator would split, but normal single paths are fine.
+    # (Path::Tiny normalizes backslashes to forward slashes, which xmake accepts.)
     if ( $^O eq 'MSWin32' ) {
         my @win = $repo->_build_args( { includes => 'C:\path with space\recipe.lua' } );
         my ($flag_win) = grep {/^--includes=/} @win;
-        is $flag_win, '--includes=C:\path with space\recipe.lua', 'Windows path passes through verbatim';
+        is $flag_win, '--includes=C:/path with space/recipe.lua', 'Windows path passes through (forward-slash normalized)';
     }
+};
+
+subtest 'package recipes materialize into a temporary local repository' => sub {
+
+    # A vendored *package recipe* is invalid as an xrepo rcfile (it would be
+    # prepended to the temp project xmake.lua and break root scope with
+    # "unknown interface: add_rules()"), so it must become a local repo + an
+    # rc file that registers that repo via add_repositories().
+    my $dir = File::Temp::tempdir('xrepo-incl-XXXX', CLEANUP => 1);
+    my $recipe = path($dir)->child('libsdl3_ttf.lua');
+    $recipe->spew(qq{package("libsdl3_ttf")\n    set_license("zlib")\nend\n});
+
+    my @args  = $repo->_build_args( { includes => $recipe->stringify } );
+    my ($flag) = grep {/^--includes=/} @args;
+    ok $flag, 'recipe include produced an --includes flag';
+    my ($rcpath) = $flag =~ /^--includes=(.*)$/s;
+    ok $rcpath, 'rc path extracted';
+    my $rc = path($rcpath);
+    ok $rc->is_file, 'rc file exists';
+    like $rc->slurp_raw, qr{add_repositories\("[^"]+", "[^"]+"\)}, 'rc registers the local repository';
+    my $copied = $rc->parent->child( 'packages', 'l', 'libsdl3_ttf', 'xmake.lua' );
+    ok $copied->is_file, 'recipe copied into repo packages/l/libsdl3_ttf/xmake.lua';
+
+    # The same recipe set reuses the same rc (idempotent)...
+    my @again = $repo->_build_args( { includes => $recipe->stringify } );
+    my ($flag_again) = grep {/^--includes=/} @again;
+    is $flag_again, $flag, 'same recipe materializes to the same rc';
+
+    # ...while a config rc (no package() form) is still passed through verbatim.
+    my $cfgd = path($dir)->child('cfg.lua');
+    $cfgd->spew("add_toolchains(\"clang\")\n");
+    my @cfg = $repo->_build_args( { includes => [ $recipe->stringify, $cfgd->stringify ] } );
+    my ($flag_cfg) = grep {/^--includes=/} @cfg;
+    ok index( $flag_cfg, $cfgd->absolute->stringify ) >= 0, 'config rc mixed into includes without materialization';
 };
 
 subtest '_build_args auto-confirm flags' => sub {

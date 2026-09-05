@@ -8,6 +8,8 @@ class Alien::Xrepo v0.9.4 {
     use Path::Tiny;
     use Config;
     use Capture::Tiny qw[capture];
+    use Digest::MD5 ();
+    use File::Spec;
     #
     field $verbose : param //= 0;
     field $root    : param //= undef;
@@ -203,10 +205,30 @@ class Alien::Xrepo v0.9.4 {
             }
         }
 
-        # Build Includes (deps)
+        # Build Includes. xrepo splits the `--includes` value on the OS path separator
+        # (path.splitenv) and rejoins with path.joinenv into XMAKE_RCFILES, the contents of
+        # which are textually PREPENDED to the temp project xmake.lua. True runtime-config
+        # files (root-scope DSL like add_toolchains) are forwarded verbatim; but a *package
+        # recipe* (package() {...}) is NOT valid in that project scope -- prepending it
+        # corrupts the project script and xmake dies with e.g. "unknown interface:
+        # add_rules()". Package files are therefore materialized into a temporary local
+        # repository and an rc file that calls add_repositories() is emitted instead
+        # (locally-registered repos are consulted before the bundled xmake-repo).
+        my @rc;
         if ( my $i = $opts->{includes} ) {
-            my $joined = ref $i eq 'ARRAY' ? join( $Config{path_sep}, @$i ) : $i;
-            push @args, '--includes=' . $joined;
+            my @incs = ref $i eq 'ARRAY' ? @$i : split( /\Q$Config{path_sep}\E/, $i );
+            my @recipes;
+            for my $inc (@incs) {
+                my $p = path($inc);
+                if ( $p->is_file && $p->slurp_raw =~ /^\s*package\s*\(/m ) {
+                    push @recipes, $p;
+                }
+                else {
+                    push @rc, $p->absolute->stringify;
+                }
+            }
+            push @rc, $self->_recipe_override_rc(\@recipes) if @recipes;
+            push @args, '--includes=' . join( $Config{path_sep}, @rc ) if @rc;
         }
 
         # Extra per-action flags (e.g. --json, --cflags, --ldflags)
@@ -218,16 +240,63 @@ class Alien::Xrepo v0.9.4 {
     # `theme =>` per-call, or `theme =>` to the constructor. xmake reads $ENV{XMAKE_THEME}.
     method _theme (%opts) { $opts{theme} // $theme }
 
+    # Materialize vendored package recipe file(s) into a temporary local xmake repository
+    # and return an rc file that registers it call add_repositories(). xmake consults
+    # locally-registered repositories before the bundled xmake-repo, so the overridden
+    # recipe wins for the package(s) it defines. The repo lives under the OS temp dir in a
+    # subdir keyed by a hash of the concatenated recipe contents, so repeated install/fetch
+    # calls are idempotent and stale overrides are never (re)registered for a different
+    # recipe set.
+    method _recipe_override_rc ($recipes) {
+        return unless $recipes && @$recipes;
+        my $ctx = join( "\x00", map { path($_)->slurp_raw } @$recipes );
+        my $key = substr( Digest::MD5::md5_hex($ctx), 0, 12 );
+        my $root = path( File::Spec->tmpdir, 'xrepo-local-repos', $key );
+
+        for my $recipe (@$recipes) {
+            $recipe = path($recipe);
+            my @pkgs = $recipe->slurp_raw =~ /^\s*package\s*\(\s*["']([^"']+)["']/mg;
+            @pkgs = ( $recipe->basename(qr/\.lua$/i) ) unless @pkgs;
+            for my $pkg (@pkgs) {
+                my $dest = $root->child( 'packages', substr( $pkg, 0, 1 ), $pkg, 'xmake.lua' );
+                $dest->parent->mkpath;
+                $recipe->copy($dest);
+            }
+        }
+
+        my $repoxm = $root->child('xmake.lua');
+        unless ( $repoxm->exists ) {
+            $repoxm->spew("set_project(\"xrepo-local-repos\")\nadd_rules(\"mode.release\", \"mode.debug\")\n");
+        }
+
+        my $repopath = $root->absolute->stringify;
+        $repopath =~ s{\\}{/}g;
+        my $rc = $root->child('rc.lua');
+        $rc->spew(qq{add_repositories("$key", "$repopath")\n}) unless $rc->exists;
+        return $rc->absolute->stringify;
+    }
+
+    # Assemble a full xrepo CLI argv. The bundled xrepo 3.1.1 option parser treats an
+    # option that follows the first positional package as another package name
+    # (`xrepo install libsdl3_ttf --includes=X` leaks '--includes=X' into the package
+    # list), so the package spec MUST be the trailing arguments. Every xrepo invocation
+    # is routed through this helper to keep the flags-before-spec ordering invariant.
     method _argv ( $action, $flags, @spec ) {
         @spec = grep { defined } @spec;
         return ( $xmake->exe, qw[lua private.xrepo], $action, @$flags, @spec );
     }
+
+    # Actions that mutate the package store auto-confirm (-y) unless the caller
+    # explicitly opts out. The constructor's `yes =>` (or a per-call `yes =>` /
+    # `confirm =>`) is honored by _build_args; this covers the "caller said nothing"
+    # case so a captured install never hangs on an interactive prompt.
     method _confirm_args ($opts) {
         return ( '-y' ) if !$yes
             && !exists $opts->{yes}
             && !( defined $opts->{confirm} && length $opts->{confirm} );
         return ();
     }
+
     # Run `xrepo fetch` and return a parsed PackageInfo (or raw flags).
     method fetch ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
