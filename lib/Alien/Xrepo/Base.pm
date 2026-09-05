@@ -1,7 +1,7 @@
 use v5.40;
 use experimental 'class';
 #
-class Alien::Xrepo::Base v0.9.4 {
+class Alien::Xrepo::Base v0.9.5 {
     use Alien::Xrepo;
     use Path::Tiny;
     use Exporter qw[import];
@@ -30,6 +30,7 @@ class Alien::Xrepo::Base v0.9.4 {
                 for my $name (@names) {
                     my $c = $config_class->package($name);
                     if ($c) {
+                        next if exists $c->{error};
                         $infos->{$name} = Alien::Xrepo::PackageInfo->new(%$c);
                     }
                 }
@@ -167,7 +168,7 @@ class Alien::Xrepo::Base v0.9.4 {
         Alien::Xrepo::Base::Builder->new( alien_class => $alien_class, action => $action, argv => \@ARGV )->execute();
     }
     class    #
-        Alien::Xrepo::Base::Builder v0.9.4 {
+        Alien::Xrepo::Base::Builder v0.9.5 {
         use CPAN::Meta;
         use ExtUtils::Install qw[install];
         use ExtUtils::InstallPaths;
@@ -311,7 +312,18 @@ class Alien::Xrepo::Base v0.9.4 {
             my %out;
             for my $pkg (@pkgs) {
                 say "Installing $pkg (and its dependencies) into global cache...";
-                my $info = $repo->install( $pkg, undef, %opts );
+
+                # Wrap each install in try/catch so a failure records an error
+                # in ConfigData and lets remaining packages proceed.
+                my $info;
+                try {
+                    $info = $repo->install( $pkg, undef, %opts );
+                }
+                catch ($e) {
+                    warn "[!] $pkg failed to install: $e\n";
+                    $out{$pkg} = { error => "$e" };
+                    next;
+                }
 
                 # 2. Extract just the target package into the Alien's distribution share_dir
                 my $pkg_share = $share_dir->child($pkg);
@@ -411,7 +423,7 @@ class Alien::Xrepo::Base v0.9.4 {
         }
         };
     class    #
-        Alien::Xrepo::Base::Alt v0.9.4 {
+        Alien::Xrepo::Base::Alt v0.9.5 {
         field $base : param;
         field $pkg  : param;
         method package_names ()      { $base->package_names }

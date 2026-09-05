@@ -5,6 +5,12 @@ All notable changes to Alien::Xmake will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `Alien::Xrepo` no longer feeds vendored *package recipes* through xrepo's `--includes` (rcfile) mechanism directly. xrepo textually prepends rcfile contents to the temp project `xmake.lua`, so a `package() {...}` recipe ran in project scope and died with e.g. `unknown interface: add_rules()`. Recipe files are now materialized into a temporary local xmake repository (keyed by a hash of their contents) and registered via an rc file that calls `add_repositories()`; genuine runtime-config rc files (`add_toolchains`, etc.) still pass through verbatim.
+
 ## [v0.9.4] - 2026-09-04
 
 ### Added
