@@ -1,7 +1,7 @@
 use v5.40;
 use experimental 'class';
 #
-class Alien::Xrepo::Base v0.9.4 {
+class Alien::Xrepo::Base v0.9.5 {
     use Alien::Xrepo;
     use Path::Tiny;
     use Exporter qw[import];
@@ -168,7 +168,7 @@ class Alien::Xrepo::Base v0.9.4 {
         Alien::Xrepo::Base::Builder->new( alien_class => $alien_class, action => $action, argv => \@ARGV )->execute();
     }
     class    #
-        Alien::Xrepo::Base::Builder v0.9.4 {
+        Alien::Xrepo::Base::Builder v0.9.5 {
         use CPAN::Meta;
         use ExtUtils::Install qw[install];
         use ExtUtils::InstallPaths;
@@ -423,7 +423,7 @@ class Alien::Xrepo::Base v0.9.4 {
         }
         };
     class    #
-        Alien::Xrepo::Base::Alt v0.9.4 {
+        Alien::Xrepo::Base::Alt v0.9.5 {
         field $base : param;
         field $pkg  : param;
         method package_names ()      { $base->package_names }
