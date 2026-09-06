@@ -5,6 +5,8 @@ no warnings 'experimental::class';
 class Alien::Xrepo v0.9.5 {
     use Alien::Xmake;
     use JSON::PP;
+    use Digest::SHA qw[sha1_hex];
+    use File::Copy  qw[move];
     use Path::Tiny;
     use Config;
     use Capture::Tiny qw[capture capture_merged];
@@ -23,6 +25,12 @@ class Alien::Xrepo v0.9.5 {
     # Default package kind (-k) for every action; a per-call `kind` wins. Undef (the default)
     # omits -k so installs match a bare `xrepo` command, matching cd52e9b behavior.
     field $kind : param //= ();
+
+    # Warm-start resolution cache. install() memorizes a successful fetch result under this
+    # instance's store so a repeat launch skips xrepo entirely. Entries are LRU-bounded and a
+    # hit is only trusted while its recorded install dir still exists. Pass cache => 0 to
+    # disable (pure fetch-first behavior, one spawn per launch).
+    field $cache : param //= 1;
 
     # Resolve which package store a call should operate on. A per-call `installdir` wins, then the
     # `root` handed to the constructor, then whatever xrepo/the environment chooses (global store).
@@ -85,38 +93,194 @@ class Alien::Xrepo v0.9.5 {
                 kind        => $kind
             }
         }
-        }
-        #
-        method install ( $pkg_spec, $version //= (), %opts ) {
+    };
+    #
+    method install ( $pkg_spec, $version //= (), %opts ) {
         my $full_spec = defined $version && length $version ? "$pkg_spec $version" : $pkg_spec;
         local $ENV{XMAKE_THEME}          = $self->_theme(%opts);
         local $ENV{XMAKE_PKG_INSTALLDIR} = $self->_store_dir(%opts) if defined $self->_store_dir(%opts);
         local $ENV{XMAKE_PKG_CACHEDIR}   = $opts{cachedir}          if defined $opts{cachedir};
 
-        # Build common arguments for both install and fetch. The mutating install gets
-        # an implicit -y unless the caller opted out; fetch is query-only, so no confirm.
+        # Common arguments for install and fetch. The mutating install gets an implicit -y
+        # unless the caller opted out; fetch is query-only, so no confirm.
         my @args = ( $self->_confirm_args( \%opts ), $self->_build_args( \%opts ) );
         say "[*] xrepo: ensuring $full_spec is installed..." if $verbose;
 
-        # Install (flags precede the package spec -- see _argv)
+        # Warm path: a prior successful install+fetch is replayed straight from disk, so a
+        # repeat launch (eg/webui.pl) skips xrepo entirely. The LRU is validated against the
+        # recorded install dir before an entry is trusted.
+        my $use_cache = defined $opts{cache} ? $opts{cache}                                                    : $cache;
+        my $key       = $use_cache           ? $self->_cache_key( $full_spec, \%opts )                         : undef;
+        my $meta      = $use_cache           ? ( $self->_cache_load(%opts) || { order => [], entries => {} } ) : undef;
+        if ( $meta && defined $key ) {
+            if ( my $hit = $self->_cache_get( $key, $meta ) ) {
+                my $info = eval { $self->_process_info( decode_json( $hit->{json} ) ) };
+                if ( ref $info ) {
+                    $self->_cache_save( $meta, %opts );
+                    return $info;
+                }
+            }
+        }
+
+        # Fetch-first: an already-installed package answers with real paths immediately, so the
+        # mutating install is skipped (and the result is memorized for next launch).
+        my ( $data, $err ) = $self->_try_fetch( $full_spec, \%opts );
+        if ( defined $data && $self->_info_installed($data) ) {
+            say "[*] xrepo: $full_spec already installed, reusing fetch result..." if $verbose;
+            if ( $meta && defined $key ) {
+                $self->_cache_put( $key, $meta, $self->_cache_entry($data) );
+                $self->_cache_save( $meta, %opts );
+            }
+            return $self->_process_info($data);
+        }
+
+        # Cold path: install, then fetch (which must succeed, since it tells us where things land).
         my @install_cmd = $self->_argv( 'install', \@args, $full_spec );
         $self->_debug_cmd(@install_cmd);
         $self->blah("Running: @install_cmd");
         system(@install_cmd) == 0 or die "xrepo install failed for $full_spec";
+        say "[*] xrepo: fetching paths..." if $verbose;
+        my $fresh = $self->_require_fetch( $full_spec, \%opts, $err );
+        if ( $meta && defined $key ) {
+            $self->_cache_put( $key, $meta, $self->_cache_entry($fresh) );
+            $self->_cache_save( $meta, %opts );
+        }
+        $self->_process_info($fresh);
+    }
 
-        # Fetch (must use same args to get correct paths for arch/mode)
-        warn "[*] xrepo: fetching paths...\n" if $verbose;
-        my @fetch_args = $self->_build_args( \%opts );
+    # --- install-result cache -------------------------------------------------
+    # LRU cap on cached resolutions. Entries are just the fetch JSON plus its install dir, so
+    # the bound keeps the file a few hundred KB even after a long debugging session.
+    sub _CACHE_MAX () {64}
+
+    # Where the resolution cache lives: alongside the caller's/instance's store when one is set,
+    # else the xmake global dir (~/.xmake) that xrepo itself uses for the default per-user store.
+    method _cache_dir (%opts) {
+        my $store = $self->_store_dir(%opts);
+        return path($store)->child('.alien-xmake') if defined $store && length $store;
+        my $home = $ENV{XMAKE_GLOBALDIR};
+        $home //= $ENV{HOME};
+        if ( !defined $home || !length $home ) {
+            $home = $^O eq 'MSWin32' ? "$ENV{HOMEDRIVE}$ENV{HOMEPATH}" : ();
+        }
+        return () if !defined $home || !length $home;
+        path($home)->child( '.xmake', '.alien-xmake' );
+    }
+
+    # Cache identity: everything that can move the installed layout. configs values run through
+    # the same boolean stringifier as the CLI, so built-in true/false produce a stable key.
+    method _cache_key ( $full_spec, $opts ) {
+        my @parts = ( $full_spec, $opts->{kind} // '', $opts->{plat} // '', $opts->{arch} // '', $opts->{mode} // '' );
+        if ( my $c = $opts->{configs} ) {
+            my $str = ref $c eq 'HASH' ? join( ',', map { "$_=" . Alien::Xmake::_bool_str( $c->{$_} ) } sort keys %$c ) : "$c";
+            push @parts, $str;
+        }
+        sha1_hex( join( "\0", @parts ) );
+    }
+
+    method _cache_load (%opts) {
+        my $dir  = $self->_cache_dir(%opts) or return ();
+        my $file = $dir->child('cache.json');
+        return () unless -f $file;
+        my $raw = eval { $file->slurp_utf8 };
+        return () unless defined $raw && length $raw;
+        my $meta = eval { decode_json($raw) };
+        return () unless ref $meta eq 'HASH' && ref $meta->{order} eq 'ARRAY' && ref $meta->{entries} eq 'HASH';
+        $meta;
+    }
+
+    method _cache_save ( $meta, %opts ) {
+        my $dir = $self->_cache_dir(%opts) or return;
+        my ( @order, %keep );
+        for my $k ( @{ $meta->{order} // [] } ) {
+            my $e = $meta->{entries}{$k} or next;
+            next unless $self->_entry_alive($e);
+            push @order, $k;
+            $keep{$k} = $e;
+        }
+        while ( @order > _CACHE_MAX() ) { delete $keep{ pop @order }; }
+        $dir->mkpath;
+        my $file = $dir->child('cache.json');
+        my $tmp  = $dir->child('cache.json.tmp');
+        $tmp->spew_utf8( encode_json( { version => 1, order => \@order, entries => \%keep } ) );
+        move( "$tmp", "$file" );
+    }
+
+    # A cached entry is trustworthy only while its recorded install dir (or first lib) still
+    # exists; uninstalled packages disqualify themselves and are pruned on the next save.
+    method _entry_alive ($e) {
+        return () unless ref $e eq 'HASH';
+        if ( defined $e->{installdir} && length $e->{installdir} ) { return 1 if -d $e->{installdir}; }
+        if ( defined $e->{libpath}    && length $e->{libpath} )    { return 1 if -f $e->{libpath}; }
+        ();
+    }
+
+    method _cache_get ( $key, $meta ) {
+        my $e = $meta->{entries}{$key} or return ();
+        return () unless $self->_entry_alive($e);
+        $e->{last_used} = time;
+        $meta->{order}  = [ $key, grep { $_ ne $key } @{ $meta->{order} } ];
+        $e;
+    }
+
+    method _cache_put ( $key, $meta, $entry, $max //= _CACHE_MAX() ) {
+        $meta->{entries}{$key} = $entry;
+        $meta->{order} = [ $key, grep { $_ ne $key } @{ $meta->{order} } ];
+        while ( @{ $meta->{order} } > $max ) {
+            delete $meta->{entries}{ pop @{ $meta->{order} } };
+        }
+        $meta;
+    }
+
+    method _cache_entry ($data) {
+        my $info  = ref $data eq 'ARRAY' ? $data->[0] : $data;
+        my %entry = ( json => encode_json($data), last_used => time );
+        if ( ref $info eq 'HASH' ) {
+            my $art = $info->{artifacts};
+            if    ( ref $art eq 'HASH' && defined $art->{installdir} ) { $entry{installdir} = $art->{installdir}; }
+            elsif ( defined $info->{installdir} )                      { $entry{installdir} = $info->{installdir}; }
+            if    ( @{ $info->{libfiles} // [] } )                     { $entry{libpath}    = $info->{libfiles}[0]; }
+        }
+        \%entry;
+    }
+
+    # Query-only fetch that reports failure instead of dying, so install() can first probe
+    # whether a package is already installed. Returns ( $data, $errmsg ); $data is undef on any
+    # failure (bad exit, no JSON, undecodable chatter) and the message is passed to the caller.
+    method _try_fetch ( $full_spec, $opts ) {
+        my @fetch_args = $self->_build_args($opts);
         my @fetch_cmd  = $self->_argv( 'fetch', [ '--json', @fetch_args ], $full_spec );
         $self->_debug_cmd(@fetch_cmd);
         $self->blah("Running: @fetch_cmd");
-        my ( $json_out, $json_err, $json_exit ) = capture { system @fetch_cmd };
-        die "xrepo fetch failed:\nCommand: @fetch_cmd\nError:\n$json_err" if $json_exit != 0;
-        $self->blah("Raw fetch output:\n$json_out");
-        my $data = $self->_decode_json_output($json_out);
+        my ( $out, $err, $exit ) = capture { system @fetch_cmd };
+        return ( undef, "Command: @fetch_cmd\nError:\n$err" ) if $exit != 0;
+        return ( undef, "Command: @fetch_cmd\nNo JSON output" ) unless defined $out && length $out;
+        my $data = eval { $self->_decode_json_output($out) };
+        return ( undef, "Command: @fetch_cmd\n$@" ) if !defined $data;
+        ( $data, undef );
+    }
 
-        # xrepo might return a single object or a list.
-        $self->_process_info( ( ref $data eq 'ARRAY' ) ? $data->[0] : $data );
+    # Mandatory fetch: after an install we have to know where the output landed, so a failure
+    # here is fatal. $why carries the earlier probe error so the die explains which attempt failed.
+    method _require_fetch ( $full_spec, $opts, $why //= () ) {
+        my ( $data, $err ) = $self->_try_fetch( $full_spec, $opts );
+        unless ( defined $data ) {
+            die "xrepo fetch failed:\n$err\n" . ( defined $why && length $why ? "\n(an earlier fetch probe also failed:\n$why)" : () );
+        }
+        $data;
+    }
+
+    # Verify a fetched record corresponds to files that actually exist on disk; xrepo fetch of a
+    # not-yet-installed package can still exit 0 with an empty/speculative record.
+    method _info_installed ($data) {
+        my $info = ref $data eq 'ARRAY' ? $data->[0] : $data;
+        return () unless ref $info eq 'HASH';
+        my $art        = $info->{artifacts};
+        my $installdir = ref $art eq 'HASH' && defined $art->{installdir} ? $art->{installdir} : $info->{installdir};
+        return 1 if defined $installdir && -d $installdir;
+        for my $f ( @{ $info->{libfiles} // [] } ) { return 1 if -f $f; }
+        for my $d ( @{ $info->{bindirs}  // [] } ) { return 1 if -d $d; }
+        ();
     }
 
     method uninstall ( $pkg_spec, %opts ) {
@@ -147,7 +311,7 @@ class Alien::Xrepo v0.9.5 {
         my @cmd = $self->_argv( 'clean', ['-y'] );
         system @cmd;
     }
-    #
+
     method add_repo ( $name, $url, $branch //= () ) {
         local $ENV{XMAKE_THEME} = $self->_theme;
         say "[*] xrepo: adding repo $name..." if $verbose;
@@ -215,7 +379,7 @@ class Alien::Xrepo v0.9.5 {
         # Complex configs (passed as --configs='key=val,key2=val2')
         if ( my $c = $opts->{configs} ) {
             if ( ref $c eq 'HASH' ) {
-                my $str = join( ',', map {"$_=$c->{$_}"} sort keys %$c );
+                my $str = join( ',', map { "$_=" . Alien::Xmake::_bool_str( $c->{$_} ) } sort keys %$c );
                 push @args, "--configs=$str";
             }
             else {
@@ -458,13 +622,15 @@ class Alien::Xrepo v0.9.5 {
     }
 
     method _process_info ($info) {
-        return () unless defined $info;
+        $info = $info->[0] if ref $info eq 'ARRAY';
+        return () unless ref $info eq 'HASH';
         my $libfiles   = $info->{libfiles}    // [];
         my $incdirs    = $info->{includedirs} // [];
         my $linkdirs   = $info->{linkdirs}    // [];
         my $bindirs    = $info->{bindirs}     // [];
         my $installdir = $info->{artifacts}{installdir};
         my $kind       = $info->{kind};
+
         if ( !defined $installdir ) {
             my ( $probe, $depth );
             if    (@$libfiles) { ( $probe, $depth ) = ( $libfiles->[0], 2 ); }

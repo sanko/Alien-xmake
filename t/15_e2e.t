@@ -6,7 +6,6 @@ use Test::Alien::Build qw(alienfile_ok alien_build_ok alien_install_type_is);
 use Test::Alien        qw(alien_ok ffi_ok with_subtest);
 use Path::Tiny;
 use File::Spec;
-use Carp::Always;
 
 # Alien::Build unshifts bin_dir / pkg_config entries into tied @PATH /
 # @PKG_CONFIG_PATH for every hook; under `-w`/PERL5OPT=-w an undefined variable

@@ -103,6 +103,7 @@ use %s;
         # Generate ConfigData.pm
         $self->_write_config_data($config_data);
         say 'Build complete' if $verbose;
+        true;
     }
 
     method _stage_sharedir () {
@@ -135,6 +136,7 @@ use %s;
         );
 
         # XXX: Should I bother with the $install_results{install_fail}?
+        true;
     }
 
     method ACTION_clean () {
@@ -144,6 +146,7 @@ use %s;
         path('config.log')->remove;
         path('Build')->remove;
         path('_build_params')->remove;
+        true;
     }
 
     method ACTION_test ( ) {
@@ -151,7 +154,8 @@ use %s;
         say 'Running tests...' if $verbose;
         require Test::Harness;
         my @tests = glob('t/*.t');
-        Test::Harness::runtests(@tests) if @tests;
+        return Test::Harness::runtests(@tests) if @tests;
+        true;
     }
 
     method _copy_libs ( ) {
@@ -542,7 +546,7 @@ use %s;
             say "Configuring with make=$make_cmd..." if $verbose;
             system( './configure', "--make=$make_cmd" ) == 0 or die 'Configure failed';
             system( $make_cmd,     '-j4' ) == 0              or die 'Make failed';
-            say "Installing to $installdir...";
+            say "Installing to $installdir..." if $verbose;
             system( $make_cmd, 'install', "PREFIX=$installdir" ) == 0 or die 'Install failed';
         }
         else {

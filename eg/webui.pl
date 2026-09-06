@@ -1,4 +1,5 @@
 use v5.40;
+use blib;
 use feature 'class';
 no warnings 'experimental::class';
 
@@ -17,8 +18,15 @@ no warnings 'experimental::class';
 #
 use Alien::Xrepo;
 my $repo = Alien::Xrepo->new( verbose => 0 );
-$repo->update_repo;
-my $webui = $repo->install('webui');
+
+#~ $repo->update_repo;
+my $webui = $repo->install(
+    'webui', undef,
+    #
+    kind => 'shared'
+
+    #~ configs => { shared => true } # This would also work
+);
 
 # A tiny OO wrapper around the WebUI C API used here.
 # The affix declarations mirror include/webui.h from the installed package.

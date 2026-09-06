@@ -13,6 +13,7 @@ class Alien::Xrepo::Build v0.9.5 {
     field $recipe       : param;               # Recipe object (or path/dir, normalized in ADJUST)
     field $root         : param //= undef;     # xrepo store root (XMAKE_PKG_INSTALLDIR)
     field $verbose      : param //= 0;
+    field $cache        : param //= 1;         # forward the engine's warm-start cache to Alien::Xrepo
     field $repo         : param //= undef;     # injectable engine (spy-able)
     field $checkpoint   : param //= undef;     # state file path; enables resume
     field $snapshot     : param //= undef;     # write gathered runtime data as JSON here
@@ -37,7 +38,7 @@ class Alien::Xrepo::Build v0.9.5 {
             $recipe = Alien::Xrepo::Build::Recipe->new( defined $recipe && -d $recipe ? ( dir => $recipe ) : ( file => $recipe ), );
         }
         die "probe_policy must be skip|always|off" unless $probe_policy =~ /^(?:skip|always|off)$/;
-        $r = $repo // Alien::Xrepo->new( root => $root, verbose => $verbose );
+        $r = $repo // Alien::Xrepo->new( root => $root, verbose => $verbose, cache => $cache );
         if ($resume) {
             $self->_load_checkpoint;
             $self->configure( resume => 1 ) unless $stage_done->{configure};

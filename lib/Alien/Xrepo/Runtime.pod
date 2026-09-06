@@ -98,6 +98,7 @@ Package metadata and a whitespace flag-splitter (Windows-safe).
         install_opts => { kind => 'shared' },    # ambient flags under every package
         root         => $store_root,
         repo         => $alien_xrepo,            # injectable engine
+        cache        => 0,                       # bypass Alien::Xrepo's warm-start cache
         snapshot     => $file,                   # hermetic data; wins over dynamic fetch
         autodetect_snapshot => 1,                # look in the installed dist share dir
         verbose      => 1,
@@ -105,6 +106,10 @@ Package metadata and a whitespace flag-splitter (Windows-safe).
 
 Subclasses may also declare C<pkg_name> and C<install_opts> as methods, which the constructor honors when no
 constructor argument is supplied.
+
+B<cache> (default 1) is forwarded to the engine created by this class, so C<cache =E<gt> 0> disables
+L<Alien::Xrepo|/CACHE>'s on-disk resolution cache for a fully live, one-spawn-per-package consumer. When
+C<repo =E<gt> ...> injects an engine, that engine's own cache setting is used instead.
 
 =head1 SEE ALSO
 

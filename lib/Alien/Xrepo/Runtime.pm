@@ -27,6 +27,7 @@ class Alien::Xrepo::Runtime v0.9.5 {
     field $snapshot     : param //= undef;  # path to a snapshot JSON (hermetic mode)
     field $autodetect_snapshot : param //= 1;  # look for dist auto/share snapshots
     field $install_opts : param = {};       # ambient profile merged under every package def
+    field $cache        : param //= 1;      # forward the engine's warm-start cache to Alien::Xrepo
     #
     field $recipe_obj = undef;              # resolved Alien::Xrepo::Build::Recipe
     field $infos  = {};                     # package => Alien::Xrepo::PackageInfo
@@ -42,7 +43,7 @@ class Alien::Xrepo::Runtime v0.9.5 {
         if ( !keys %$install_opts && $self->can('install_opts') ) {
             $install_opts = { $self->install_opts };
         }
-        $r = $repo // Alien::Xrepo->new( root => $root, verbose => $verbose );
+        $r = $repo // Alien::Xrepo->new( root => $root, verbose => $verbose, cache => $cache );
         if ( defined $recipe ) {
             $recipe_obj = ref $recipe
                 ? $recipe

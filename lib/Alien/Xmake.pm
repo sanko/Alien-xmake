@@ -1,5 +1,7 @@
 use v5.40;
 use experimental 'class';
+use builtin 'is_bool';
+no warnings 'experimental::builtin';
 #
 class Alien::Xmake v0.9.5 {
     use File::Spec;
@@ -153,7 +155,18 @@ class Alien::Xmake v0.9.5 {
     # Format a scalar or arrayref as a comma/separator joined flag value.
     method _join ( $value, $sep //= ',' ) {
         return () unless defined $value;
-        ref $value eq 'ARRAY' ? join( $sep, @$value ) : $value;
+        ref $value eq 'ARRAY' ? join( $sep, map { _bool_str($_) } @$value ) : _bool_str($value);
+    }
+
+    # Map a Perl built-in boolean scalar (`use feature 'true'/'false'`, enabled by `use v5.36+`)
+    # to the literal string xmake/xrepo expect. Ordinary stringification renders them as 1 / "",
+    # which gets misread downstream, so genuine built-in booleans become 'true'/'false'; every
+    # other value (IVs, strings, references) passes through untouched.
+    sub _bool_str ($value) {
+        if ( is_bool($value) ) {
+            return $value ? 'true' : 'false';
+        }
+        return $value;
     }
 
     # Generic escape hatch: run any task/plugin by name.

@@ -88,6 +88,7 @@ C<local_repos>, C<hooks> and C<name> are the remaining top-level keys.
         recipe       => $path_or_recipe,   # xrepo.json path/dir or a Recipe object
         root         => $store_root,       # XMAKE_PKG_INSTALLDIR
         repo         => $alien_xrepo,      # injectable engine
+        cache        => 0,                 # bypass Alien::Xrepo's warm-start cache
         verbose      => true,
         checkpoint   => $state_file,       # enables resume
         snapshot     => $snapshot_file,    # write runtime data here during export
@@ -95,6 +96,9 @@ C<local_repos>, C<hooks> and C<name> are the remaining top-level keys.
         probe_policy => 'skip',            # skip|always|off
         resume       => true               # load checkpoint on construction
     );
+
+B<cache> (default 1) is forwarded to the engine this class creates, so C<cache =E<gt> 0> disables the on-disk
+resolution cache (see L<Alien::Xrepo|/CACHE>); an injected C<repo =E<gt> ...> keeps its own cache setting.
 
 =head2 C<run( %opts )>
 

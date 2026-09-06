@@ -325,7 +325,7 @@ package Alien::Build::Plugin::Build::Xrepo v0.9.5 {
             my @with;
             for my $k (@kids) {
                 next unless $k->is_dir;
-                next unless $k->basename =~ /^(?:include|lib)$/;
+                next unless $k->basename =~ /^(?:include|lib|bin)$/;
                 next unless _has_entries($k);
                 push @with, $k;
             }

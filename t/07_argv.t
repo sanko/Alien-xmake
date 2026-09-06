@@ -57,6 +57,25 @@ subtest '_argv prefix and flags-before-spec invariant' => sub {
     my @argv = $repo->_argv( 'install', ['-y'], 'libsdl3_ttf >=3.2.2' );
     is $argv[-1], 'libsdl3_ttf >=3.2.2', 'versioned spec is a single trailing element';
 };
+subtest '_build_args configs boolean rendering' => sub {
+
+    # A Perl built-in boolean (use feature 'true'/'false' via use v5.40) must render as the
+    # literal string 'true'/'false' that xrepo expects, never as 1 / "".
+    my @bool = $repo->_build_args( { configs => { shared => true } } );
+    my ($flag_bool) = grep {/^--configs=/} @bool;
+    is $flag_bool, '--configs=shared=true', 'built-in true renders as --configs=shared=true';
+    my @boolf = $repo->_build_args( { configs => { shared => false } } );
+    my ($flag_boolf) = grep {/^--configs=/} @boolf;
+    is $flag_boolf, '--configs=shared=false', 'built-in false renders as --configs=shared=false';
+    my @mixed = $repo->_build_args( { configs => { shared => true, vs_runtime => 'MD' } } );
+    my ($flag_mixed) = grep {/^--configs=/} @mixed;
+    is $flag_mixed, '--configs=shared=true,vs_runtime=MD', 'booleans and strings mix in key order';
+
+    # Plain numbers / strings are historical behavior: values pass through untouched.
+    my @vec = $repo->_build_args( { configs => { legacy => 1, mode => 'debug' } } );
+    my ($flag_vec) = grep {/^--configs=/} @vec;
+    is $flag_vec, '--configs=legacy=1,mode=debug', 'non-boolean config values pass through unchanged';
+};
 subtest '_build_args includes uses the OS path separator' => sub {
 
     # xrepo's install.lua splits `--includes` with path.splitenv and rejoins with
