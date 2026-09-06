@@ -51,7 +51,7 @@ class    #
     }
 
     method Build_PL() {
-        say "Pure perl Alien? Ha! You wish." if $pureperl;
+        say 'Pure perl Alien? Ha! You wish.' if $pureperl;
         say sprintf 'Creating new Build script for %s %s', $meta->name, $meta->version;
 
         # We must capture the current INC to ensure the builder finds itself
@@ -340,7 +340,7 @@ use %s;
 
             # Don't treat our own share/ bundle (a future sharedir install) as a system install.
             next if $p->absolute eq $own_share;
-            my $exts = ( $^O eq 'MSWin32' ) ? [qw(.exe .cmd .bat)] : [''];
+            my $exts = ( $^O eq 'MSWin32' ) ? [qw[.exe .cmd .bat]] : [''];
             for my $ext (@$exts) {
                 my $full = $p->child("xmake$ext");
                 return $full if -x $full;
@@ -456,9 +456,7 @@ use %s;
         my $asset   = $self->_find_asset(qr/\Q$filename\E\z/i);
         my $url     = $asset ? $asset->{browser_download_url} : "https://github.com/$owner/$repo/releases/download/$target/$filename";
         my $outfile = $temppath->child('xmake-installer.exe');
-        if ( !$self->_download_file( $url, $outfile ) ) {
-            die "Download failed for $url";
-        }
+        die 'Download failed for ' . $url unless $self->_download_file( $url, $outfile );
         $self->_verify_download( $outfile, $asset );
         my $install_str = $installdir->stringify;
         $install_str =~ s{/}{\\}g;
@@ -561,7 +559,7 @@ use %s;
             say 'Downloading with HTTP::Tiny...' if $verbose;
             CORE::state $http //= HTTP::Tiny->new( verify_SSL => 1 );
             my $res = $http->mirror( $url, $dest_str );
-            return                                                 if $res->{success};
+            return 1                                               if $res->{success};
             say "HTTP::Tiny failed: $res->{status} $res->{reason}" if $verbose;
         }
         catch ($e) {
