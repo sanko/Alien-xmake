@@ -7,7 +7,6 @@ my $alien = Alien::Zstandard->new;
 
 # Runtime resolution is lazy: a build-served snapshot or an xrepo store hit
 # settles the package on demand; otherwise ffi_lib stays undef.
-
 # Initialize Platypus using api version 2
 my $lib_path = $alien->ffi_lib;
 die "Could not find Zstd library path" unless $lib_path;

@@ -8,8 +8,7 @@ Alien::Xrepo::Build - alienfile-shaped build engine where every stage is xrepo
 
 =head1 SYNOPSIS
 
-A distribution ships a declarative recipe (C<xrepo.json>) and lets the engine
-drive installs through xrepo:
+A distribution ships a declarative recipe (C<xrepo.json>) and lets the engine drive installs through xrepo:
 
     {
        "name" : "Alien-Zstandard",
@@ -26,11 +25,10 @@ drive installs through xrepo:
 
 =head1 DESCRIPTION
 
-C<Alien::Xrepo::Build> is a build engine in the spirit of L<Alien::Build>: a
-stage pipeline with hooks and three property buckets, all serialized as plain
-JSON. Unlike alienfile, there are no download/extract/compile stages of our own
--- xrepo (via L<Alien::Xrepo>) is the performant docker/kbuild behind every step.
-What remains is the essential orchestration an xrepo wrapper is missing:
+C<Alien::Xrepo::Build> is a build engine in the spirit of L<Alien::Build>: a stage pipeline with hooks and three
+property buckets, all serialized as plain JSON. Unlike alienfile, there are no download/extract/compile stages of our
+own -- xrepo (via L<Alien::Xrepo>) is the performant docker/kbuild behind every step. What remains is the essential
+orchestration an xrepo wrapper is missing:
 
 =over
 
@@ -48,9 +46,8 @@ What remains is the essential orchestration an xrepo wrapper is missing:
 
 =head2 Pipeline stages
 
-The pipeline runs C<configure>, C<probe>, C<install>, C<gather>, C<export>,
-C<test> in order. Each stage method is idempotent per run (a checkpointed stage is
-skipped). Hooks run immediately before their stage body:
+The pipeline runs C<configure>, C<probe>, C<install>, C<gather>, C<export>, C<test> in order. Each stage method is
+idempotent per run (a checkpointed stage is skipped). Hooks run immediately before their stage body:
 
     $build->register_hook( install => sub ($build) { ... } );
 
@@ -70,8 +67,8 @@ The three buckets mirror L<Alien::Build>'s meta/install/runtime split:
 
 =head2 The recipe
 
-C<xrepo.json> is loaded and validated by L<Alien::Xrepo::Build::Recipe>. Its
-C<packages> array mirrors an L<Alien::Xrepo::Runtime> C<pkg_name> declaration:
+C<xrepo.json> is loaded and validated by L<Alien::Xrepo::Build::Recipe>. Its C<packages> array mirrors an
+L<Alien::Xrepo::Runtime> C<pkg_name> declaration:
 
 =over
 
@@ -81,22 +78,19 @@ C<packages> array mirrors an L<Alien::Xrepo::Runtime> C<pkg_name> declaration:
 
 =back
 
-C<defaults> holds ambient flags applied under every package (same key set, plus
-C<configs>). C<pkg_roots>, C<local_repos>, C<hooks> and C<name> are the remaining
-top-level keys.
+C<defaults> holds ambient flags applied under every package (same key set, plus C<configs>). C<pkg_roots>,
+C<local_repos>, C<hooks> and C<name> are the remaining top-level keys.
 
 =head1 METHODS
 
 =head2 run( %opts )
 
-Run the full pipeline: C<configure>, C<probe>, C<install>, C<gather>, C<export>,
-C<test>. Ambient options (C<kind>, C<mode>, C<plat>, C<arch>, C<configs>, ...) are
-folded over the recipe defaults into the install profile.
+Run the full pipeline: C<configure>, C<probe>, C<install>, C<gather>, C<export>, C<test>. Ambient options (C<kind>,
+C<mode>, C<plat>, C<arch>, C<configs>, ...) are folded over the recipe defaults into the install profile.
 
 =head2 configure( %opts ), probe(), install(), gather(), export(), test()
 
-The individual stages. Idempotent (already-run stages are skipped, including
-after a resume).
+The individual stages. Idempotent (already-run stages are skipped, including after a resume).
 
 =head2 register_hook( $stage, $code ), has_hook( $stage )
 
@@ -116,8 +110,7 @@ Recipe package names in order, and the normalized per-package defs.
 
 =head2 engine()
 
-The underlying L<Alien::Xrepo> instance (injectable via C<repo =E<gt>> for tests
-or alternate engines).
+The underlying L<Alien::Xrepo> instance (injectable via C<repo =E<gt>> for tests or alternate engines).
 
 =head1 CONSTRUCTOR
 
@@ -135,7 +128,6 @@ or alternate engines).
 
 =head1 SEE ALSO
 
-L<Alien::Xrepo::Runtime>, L<Alien::Xrepo::Build::Recipe>, L<Alien::Xrepo>,
-L<Alien::Build>, L<alienfile>
+L<Alien::Xrepo::Runtime>, L<Alien::Xrepo::Build::Recipe>, L<Alien::Xrepo>, L<Alien::Build>, L<alienfile>
 
 =cut

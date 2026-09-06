@@ -139,9 +139,9 @@ Boolean. If true, prints command output and status messages to C<STDOUT>. Defaul
 
 Optional default installation root (package store) for this instance. Every store-touching method (C<install>,
 C<fetch>, C<scan>, C<uninstall>, ...) uses C<installdir =E<gt> $root> unless a per-call C<installdir> is given, so the
-instance is confined to its own project-local directory instead of the shared per-user store. Used by
-alien consumers such as L<Alien::Xrepo::Runtime> and the L<Alien::Xrepo::Build> engine to keep a distribution's
-native dependencies inside its C<share> directory.
+instance is confined to its own project-local directory instead of the shared per-user store. Used by alien consumers
+such as L<Alien::Xrepo::Runtime> and the L<Alien::Xrepo::Build> engine to keep a distribution's native dependencies
+inside its C<share> directory.
 
 =item B<theme>
 

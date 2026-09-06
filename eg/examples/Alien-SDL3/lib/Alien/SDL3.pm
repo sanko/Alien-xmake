@@ -1,7 +1,6 @@
 use v5.40;
 use feature 'class';
 no warnings 'experimental::class';
-
 use Alien::Xrepo::Runtime;
 
 class Alien::SDL3 : isa(Alien::Xrepo::Runtime) {

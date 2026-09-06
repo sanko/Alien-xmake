@@ -20,13 +20,10 @@ Alien::Xrepo::Build::Recipe - load and validate an xrepo.json recipe
 
 =head1 DESCRIPTION
 
-C<xrepo.json> is a small JSON recipe consumed by
-L<Alien::Xrepo::Build>. This class loads it (from a file/directory or inline
-data), validates it, and normalizes the package entries. The allowed per-package
-keys are the installer flags taken by L<Alien::Xrepo> (C<plat>, C<arch>,
-C<mode>, C<kind>, C<toolchain>, C<vs*>, C<ndk>, C<sdk>, C<mingw>, C<jobs>,
-C<force>, ..., plus C<name>, C<version>, and the nested recipe options under
-C<configs>).
+C<xrepo.json> is a small JSON recipe consumed by L<Alien::Xrepo::Build>. This class loads it (from a file/directory or
+inline data), validates it, and normalizes the package entries. The allowed per-package keys are the installer flags
+taken by L<Alien::Xrepo> (C<plat>, C<arch>, C<mode>, C<kind>, C<toolchain>, C<vs*>, C<ndk>, C<sdk>, C<mingw>, C<jobs>,
+C<force>, ..., plus C<name>, C<version>, and the nested recipe options under C<configs>).
 
 =head1 RECIPE FORMAT
 
@@ -41,10 +38,9 @@ C<configs>).
        "hooks" : [ "Alien::Zstandard::Hooks" ]
     }
 
-C<packages> is required and must not be empty; order matters (the first entry is
-the primary package). C<local_repos> are registered with xrepo during configure,
-C<hooks> are loaded by a consuming engine, and C<pkg_roots> maps a package to an
-advanced-user environment variable, mirroring Alien::Build's C<pkg_roots>.
+C<packages> is required and must not be empty; order matters (the first entry is the primary package). C<local_repos>
+are registered with xrepo during configure, C<hooks> are loaded by a consuming engine, and C<pkg_roots> maps a package
+to an advanced-user environment variable, mirroring Alien::Build's C<pkg_roots>.
 
 =head1 METHODS
 
@@ -64,8 +60,7 @@ The per-package version constraint, if any.
 
 =item C<opts_for( $name, %ambient )>
 
-Ambient options with the package's per-package def merged over them (flag keys
-override; C<configs> merge per-key).
+Ambient options with the package's per-package def merged over them (flag keys override; C<configs> merge per-key).
 
 =back
 

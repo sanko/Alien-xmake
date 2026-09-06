@@ -7,7 +7,6 @@ my $zstd_alien = Alien::Zstandard->new;
 
 # Runtime resolution is lazy: a build-served snapshot or an xrepo store hit
 # settles the package on demand; otherwise ffi_lib stays undef.
-
 # Get the path to the dynamic library (.so, .dll, or .dylib)
 my $lib_path = $zstd_alien->ffi_lib;
 die 'Could not find Zstd library path' unless $lib_path;

@@ -17,29 +17,28 @@ class Alien::Xrepo::Build v0.9.5 {
     #
     my @STAGES = qw[configure probe install gather export test];
     #
-    field $recipe       : param;                     # Recipe object (or path/dir, normalized in ADJUST)
-    field $root         : param //= undef;           # xrepo store root (XMAKE_PKG_INSTALLDIR)
+    field $recipe       : param;               # Recipe object (or path/dir, normalized in ADJUST)
+    field $root         : param //= undef;     # xrepo store root (XMAKE_PKG_INSTALLDIR)
     field $verbose      : param //= 0;
-    field $repo         : param //= undef;           # injectable engine (spy-able)
-    field $checkpoint   : param //= undef;           # state file path; enables resume
-    field $snapshot     : param //= undef;           # write gathered runtime data as JSON here
-    field $export_dir   : param //= undef;           # also xrepo-export each package into this dir
-    field $probe_policy : param //= 'skip';          # skip|always|off
+    field $repo         : param //= undef;     # injectable engine (spy-able)
+    field $checkpoint   : param //= undef;     # state file path; enables resume
+    field $snapshot     : param //= undef;     # write gathered runtime data as JSON here
+    field $export_dir   : param //= undef;     # also xrepo-export each package into this dir
+    field $probe_policy : param //= 'skip';    # skip|always|off
     field $resume       : param //= 0;
     #
-    field $hooks        = {};                        # stage => [ coderef, ... ]
+    field $hooks        = {};                  # stage => [ coderef, ... ]
     field $meta_prop    = {};
     field $install_prop = {};
     field $runtime_prop = {};
     field $stage_done   = {};
     field $install_type = 'system';
-    field $r            = undef;                     # resolved Alien::Xrepo engine
+    field $r            = undef;               # resolved Alien::Xrepo engine
+
     #
     ADJUST {
         unless ( ref $recipe ) {
-            $recipe = Alien::Xrepo::Build::Recipe->new(
-                defined $recipe && -d $recipe ? ( dir => $recipe ) : ( file => $recipe ),
-            );
+            $recipe = Alien::Xrepo::Build::Recipe->new( defined $recipe && -d $recipe ? ( dir => $recipe ) : ( file => $recipe ), );
         }
         die "probe_policy must be skip|always|off" unless $probe_policy =~ /^(?:skip|always|off)$/;
         $r = $repo // Alien::Xrepo->new( root => $root, verbose => $verbose );
@@ -49,23 +48,24 @@ class Alien::Xrepo::Build v0.9.5 {
         }
     }
     #
-    method meta_prop    () { return $meta_prop }
+    method meta_prop ()    { return $meta_prop }
     method install_prop () { return $install_prop }
     method runtime_prop () { return $runtime_prop }
     method install_type () { return $install_type }
-    method packages      () { return $recipe->packages }
-    method package_defs  () { return $recipe->package_defs }
-    method stage_done    () { return $stage_done }
-    method engine        () { return $r }
+    method packages ()     { return $recipe->packages }
+    method package_defs () { return $recipe->package_defs }
+    method stage_done ()   { return $stage_done }
+    method engine ()       { return $r }
     #
     # Hooks. A hook is invoked with ($self) immediately before its stage body.
     method register_hook ( $stage, $hook ) {
         die "Unknown stage '$stage'. Stages: @STAGES" unless grep { $_ eq $stage } @STAGES;
-        die 'hook must be a coderef' unless ref $hook eq 'CODE';
+        die 'hook must be a coderef'                  unless ref $hook eq 'CODE';
         push @{ $hooks->{$stage} //= [] }, $hook;
         return;
     }
-    method has_hook ($stage)   { return $hooks->{$stage} && @{ $hooks->{$stage} } ? 1 : 0 }
+    method has_hook ($stage) { return $hooks->{$stage} && @{ $hooks->{$stage} } ? 1 : 0 }
+
     method run_hooks ($stage) {
         $self->$_($self) for @{ $hooks->{$stage} // [] };
         return;
@@ -102,12 +102,8 @@ class Alien::Xrepo::Build v0.9.5 {
         my $store;
         eval { $store = $r->_store_dir( installdir => $root ) };
         $store //= $root;
-        $install_prop = {
-            root    => $root,
-            profile => \%profile,
-            probed  => {},
-            store   => $store,
-        };
+        $install_prop = { root => $root, profile => \%profile, probed => {}, store => $store, };
+
         for my $repo_def ( @{ $recipe->local_repos } ) {
             my $dir = path($repo_def)->absolute;
             my $nm  = 'alien-' . $dir->basename;
@@ -130,16 +126,14 @@ class Alien::Xrepo::Build v0.9.5 {
         $install_prop->{probed} ||= {};
         if ( $probe_policy ne 'off' ) {
             for my $name ( $recipe->packages ) {
-            my %opts = $recipe->opts_for( $name, %{ $install_prop->{profile} // {} } );
-            my $expected = $recipe->version_for($name);
-            my $found;
-            eval {
-                my $info = $r->info( $name, format => 'json', %opts );
-                $found = ref $info eq 'HASH'
-                    ? ( $info->{version} // $info->{package}{version} // undef )
-                    : undef;
-            };
-            $install_prop->{probed}{$name} = { version => $found, satisfied => $self->_probe_satisfied( $found, $expected ) };
+                my %opts     = $recipe->opts_for( $name, %{ $install_prop->{profile} // {} } );
+                my $expected = $recipe->version_for($name);
+                my $found;
+                eval {
+                    my $info = $r->info( $name, format => 'json', %opts );
+                    $found = ref $info eq 'HASH' ? ( $info->{version} // $info->{package}{version} // undef ) : undef;
+                };
+                $install_prop->{probed}{$name} = { version => $found, satisfied => $self->_probe_satisfied( $found, $expected ) };
             }
         }
         $self->_checkpoint;
@@ -165,9 +159,7 @@ class Alien::Xrepo::Build v0.9.5 {
             my $version = $recipe->version_for($name);
             say "Installing $name" . ( defined $version && length $version ? " $version" : '' ) . '...' if $verbose;
             my $info;
-            eval {
-                $info = $r->install( $name, $version, %opts );
-            };
+            eval { $info = $r->install( $name, $version, %opts ); };
             if ($@) {
                 warn "[!] $name failed to install: $@\n";
                 $runtime_prop->{errors}{$name} = "$@";
@@ -193,11 +185,9 @@ class Alien::Xrepo::Build v0.9.5 {
         my $profile = $install_prop->{profile} // {};
         for my $name ( $recipe->packages ) {
             next if exists $runtime_prop->{packages}{$name} || exists $runtime_prop->{errors}{$name};
-            my %opts  = $recipe->opts_for( $name, %$profile );
+            my %opts = $recipe->opts_for( $name, %$profile );
             my $info;
-            eval {
-                $info = $r->fetch( $name, $recipe->version_for($name), %opts );
-            };
+            eval { $info = $r->fetch( $name, $recipe->version_for($name), %opts ); };
             if ($@) {
                 warn "[!] $name could not be gathered: $@\n";
                 $runtime_prop->{errors}{$name} //= "$@";
@@ -220,15 +210,13 @@ class Alien::Xrepo::Build v0.9.5 {
         $self->run_hooks('export');
         if ( my $dir = $export_dir ) {
             for my $name ( $recipe->packages ) {
-                next if exists $runtime_prop->{errors}{$name};
+                next                               if exists $runtime_prop->{errors}{$name};
                 say "Exporting $name into $dir..." if $verbose;
-                eval {
-                    $r->export( $name, $recipe->version_for($name), packagedir => path($dir)->child($name)->absolute );
-                };
+                eval { $r->export( $name, $recipe->version_for($name), packagedir => path($dir)->child($name)->absolute ); };
                 warn "[!] $name could not be exported: $@\n" if $@;
             }
         }
-        if ( $snapshot ) {
+        if ($snapshot) {
             my $data = {
                 dist_name    => $recipe->name,
                 install_type => $install_type,
@@ -253,11 +241,11 @@ class Alien::Xrepo::Build v0.9.5 {
         return $self;
     }
     #
-    method _version_for_pkg ($name) { $recipe->version_for($name) }
-    method _opts_for_pkg  ( $name, %opts ) { $recipe->opts_for( $name, %opts ) }
+    method _version_for_pkg ($name)          { $recipe->version_for($name) }
+    method _opts_for_pkg    ( $name, %opts ) { $recipe->opts_for( $name, %opts ) }
     #
     method _probe_satisfied ( $found, $expected ) {
-        return 0 unless defined $found && length $found;
+        return 0 unless defined $found    && length $found;
         return 1 unless defined $expected && length $expected;
         return $found eq $expected;
     }
@@ -297,6 +285,6 @@ class Alien::Xrepo::Build v0.9.5 {
         $runtime_prop = $data->{runtime_prop} // {};
         return 1;
     }
-}
-#
-1;
+    }
+    #
+    1;

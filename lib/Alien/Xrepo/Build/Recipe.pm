@@ -31,13 +31,12 @@ class Alien::Xrepo::Build::Recipe v0.9.5 {
     #
     field $defs  = {};    # package name => normalized per-package hashref def
     field $order = [];    # package names in recipe order (first = primary)
+
     #
     ADJUST {
         if ( defined $file || defined $dir ) {
-            die "Recipe: pass exactly one of file / dir / inline data"
-                if defined $file && defined $dir;
-            die "Recipe: inline 'packages' is ignored when a file is given"
-                if defined $packages;
+            die "Recipe: pass exactly one of file / dir / inline data"      if defined $file && defined $dir;
+            die "Recipe: inline 'packages' is ignored when a file is given" if defined $packages;
             my $path = $file // path($dir)->child('xrepo.json');
             die "Recipe file not found: $path" unless -e $path;
             my $data = eval { decode_json( path($path)->slurp_utf8 ) };
@@ -46,6 +45,7 @@ class Alien::Xrepo::Build::Recipe v0.9.5 {
             $packages  //= $data->{packages};
             $defaults  //= $data->{defaults};
             $pkg_roots //= $data->{pkg_roots};
+
             if ( defined $data->{local_repos} ) {
                 $local_repos //= $data->{local_repos};
             }
@@ -56,27 +56,28 @@ class Alien::Xrepo::Build::Recipe v0.9.5 {
         die "Recipe: packages is required" unless defined $packages;
         $order = [ $self->_normalize_defs($packages) ];
         die "Recipe: at least one package is required" unless @$order;
-        $defaults  //= {};
-        $pkg_roots //= {};
+        $defaults    //= {};
+        $pkg_roots   //= {};
         $local_repos //= [] if !defined $local_repos;
         $hooks       //= [] if !defined $hooks;
-        $self->_validate_profile($defaults, 'defaults');
-        $self->_validate_strings($local_repos, 'local_repos');
-        $self->_validate_strings($hooks, 'hooks');
+        $self->_validate_profile( $defaults, 'defaults' );
+        $self->_validate_strings( $local_repos, 'local_repos' );
+        $self->_validate_strings( $hooks,       'hooks' );
         die 'Recipe: pkg_roots must be a hashref' unless ref $pkg_roots eq 'HASH';
+
         for my $root ( keys %$pkg_roots ) {
             my $v = $pkg_roots->{$root};
             die "Recipe: pkg_roots '$root' must be a plain string" if ref $v || !defined $v;
         }
     }
     #
-    method name         () { return $name }
-    method packages     () { return @$order }
+    method name ()         { return $name }
+    method packages ()     { return @$order }
     method package_defs () { return $defs }
-    method defaults     () { return $defaults }
-    method pkg_roots    () { return $pkg_roots }
-    method local_repos  () { return $local_repos }
-    method hooks        () { return $hooks }
+    method defaults ()     { return $defaults }
+    method pkg_roots ()    { return $pkg_roots }
+    method local_repos ()  { return $local_repos }
+    method hooks ()        { return $hooks }
     #
     # Version constraint a package installs at: its per-package `version` wins,
     # otherwise there is none (recipe defaults carry no version by design).
@@ -91,9 +92,9 @@ class Alien::Xrepo::Build::Recipe v0.9.5 {
     method opts_for ( $name, %ambient ) {
         my $def = $defs->{$name};
         return %ambient unless ref $def eq 'HASH';
-        my %merged   = %ambient;
-        my $g_cfg    = $merged{configs};
-        my %configs  = ref $g_cfg eq 'HASH' ? %$g_cfg : ();
+        my %merged  = %ambient;
+        my $g_cfg   = $merged{configs};
+        my %configs = ref $g_cfg eq 'HASH' ? %$g_cfg : ();
         %configs = ( %configs, %{ $def->{configs} } ) if ref $def->{configs} eq 'HASH';
         for my $key ( keys %$def ) {
             next if $key eq 'name' || $key eq 'version' || $key eq 'configs';
@@ -162,6 +163,6 @@ class Alien::Xrepo::Build::Recipe v0.9.5 {
         }
         return;
     }
-}
-#
-1;
+    }
+    #
+    1;

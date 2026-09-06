@@ -19,6 +19,7 @@ build_requires:
   IO::Socket::SSL: '0'
   JSON::PP: '2'
   Path::Tiny: '0'
+  Test::Alien::Build: '0'
   Test2::V0: '0'
   perl: v5.40.0
 configure_requires:
@@ -73,10 +74,18 @@ provides:
   Alien::Xrepo::Runtime:
     file: lib/Alien/Xrepo/Runtime.pm
     version: v0.9.5
+  Alien::Xrepo::Runtime::Alt:
+    file: lib/Alien/Xrepo/Runtime.pm
+    version: v0.9.5
+  Alien::Build::Plugin::Build::Xrepo:
+    file: lib/Alien/Build/Plugin/Build/Xrepo.pm
+    version: v0.9.5
 requires:
+  Alien::Build: '2.84'
   Capture::Tiny: '0'
   ExtUtils::Helpers: '0.028'
   ExtUtils::InstallPaths: '0.002'
+  File::Which: '0'
   Path::Tiny: '0'
   perl: v5.40.0
 resources:

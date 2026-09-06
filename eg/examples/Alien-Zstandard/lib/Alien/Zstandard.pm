@@ -1,7 +1,6 @@
 use v5.40;
 use feature 'class';
 no warnings 'experimental::class';
-
 use Alien::Xrepo::Runtime;
 
 class Alien::Zstandard : isa(Alien::Xrepo::Runtime) {
