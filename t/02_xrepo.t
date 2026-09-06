@@ -8,7 +8,7 @@ use File::Temp qw[tempdir];
 #
 ok $Alien::Xrepo::VERSION, 'Alien::Xrepo::VERSION';
 #
-my $repo  = Alien::Xrepo->new( verbose => 0 );
+my $repo  = Alien::Xrepo->new( verbose => 0, kind => 'shared' );
 my $xmake = Alien::Xmake->new;
 my $exe   = $xmake->exe;
 qx[$exe g --theme=plain];

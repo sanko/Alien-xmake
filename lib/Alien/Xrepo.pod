@@ -160,6 +160,12 @@ Supplies an explicit answer (C<yes>, C<no>, or C<def>) to any prompt, passed thr
 precedence over C<yes =E<gt> 1>. Both may be overridden per-call with C<yes =E<gt> ...> or C<confirm =E<gt> ...> on any
 store-touching method.
 
+=item B<kind>
+
+Default package kind (C<shared> or C<static>) for every action this instance performs. A per-call C<kind =E<gt> ...>
+wins. Left unset (the default), C<-k> is omitted entirely so installs behave exactly like a bare C<xrepo install>.
+Useful when you know every package this repo builds should be one kind (e.g. C<shared> for FFI consumers).
+
 =back
 
 =head1 METHODS
@@ -201,7 +207,8 @@ Build mode: C<debug> or C<release>.
 
 =item B<kind>
 
-Library kind: C<shared> (default) or C<static>.
+Library kind: C<shared> or C<static>. Omitted entirely, the package's own default applies, so a bare install behaves
+exactly like C<xrepo install>.
 
 I<Note: For FFI, you almost always want C<shared>, but C<static> is available if you are linking archives with, say, an
 XS module.>
@@ -259,7 +266,13 @@ A hashref or string of package-specific configurations.
 
 =item B<includes>
 
-A list or string of extra dependencies to include in the environment.
+A list or string of extra rc files to include in the environment.
+
+Each include is forwarded to xmake verbatim, so it must be genuine root-scope xmake config (e.g. C<add_toolchains>);
+xmake textually prepends rc contents to the temporary project script. A vendored C<package() {...}> recipe is NOT
+supported here: it is invalid in project scope and dies with e.g. C<unknown interface: add_rules()>. The value is
+split/rejoined on the OS path separator (C<$Config{path_sep}>), and each path is normalized to an absolute path before
+being passed on.
 
 =item B<installdir>, B<cachedir>
 

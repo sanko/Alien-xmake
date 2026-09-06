@@ -9,6 +9,7 @@ class    #
     use CPAN::Meta;
     use ExtUtils::Install qw[pm_to_blib install];
     use ExtUtils::InstallPaths;
+    use Digest::SHA;
     use JSON::PP;
     use Config;
     use HTTP::Tiny;
@@ -56,12 +57,12 @@ class    #
         # We must capture the current INC to ensure the builder finds itself
         # when running the generated script.
         my $inc_str = join( ' ', map {"-I$_"} @INC );
-        $self->write_file( 'Build', sprintf <<~'', $^X, $inc_str, __PACKAGE__, __PACKAGE__ );
-            #!%s %s
-            use lib 'builder';
-            use %s;
-            %s->new( @ARGV && $ARGV[0] =~ /\A\w+\z/ ? ( action => shift @ARGV ) : (),
-                map { /^--/ ? ( shift(@ARGV) =~ s[^--][]r => 1 ) : /^-/ ? ( shift(@ARGV) =~ s[^-][]r => shift @ARGV ) : () } @ARGV )->Build();
+        $self->write_file( 'Build', sprintf <<'', $^X, $inc_str, __PACKAGE__, __PACKAGE__ );
+#!%s %s
+use lib 'builder';
+use %s;
+%s->new( @ARGV && $ARGV[0] =~ /\A\w+\z/ ? ( action => shift @ARGV ) : (),
+    map { /^--/ ? ( shift(@ARGV) =~ s[^--][]r => 1 ) : /^-/ ? ( shift(@ARGV) =~ s[^-][]r => shift @ARGV ) : () } @ARGV )->Build();
 
         make_executable('Build');
         my @env = defined $ENV{PERL_MB_OPT} ? split_like_shell( $ENV{PERL_MB_OPT} ) : ();
@@ -474,6 +475,7 @@ class    #
         if ( !$self->_download_file( $url, $outfile ) ) {
             die "Download failed for $url";
         }
+        $self->_verify_download( $outfile, $asset );
         my $install_str = $installdir->stringify;
         $install_str =~ s{/}{\\}g;
         my $outfile_str = $outfile->stringify;
@@ -534,6 +536,7 @@ class    #
         if ( !$self->_download_file( $gh_url, $outfile ) ) {
             die "Download failed for $gh_url";
         }
+        $self->_verify_download( $outfile, $asset );
         say 'Extracting source bundle...';
         $self->_run_cmd( 'sh', $outfile, '--noexec', '--quiet', '--target', $build_dir ) or die 'Failed to extract .run file';
         my $cwd = cwd();
@@ -609,16 +612,34 @@ class    #
         return 0;
     }
 
+    # Verify a downloaded installer against the sha256 GitHub reports for its
+    # release asset (the API's `digest` field, e.g. "sha256:<hex>"). Dies on
+    # mismatch so a corrupted or tampered download never gets executed; skips
+    # (with a warning) when the asset carries no sha256 digest -- e.g. the
+    # hardcoded-URL fallback where release metadata is unavailable.
+    method _verify_download ( $file, $asset ) {
+        my $digest = $asset && $asset->{digest};
+        unless ( defined $digest && length $digest ) {
+            say 'No digest reported for this release asset; skipping verification.';
+            return;
+        }
+        my $expected = $digest =~ /^sha256:(.+)$/ ? $1 : undef;
+        unless ( defined $expected && length $expected ) {
+            say "Unsupported digest scheme '$digest'; skipping verification.";
+            return;
+        }
+        say "Verifying sha256 of $file...";
+        my $got = Digest::SHA->new(256)->addfile( "$file", 'b' )->hexdigest;
+        if ( lc $got ne lc $expected ) {
+            die "Checksum mismatch for $file:\n" . "  expected sha256:$expected\n" . "  got      sha256:$got\n";
+        }
+        say 'sha256 OK.';
+        return;
+    }
+
     method _test_tools ( ) {
         say 'Checking build tools...';
         my $ok = 1;
-        if ( $self->_run_cmd('git --version >/dev/null 2>&1') ) {
-            say ' - git: Found';
-        }
-        else {
-            say ' - git: Missing';
-            $ok = 0;
-        }
 
         # GNU or BSD make
         my $found_make = 0;
@@ -687,18 +708,18 @@ class    #
 
     method _install_tools ($sudo) {
         my @installers = (
-            [ 'apt --version', 'apt install -y git build-essential libreadline-dev' ],
-            [ 'dnf --version', 'dnf install -y git readline-devel bzip2 @development-tools' ],
-            [ 'yum --version', qq[yum install -y git readline-devel bzip2 && $sudo yum groupinstall -y 'Development Tools'] ],
+            [ 'apt --version', 'apt install -y build-essential libreadline-dev' ],
+            [ 'dnf --version', 'dnf install -y readline-devel bzip2 @development-tools' ],
+            [ 'yum --version', qq[yum install -y readline-devel bzip2 && $sudo yum groupinstall -y 'Development Tools'] ],
             [   'zypper --version',
-                qq[zypper --non-interactive install git readline-devel && $sudo zypper --non-interactive install -t pattern devel_C_C++]
+                qq[zypper --non-interactive install readline-devel && $sudo zypper --non-interactive install -t pattern devel_C_C++]
             ],
-            [ 'pacman -V',              'pacman -S --noconfirm --needed git base-devel ncurses readline' ],
+            [ 'pacman -V',              'pacman -S --noconfirm --needed base-devel ncurses readline' ],
             [ 'emerge -V',              'emerge -atv dev-vcs/git' ],
-            [ 'pkg list-installed',     'pkg install -y git gmake' ],
-            [ 'nix-env --version',      'nix-env -i git gcc readline ncurses' ],
-            [ 'apk --version',          'apk add git gcc g++ make readline-dev ncurses-dev libc-dev linux-headers' ],
-            [ 'xbps-install --version', 'xbps-install -Sy git base-devel' ]
+            [ 'pkg list-installed',     'pkg install -y gmake' ],
+            [ 'nix-env --version',      'nix-env -i gcc readline ncurses' ],
+            [ 'apk --version',          'apk add gcc g++ make readline-dev ncurses-dev libc-dev linux-headers' ],
+            [ 'xbps-install --version', 'xbps-install -Sy base-devel' ]
         );
         for my $pair (@installers) {
             my ( $check, $install ) = @$pair;
@@ -715,7 +736,7 @@ class    #
         die <<~'MSG';
     Dependencies Installation Failed or Skipped.
 
-    We could not find the necessary tools (git, make, compiler) to build Xmake from source.
+    We could not find the necessary tools (make, compiler) to build Xmake from source.
 
     You have three options:
 

@@ -1,7 +1,7 @@
 use v5.40;
 use experimental 'class';
 #
-class Alien::Xmake v0.9.4 {
+class Alien::Xmake v0.9.5 {
     use File::Spec;
     use File::Basename qw[dirname];
     use File::Temp     qw[tempdir];
@@ -63,25 +63,29 @@ class Alien::Xmake v0.9.4 {
         return dirname($exe);
     }
 
-    method exe () {        # Return a potentially quoted path for execution
-        my $path = $self->_resolve_path;
-        return $self->_quote_path($path);
+    # Return the bare executable path. NEVER embed quote characters here: every
+    # LIST-form spawn (`system @cmd`, Capture::Tiny around it) treats the path as
+    # the literal image name, so quotes make CreateProcess fail even for paths
+    # with spaces. Only single-string/`qx` call sites quote, and they do it
+    # themselves (see _getver_build and pkg_config).
+    method exe () {
+        return $self->_resolve_path;
     }
 
-    method xrepo () {      # xrepo is usually in the same folder as Xmake
+    method xrepo () {    # xrepo is usually in the same folder as Xmake; bare path, see exe()
         my $exe_path   = $self->_resolve_path;
         my $parent     = dirname($exe_path);
         my $xrepo_name = 'xrepo' . ( $windows ? '.bat' : '' );
 
         # Check sibling
         my $try = File::Spec->catfile( $parent, $xrepo_name );
-        return $self->_quote_path($try) if -e $try;
+        return $try if -e $try;
 
         # Fallback to config path calculation if the sibling check failed
         if ( $config->{bin} ) {
             my $conf_parent = dirname( $config->{bin} );
             my $target      = File::Spec->catfile( $conf_parent, $xrepo_name );
-            return $self->_quote_path($target);
+            return $target;
         }
 
         # Last resort: return bare command
@@ -91,9 +95,9 @@ class Alien::Xmake v0.9.4 {
     method pkg_config ($package) {
         my $xrepo = $self->xrepo;
         system( $xrepo, 'install', '-y', $package ) == 0 || die "Alien::Xmake: Could not install package '$package'\n";
-        my $cflags = qx|$xrepo fetch --cflags "$package"|;
+        my $cflags = qx|"$xrepo" fetch --cflags "$package"|;
         chomp $cflags;
-        my $libs = qx|$xrepo fetch --ldflags "$package"|;
+        my $libs = qx|"$xrepo" fetch --ldflags "$package"|;
         chomp $libs;
         return { cflags => $cflags, libs => $libs };
     }
@@ -610,7 +614,7 @@ class Alien::Xmake v0.9.4 {
 
     method _getver_build() {
         my $cmd = $self->exe;
-        state $out //= qx[$cmd --version];
+        state $out //= qx["$cmd" --version];
         return ( $1, $2 ) if $out =~ /xmake\s+v?(\d+\.\d+\.\d+)(?:\+(.+),)?/i;
         ( '0.0.0', () );
     }

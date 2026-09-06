@@ -8,8 +8,14 @@ Alien::Xrepo::Base - Base class for Alien distributions using Xrepo
 
 =head1 SYNOPSIS
 
+Subclass C<Alien::Xrepo::Base>, declare which xrepo package(s) the module represents with L</"C<pkg_name( )>">, and
+optionally steer the install with L</"C<install_opts( )>">. During C<./Build>, the Builder installs those packages with
+xrepo, shallow-copies the finished artifacts into the module's share directory, and records the result in a generated
+C<::ConfigData> so the accessors below resolve without re-running the resolver.
+
 In your subclass C<lib/Alien/Zstd.pm>:
 
+    package Alien::Zstd;
     use v5.40;
     use experimental 'class';
     use Alien::Xrepo::Base;
@@ -26,35 +32,68 @@ In your subclass C<lib/Alien/Zstd.pm>:
         }
     }
 
+    1;
+
+A multi-package family (such as SDL3) returns a list of package names and may ship a tree of patched recipes:
+
+    package Alien::SDL3;
+    use v5.40;
+    use feature 'class';
+    use Alien::Xrepo::Base;
+    use Path::Tiny qw[path];
+
+    class Alien::SDL3 : isa(Alien::Xrepo::Base) {
+        method pkg_name { [ 'libsdl3', 'libsdl3_image', 'libsdl3_ttf' ] }
+
+        method install_opts {
+            return (
+                kind        => 'shared',
+                local_repos => [ path(__FILE__)->parent->parent->parent->child('recipes') ],
+            );
+        }
+    }
+
+    1;
+
+When the packages differ in version, installer flags, or recipe options, give each one its own hashref instead of one
+global L</"C<install_opts( )>">. This is how you build a shared library alongside a binary tool in one module:
+
+    package Alien::MediaKit;
+    use v5.40;
+    use experimental 'class';
+    use Alien::Xrepo::Base;
+
+    class Alien::MediaKit : isa(Alien::Xrepo::Base) {
+        method pkg_name {
+            return [
+                'zstd',
+                { name => 'libsdl3', version => '3.4.12', kind => 'shared', configs => { wayland => 1 } },
+                { name => 'ninja',   kind => 'binary' },
+            ];
+        }
+
+        # Global options apply to every package; per-package entries override
+        # them per-key (and recipe configs merge: per-package ones win).
+        method install_opts {
+            return ( configs => { zlib => 1 } );
+        }
+    }
+
+    1;
+
 In your C<Build.PL>:
 
-    use strict;
-    use warnings;
     use lib 'lib';
     use Alien::Xrepo::Base;
 
     # Pass your subclass name to the builder
     Build_PL('Alien::Zstd');
 
-In your C<cpanfile>:
-
-    requires 'perl', '5.40.0';
-    requires 'File::ShareDir', '1.00';
-
-    on 'configure' => sub {
-        requires 'Alien::Xmake', '0.08';
-        requires 'Alien::Xrepo', '0.08';
-    };
-
-    on 'build' => sub {
-        requires 'ExtUtils::InstallPaths', '0.002';
-        requires 'ExtUtils::Install', '2.00';
-    };
-
 =head1 DESCRIPTION
 
 C<Alien::Xrepo::Base> is a base class designed to simplify the creation of C<Alien::*> distributions that use C<xrepo>
-to manage native dependencies.
+to manage native dependencies. The heavy lifting is done by L<Alien::Xrepo>, which shells out to xrepo via
+L<Alien::Xmake>; this class wires a concrete Alien front-end onto it.
 
 It leverages Perl 5.40's native C<class> features and provides a C<Module::Build::Tiny>-compatible build system that:
 
@@ -90,12 +129,15 @@ Creates a new instance. If C<pkg_name> is omitted it is inherited from the subcl
 The name of the package as it appears in the C<xrepo> repository (e.g., C<zstd>). If omitted, the value returned by the
 subclass C<pkg_name> method is used. One of the two must be provided. May also be an array reference (or list) of
 package names to install and expose C<SDL3>-style families of related libraries (see the C<Alien-SDL3> example in
-C<eg/examples/>). The first name is the C<primary> package used when no package is selected.
+C<eg/examples/>). Each entry may be a plain name or a hashref of per-package options (version, installer flags, recipe
+configs) as described under L</"C<pkg_name( )>">. The first name is the C<primary> package used when no package is
+selected.
 
 =item B<version_constraint>
 
 Optional semantic version constraint (e.g., C<1.6.x>, C<latest>, C<1.6.32>). Passed to C<Alien::Xrepo::install> and
-appended to the C<xrepo> install spec.
+appended to the C<xrepo> install spec. A per-package C<version> (see L</"C<pkg_name( )>">) overrides this for that
+package.
 
 =item B<root>
 
@@ -119,6 +161,40 @@ reference / list of names when the module installs and exposes more than one lib
 family of libraries such as SDL3). When multiple names are given, each is installed and recorded separately; the first
 name is the C<primary> package used when no package name is passed to the delegation methods. This mirrors the
 C<pkg_name> keyword of C<Alien::Build::Plugin::PkgConfig>.
+
+Each entry may be a plain package name or a hashref that configures that package individually. The top-level hashref
+keys are:
+
+=over 4
+
+=item B<< name => 'libsdl3' >>
+
+B<Required>. The xrepo package name. No other key is valid without it.
+
+=item B<< version => '3.4.12' >>
+
+Optional. A version constraint for B<this package only>, overriding the C<version_constraint> constructor parameter.
+
+=item B<< configs => { wayland => 1 } >>
+
+Optional. A hashref of nested C<xrepo> recipe options. Each pair is serialized as C<--configs=key=value>, and the pairs
+are merged over the C<configs> from L</"C<install_opts( )>"> or C<install()>, so a per-package option wins per key.
+Boolean-ish values keep their truthiness when xrepo deserializes C<--configs=key=value> (C<1>/C<0> become true/false).
+
+=item B<< kind => 'shared' | 'static' | 'binary' >>, L</"C<install_opts( )>"> flags
+
+Optional. Any installer flag that L</"C<install_opts( )>"> accepts (C<plat>, C<arch>, C<mode>, C<toolchain>,
+C<toolchain_host>, C<vs>, C<ndk>, C<sdk>, C<mingw>, C<jobs>, C<linkjobs>, C<force>, C<shallow>, C<build>, C<debugdir>,
+C<includes>, C<yes>, C<confirm>) overrides the global option for this package. This is how one module builds a shared
+library and a binary tool at once: each package carries its own C<kind>.
+
+=back
+
+Unknown top-level keys die at construction; the nested recipe options belong under C<configs>, and ambient options such
+as C<local_repos> belong in L</"C<install_opts( )>">.
+
+Precedence, highest first: the per-package entry, then C<install_opts()>/C<install()> options, then the xrepo defaults.
+Recipe C<configs> merge per key with the per-package value winning.
 
 =head2 C<package_names( )>
 
@@ -170,17 +246,44 @@ wasn't present. See the C<package_info> entry under L</METHODS>.
 
 =head2 C<install_opts( )>
 
-Optional. Returns a hash (or list) of options honored by the builder (C<Build_PL> / C<Build>) when it installs the
+Optional. Returns a hash (or list) of options honored by the Builder (C<Build_PL> / C<Build>) when it installs the
 package during the C<build> action. Pass these same options directly to C<install( %opts )> when installing at runtime.
-Common options include:
+These are the I<global> options applied to every package; a per-package hashref under L</"C<pkg_name( )>"> overrides
+them for that package (and its C<configs> merge per key, with the per-package value winning). Supported keys:
 
 =over 4
 
-=item * C<kind>: 'shared' (default) or 'static'.
+=item B<< kind => 'shared' | 'static' >>
 
-=item * C<configs>: A hash reference of package-specific configuration flags.
+Passed to xrepo as C<-k>. Ask for C<shared> explicitly when the goal is handing a dynamic library to an FFI binder; a
+bare install without C<-k> resolves whatever xmake-repo happens to default to (often static archives).
 
-=item * C<plat>, C<arch>, C<mode>: Platform/Architecture/Mode overrides.
+=item B<< local_repos => [ $dir, ... ] >>
+
+Registers each directory as a local xmake repository BEFORE any package is installed, so a patched copy of an upstream
+recipe shadows the version in xmake-repo (local repositories are consulted first). Each directory must contain a
+C<packages/> subtree laid out per xmake-repo conventions (C<packages/E<lt>nameE<gt>/E<lt>versionE<gt>/xmake.lua>). The
+Builder registers each as a repo named C<alien-E<lt>basenameE<gt>> and removes this key from the opts handed to the
+install itself.
+
+A typical use: ship a small C<recipes/> tree containing patched copies of recipes your dependency stack builds badly
+out of the box (for example this family carries a libsdl3_ttf recipe that forces freetype to build shared with zlib
+disabled).
+
+=item B<< yes => 1, confirm => 'no' >>
+
+Auto-dismiss xmake/xrepo interactive prompts so captured installs never hang.
+
+=item B<configs>
+
+A hash reference of package-specific configuration flags.
+
+=item B<< plat / arch / mode, toolchain, toolchain_host,
+    vs / vs_toolset / vs_sdkver, ndk, sdk, mingw,
+    jobs / linkjobs, force, shallow, build, includes >>
+
+Passed through to xrepo as the equivalent flags (C<-p>, C<-a>, C<-m>, C<--toolchain=...>, C<--vs=...>, C<-j> /
+C<--linkjobs=...>, C<--force>, C<--shallow>, C<--build>, C<--configs=...>, C<--includes=...>).
 
 =back
 
@@ -188,8 +291,9 @@ Common options include:
 
 =head2 C<install( %opts )>
 
-Explicitly triggers the installation of the package. This is usually handled automatically by the build system, but can
-be called manually at runtime if dynamic fetching is desired.
+Explicitly triggers the installation of every package (optionally re-resolving). This is usually handled automatically
+by the build system, but can be called manually at runtime if dynamic fetching is desired. Returns the primary
+package's info.
 
 =head2 C<upgrade( %opts )>
 
@@ -257,7 +361,15 @@ Searches the package's include directories for the specified header and returns 
 
 =head2 C<package_info( [$pkg] )>
 
-Returns the raw L<Alien::Xrepo::PackageInfo> object containing all metadata.
+Returns the raw L<Alien::Xrepo::PackageInfo> object containing all metadata. C<libfiles> from xrepo map to
+C<dynamic_libs>, and C<installdir> maps to C<dist_dir>.
+
+=head2 C<package_defs( )>
+
+Returns a hashref of package name to normalized per-package definition, for the entries declared as a hashref under
+L</"C<pkg_name( )>">. Plain package names carry no entry. Both C<Alien::Xrepo::Base::install()> and the Builder consult
+this (via the C<_version_for_pkg> / C<_opts_for_pkg> helpers) so each package installs with its own version, flags, and
+recipe configs.
 
 =head1 BUILDER METHODS
 
@@ -271,9 +383,69 @@ Creates the C<Build> script and stores build parameters. C<$alien_class> should 
 
 The entry point for the C<Build> script. Orchestrates the C<build>, C<test>, C<install>, and C<clean> actions.
 
+=head1 TIPS AND TRICKS
+
+=over 4
+
+=item Keep the default package store
+
+The Builder deliberately installs into xrepo's global store and shallow-copies the finished artifacts into the module's
+share dir. Do NOT redirect the store via C<installdir> unless you have a reason: a redirected store makes xmake re-exec
+with C<system=false> (no apt/Homebrew/MSYS system packages) and rebuilds the whole dependency tree from source, which
+is what breaks shared links (e.g. libsdl3_ttf) on Linux/macOS. The default store resolves dependencies the same way a
+bare C<xrepo install> does.
+
+=item Ask for shared when the FFI binder needs it
+
+An FFI binder such as L<Affix|https://metacpan.org/pod/Affix> loads dynamic libraries, so pass C<< kind => 'shared' >>
+and feed C<dynamic_libs>/C<ffi_lib> to it. Without C<-k> you may receive a static archive and the bind will fail at
+load time.
+
+=item Mix shared libraries and binary tools per package
+
+C<install_opts> holds one set of options for the whole family, so you cannot express "libsdl3 as a shared library,
+ninja as a binary" with it alone. Give each package a hashref under L</"C<pkg_name( )>"> instead: the library entry
+carries C<< kind => 'shared' >> (plus any recipe C<configs>) and the tool entry C<< kind => 'binary' >>. Write the FFI
+binder against the primary library's C<dynamic_libs>/C<ffi_lib>, and run the tool through the package's C<bin_dir>.
+
+=item Ship patched recipes, wait for no one
+
+If a dependency in the resolved tree mis-builds on some platform (CMake C<find_package> failures for deps xmake passes
+no variables for are common -- e.g. freetype vs. zlib), ship a corrected recipe in your C<recipes/> tree with the exact
+C<package(...)> body adjusted (freetype: build shared, I<and> disable zlib via C<-DFT_DISABLE_ZLIB=ON>) and register
+the tree via C<local_repos>. Local repositories win over xmake-repo.
+
+=item Windows: the scratch-project pitfall
+
+xrepo's private scratch project lives at C<%TEMP%\.xmake\E<lt>yymmddE<gt>\xrepo\working\> and is created on demand by
+C<xmake create -P .>. On GitHub Actions that create can abort while the template is rewritten, leaving a I<read-only>
+xmake.lua with unexpanded tokens (C<${TARGET_NAME}>, a bare C<${FAQ}>), so every later xrepo action dies parsing
+C<.\xmake.lua: unexpected symbol near '$'>. The wrapper pre-sows and repairs that directory on MSWin32 so a subclass
+needs to do nothing -- but if you ever see exactly that error, look for a stray, read-only
+C<%TEMP%\.xmake\...\xrepo\working\xmake.lua> or a tool that wrote to the real TEMP ahead of your build.
+
+=item Version constraints
+
+Pass a constraint as the second argument to L</"C<install( %opts )>"> so a bare C<./Build> resolves the same versions
+you developed against (C<< $alien->install( 'libsdl3', '3.4.x' ) >>). The C<version_constraint> constructor parameter
+does the same for every package.
+
+=item Disable the wrapper's own test suite in CI
+
+The wrapper's test suite performs network package installs (pcre2) and can flake on slow runners. Install it Notest
+(C<< cpanm -n https://github.com/sanko/Alien-Xmake.git >>) and gate on your own distribution's tests.
+
+=item Debugging xrepo installs
+
+Set C<< verbose => 1 >> on the constructor (or C<XMAKE_THEME=plain> to kill ANSI) and watch the C<[XREPO] cmd (cwd:
+...)> line the wrapper echoes; the cwd it reports reveals where xrepo believes its project root is. C<< ./Build
+clean_cache >> (also honored via C<ALIEN_XREPO_CACHE>) clears the shared package store when a poison gets in.
+
+=back
+
 =head1 SEE ALSO
 
-L<Alien::Xrepo>, L<Alien::Xmake>, L<xmake|https://xmake.io>, L<xrepo|https://xrepo.xmake.io>
+L<Alien::Xrepo>, L<Alien::Xmake>, L<Alien::Build>, L<xmake|https://xmake.io>, L<xrepo|https://xrepo.xmake.io>
 
 =head1 LICENSE
 

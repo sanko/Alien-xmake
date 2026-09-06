@@ -7,7 +7,7 @@ use File::Temp qw[tempdir];
 use Alien::Xrepo;
 #
 my $tmp  = path( tempdir() );
-my $repo = Alien::Xrepo->new( root => $tmp, verbose => 0 );
+my $repo = Alien::Xrepo->new( root => $tmp, verbose => 0, kind => 'shared' );
 my $zlib = $repo->install('zlib');
 ok defined $zlib, 'Installed zlib';
 my $lib_path = $zlib->libpath;

@@ -38,7 +38,7 @@ subtest 'pre-install delegation' => sub {
 };
 
 # Test install
-my $info = $alien->install;
+my $info = $alien->install( kind => 'shared' );
 ok $info,           'Installed package';
 ok $alien->libpath, 'Got libpath: ' . $alien->libpath;
 ok $alien->ffi_lib, 'Got ffi_lib';
@@ -72,7 +72,7 @@ else {
 }
 
 # Idempotency: installing again reuses the cached package
-my $info2 = $alien->install;
+my $info2 = $alien->install( kind => 'shared' );
 ok $info2,          'Install is idempotent';
 ok $info2->libpath, 'Re-installed package has a libpath';
 
@@ -88,7 +88,7 @@ ok !defined $missing, 'find_header returns undef for a missing header';
 # Test version_constraint via a dedicated subclass
 subtest 'version constraint' => sub {
     my $constrained = Alien::Xrepo::TestPackage->new( root => $tmp, verbose => 0, version_constraint => '1.3.x' );
-    my $cinfo       = $constrained->install;
+    my $cinfo       = $constrained->install( kind => 'shared' );
     ok $cinfo,                       'Installed with version constraint';
     ok $cinfo->version =~ /^v?1\.3/, 'Version satisfies 1.3.x constraint: ' . $cinfo->version;
 };
@@ -98,7 +98,7 @@ subtest 'with binary package' => sub {
         method pkg_name {'ninja'}
     }
     my $alien_bin = Alien::Xrepo::TestBin->new( root => $tmp, verbose => 1 );
-    my $info_bin  = $alien_bin->install;
+    my $info_bin  = $alien_bin->install( kind => 'shared' );
     ok $info_bin, 'Installed ninja';
     is $alien_bin->kind, 'binary', 'Kind is binary';
     my @bin_dirs = $alien_bin->bin_dir;
@@ -106,7 +106,7 @@ subtest 'with binary package' => sub {
     is [ $alien_bin->bin_dir ], [ $alien_bin->package_info->bin_dir ], 'bin_dir matches package_info';
 
     # Upgrade (verify it runs without error)
-    ok $alien_bin->upgrade, 'Upgrade ninja';
+    ok $alien_bin->upgrade( kind => 'shared' ), 'Upgrade ninja';
 };
 
 # install_opts is respected during the Builder phase; at runtime install still succeeds with the
@@ -114,7 +114,7 @@ subtest 'with binary package' => sub {
 subtest install_opts => sub {
     my $with_opts = Alien::Xrepo::TestPackageWithOpts->new( root => $tmp, verbose => 0 );
     ok $with_opts->can('install_opts'), 'subclass implements install_opts';
-    my $optinfo = $with_opts->install;
+    my $optinfo = $with_opts->install( kind => 'shared' );
     ok $optinfo, 'Installed package with install_opts';
     is $optinfo->kind, 'library', 'Shared library kind after install with opts';
 };
@@ -129,7 +129,7 @@ subtest 'multiple packages' => sub {
     }
     my $multi = Alien::Xrepo::TestMulti->new( root => $tmp, verbose => 0 );
     is [ $multi->package_names ], [ 'zlib', 'ninja' ], 'package_names returns both in order';
-    my $minfo = $multi->install;
+    my $minfo = $multi->install( kind => 'shared' );
     ok $minfo,          'Multi-package install succeeded';
     ok $minfo->libpath, 'Primary package has a libpath';
 
@@ -158,7 +158,7 @@ subtest 'multiple packages' => sub {
 # and the *_static aliases.
 subtest 'alien-style accessors' => sub {
     my $alien = Alien::Xrepo::TestPackage->new( root => $tmp, verbose => 0 );
-    $alien->install;
+    $alien->install( kind => 'shared' );
 
     # alt() without a name returns the primary (self); with a name a delegate.
     is $alien->alt,         $alien, 'alt() returns self for the primary package';
@@ -193,7 +193,7 @@ subtest 'alt delegate' => sub {
         method pkg_name { [ 'zlib', 'ninja' ] }
     }
     my $multi = Alien::Xrepo::TestMultiAlt->new( root => $tmp, verbose => 0 );
-    $multi->install;
+    $multi->install( kind => 'shared' );
     my $alt_ninja = $multi->alt('ninja');
     isa_ok $alt_ninja, ['Alien::Xrepo::Base::Alt'], 'alt(ninja) is a delegate';
     is $alt_ninja->kind,     'binary', 'alt(ninja)->kind is binary';

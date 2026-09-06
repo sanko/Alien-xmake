@@ -1,9 +1,23 @@
 use v5.40;
 use experimental 'class';
 #
-class Alien::Xrepo::Base v0.9.4 {
+# Top-level keys a pkg_name hashref entry may carry. `name` identifies the
+# xrepo package, `version` overrides version_constraint per-package, `configs`
+# holds nested recipe options, and the remainder are the installer flags that
+# install_opts()/install() already accept (see Alien::Xrepo::_build_args).
+my %DEF_KEYS = map { $_ => 1 } qw[
+    name version
+    plat arch mode kind no_kind toolchain toolchain_host
+    vs vs_toolset vs_sdkver ndk sdk mingw
+    jobs linkjobs force shallow build debugdir
+    yes confirm theme cachedir installdir
+    configs includes
+];
+#
+class Alien::Xrepo::Base v0.9.5 {
     use Alien::Xrepo;
     use Path::Tiny;
+    use Scalar::Util qw[looks_like_number];
     use Exporter qw[import];
     our @EXPORT = qw[Build_PL];
     #
@@ -11,11 +25,12 @@ class Alien::Xrepo::Base v0.9.4 {
     field $version_constraint : param = undef;
     field $root               : param = undef;
     field $verbose            : param = 0;
-    field $repo;
+    field $repo               : param //= undef;    # injectable for tests/alternate engines
     field $packages = [];    # normalized array ref of package names
+    field $pkg_defs = {};    # package name => normalized per-package hashref def
     field $infos    = {};    # package name => Alien::Xrepo::PackageInfo
     ADJUST {
-        my @names = $self->_normalize_names($pkg_name);
+        my @names = $self->_normalize_defs($pkg_name);
         die "pkg_name is required" unless @names;
         @$packages = @names;
 
@@ -30,6 +45,7 @@ class Alien::Xrepo::Base v0.9.4 {
                 for my $name (@names) {
                     my $c = $config_class->package($name);
                     if ($c) {
+                        next if exists $c->{error};
                         $infos->{$name} = Alien::Xrepo::PackageInfo->new(%$c);
                     }
                 }
@@ -40,28 +56,97 @@ class Alien::Xrepo::Base v0.9.4 {
             # Not installed or utilizing dynamic runtime fetch fallback
         }
 
-        # Setup repo engine
-        $repo = Alien::Xrepo->new( root => $root, verbose => $verbose );
+        # Setup repo engine. Passed-in `repo` wins (used by tests); otherwise
+        # build the standard xrepo engine on the (optional) isolated root.
+        $repo //= Alien::Xrepo->new( root => $root, verbose => $verbose );
     }
 
-    # pkg_name may be a scalar or an array ref / list of package names.
+    # pkg_name may be a scalar or an array ref / list of package names, and each
+    # entry may be a plain name or a hashref of per-package options (see POD).
     method package_names () { return @$packages }
 
-    method _normalize_names ($in) {
-        if ( ref $in eq 'ARRAY' )        { return @$in }
-        if ( defined $in && length $in ) { return ($in) }
-        if ( $self->can('pkg_name') ) {
-            my $v = $self->pkg_name;
-            return ref $v eq 'ARRAY' ? @$v : ($v);
+    # Full per-package definitions: package name => hashref def, only for entries
+    # declared as a hashref (plain names carry no def). Read by the Builder so it
+    # can install each package with its own version/flags/recipe configs.
+    method package_defs () { return $pkg_defs }
+
+    method _normalize_defs ($in) {
+        my @raw;
+        if ( defined $in ) {
+            @raw = ref $in eq 'ARRAY' ? @$in : ($in);
         }
-        return ();
+        elsif ( $self->can('pkg_name') ) {
+            my $v = $self->pkg_name;
+            @raw = ref $v eq 'ARRAY' ? @$v : defined $v ? ($v) : ();
+        }
+        my @names;
+        for my $entry (@raw) {
+            if ( ref $entry eq 'HASH' ) {
+                my %def = %$entry;
+                die "pkg_name hashref requires a 'name' key" unless defined $def{name} && length $def{name};
+                die "pkg_name '$def{name}': name must be a plain string" if ref $def{name};
+                for my $key ( keys %def ) {
+                    next if $key eq 'name' || $key eq 'version';
+                    if ( $key eq 'configs' ) {
+                        die "pkg_name '$def{name}': configs must be a hashref" unless ref $def{configs} eq 'HASH';
+                        next;
+                    }
+                    die "pkg_name '$def{name}': unknown key '$key'. Supported keys: @{[ sort keys %DEF_KEYS ]}. " .
+                        'Recipe options belong under configs => { ... }; global/ambient options belong in install_opts.'
+                        unless $DEF_KEYS{$key};
+                }
+                $pkg_defs->{ $def{name} } = {%def};
+                push @names, $def{name};
+            }
+            elsif ( ref $entry eq '' && defined $entry && length $entry && !looks_like_number($entry) ) {
+                push @names, $entry;
+            }
+            else {
+                die 'pkg_name entries must be a package name or a hashref, got ' . ( ref $entry || 'undef' );
+            }
+        }
+        return @names;
     }
+
+    # The version constraint a package should install at: its own per-package
+    # `version` wins, otherwise the constructor's version_constraint applies.
+    method _version_for_pkg ($name) {
+        my $def = $pkg_defs->{$name};
+        return $version_constraint unless ref $def eq 'HASH' && defined $def->{version};
+        return $def->{version};
+    }
+
+    # install_opts/constructor/install() options with this package's per-package
+    # def merged over them: flag keys override; `configs` merge per-key (the
+    # per-package recipe options win).
+    method _opts_for_pkg ( $name, %opts ) {
+        my $def = $pkg_defs->{$name};
+        return %opts unless $def;
+        my %merged = %opts;
+        my $global = $merged{configs};
+        my %configs = ref $global eq 'HASH' ? %$global : ();
+        for my $key ( keys %$def ) {
+            next if $key eq 'name' || $key eq 'version';
+            if ( $key eq 'configs' ) {
+                %configs = ( %configs, %{ $def->{configs} } ) if ref $def->{configs} eq 'HASH';
+                next;
+            }
+            $merged{$key} = $def->{$key};
+        }
+        $merged{configs} = \%configs if ref $global eq 'HASH' || ref ( $def->{configs} ) eq 'HASH';
+        return %merged;
+    }
+
     method _pkg_info ( $pkg = undef ) { $infos->{ $pkg // $packages->[0] } }
 
     method install (%opts) {
         %$infos = ();
         for my $name (@$packages) {
-            $infos->{$name} = $repo->install( $name, $version_constraint, %opts );
+            $infos->{$name} = $repo->install(
+                $name,
+                $self->_version_for_pkg($name),
+                $self->_opts_for_pkg( $name, %opts ),
+            );
         }
         return wantarray ? values %$infos : $self->_pkg_info;
     }
@@ -167,7 +252,7 @@ class Alien::Xrepo::Base v0.9.4 {
         Alien::Xrepo::Base::Builder->new( alien_class => $alien_class, action => $action, argv => \@ARGV )->execute();
     }
     class    #
-        Alien::Xrepo::Base::Builder v0.9.4 {
+        Alien::Xrepo::Base::Builder v0.9.5 {
         use CPAN::Meta;
         use ExtUtils::Install qw[install];
         use ExtUtils::InstallPaths;
@@ -263,7 +348,6 @@ class Alien::Xrepo::Base v0.9.4 {
             my $dest_path = path($dest)->absolute;
             return unless $src_path->is_dir;
             $dest_path->mkpath;
-
             my $iter = $src_path->iterator( { recurse => 1 } );
             while ( my $p = $iter->() ) {
                 next if $p eq $src_path;    # Skip root
@@ -271,7 +355,8 @@ class Alien::Xrepo::Base v0.9.4 {
                 my $target = $dest_path->child($rel);
                 if ( $p->is_dir ) {
                     $target->mkpath;
-                } else {
+                }
+                else {
                     $p->copy($target) or die "Failed to copy $p to $target: $!";
                     $target->chmod( $p->stat->mode | 0600 );
                 }
@@ -300,39 +385,57 @@ class Alien::Xrepo::Base v0.9.4 {
             my $dist_name = $meta->name;
             my $share_dir = path('blib/lib/auto/share/dist')->child($dist_name)->absolute;
             $share_dir->mkpath;
+            my $repo = Alien::Xrepo->new( verbose => $verbose );
 
-            # 1. Establish the global Build Cache for Alien::Xrepo
-            my $global_cache = $self->_global_cache();
-            $global_cache->mkpath;
-
-            my $repo = Alien::Xrepo->new( root => $global_cache->stringify, verbose => $verbose );
-            say "Using shared Xrepo build cache at $global_cache";
-
+            if ( my $repos = delete $opts{local_repos} ) {
+                for my $r ( ref $repos eq 'ARRAY' ? @$repos : ($repos) ) {
+                    my $dir  = path($r)->absolute;
+                    my $name = 'alien-' . $dir->basename;
+                    next unless $dir->child('packages')->is_dir;
+                    say "[xrepo] registering local recipe repo $name from $dir...";
+                    $repo->add_repo( $name, $dir->stringify );
+                }
+            }
             my %out;
             for my $pkg (@pkgs) {
                 say "Installing $pkg (and its dependencies) into global cache...";
-                my $info = $repo->install( $pkg, undef, %opts );
+
+                # Wrap each install in try/catch so a failure records an error
+                # in ConfigData and lets remaining packages proceed.
+                my $info;
+                try {
+                    $info = $repo->install(
+                        $pkg,
+                        $alien->_version_for_pkg($pkg),
+                        $alien->_opts_for_pkg( $pkg, %opts ),
+                    );
+                }
+                catch ($e) {
+                    warn "[!] $pkg failed to install: $e\n";
+                    $out{$pkg} = { error => "$e" };
+                    next;
+                }
 
                 # 2. Extract just the target package into the Alien's distribution share_dir
                 my $pkg_share = $share_dir->child($pkg);
                 $pkg_share->mkpath;
-
                 say "Copying finalized $pkg artifacts from cache to $pkg_share...";
                 $self->_copy_directory( $info->installdir, $pkg_share );
 
                 # 3. Construct relative paths so ConfigData maps everything to $pkg_share
                 my $make_rel = sub ($p) {
                     return undef unless defined $p;
-                    my $orig = path($p);
-                    my $orig_inst = path($info->installdir);
+                    my $orig      = path($p);
+                    my $orig_inst = path( $info->installdir );
+
                     # If the file came from the cache, map it to our new local copy
-                    if ($orig_inst->subsumes($orig) || $orig eq $orig_inst) {
-                        return path($pkg)->child($orig->relative($orig_inst))->stringify;
+                    if ( $orig_inst->subsumes($orig) || $orig eq $orig_inst ) {
+                        return path($pkg)->child( $orig->relative($orig_inst) )->stringify;
                     }
+
                     # Keep system/external paths absolute
                     return $orig->stringify;
                 };
-
                 $out{$pkg} = {
                     version     => $info->version,
                     kind        => $info->kind,
@@ -342,13 +445,12 @@ class Alien::Xrepo::Base v0.9.4 {
                     linkdirs    => [ map { $make_rel->($_) } @{ $info->linkdirs    // [] } ],
                     bindirs     => [ map { $make_rel->($_) } @{ $info->bindirs     // [] } ],
                     libpath     => $make_rel->( $info->libpath ),
-                    installdir  => $pkg, # The ConfigData $make_abs will prepend $share_dir later
+                    installdir  => $pkg,                            # The ConfigData $make_abs will prepend $share_dir later
                     license     => $info->license,
                     shared      => $info->shared ? 1 : 0,
                     static      => $info->static ? 1 : 0
                 };
             }
-
             return \%out;
         }
 
@@ -411,7 +513,7 @@ class Alien::Xrepo::Base v0.9.4 {
         }
         };
     class    #
-        Alien::Xrepo::Base::Alt v0.9.4 {
+        Alien::Xrepo::Base::Alt v0.9.5 {
         field $base : param;
         field $pkg  : param;
         method package_names ()      { $base->package_names }
@@ -433,10 +535,10 @@ class Alien::Xrepo::Base v0.9.4 {
         method install_type ()       { $base->install_type($pkg) }
         method split_flags ($flags)    { $base->split_flags( $flags, $pkg ) }
         method find_header ($filename) { $base->find_header( $filename, $pkg ) }
-        }
-    }
-    #
-    1;
+        };
+};
+#
+1;
 __END__
 Copyright (C) Sanko Robinson.
 
