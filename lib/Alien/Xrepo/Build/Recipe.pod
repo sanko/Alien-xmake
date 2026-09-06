@@ -1,0 +1,76 @@
+=pod
+
+=encoding utf-8
+
+=head1 NAME
+
+Alien::Xrepo::Build::Recipe - load and validate an xrepo.json recipe
+
+=head1 SYNOPSIS
+
+    my $recipe = Alien::Xrepo::Build::Recipe->new( dir => 'dist-root' );
+    my $recipe = Alien::Xrepo::Build::Recipe->new( file => 'xrepo.json' );
+    my $recipe = Alien::Xrepo::Build::Recipe->new(
+        packages => [
+            'zstd',
+            { name => 'libsdl3', version => '3.4.12', kind => 'shared', configs => { wayland => 1 } },
+        ],
+        defaults => { mode => 'release' },
+    );
+
+=head1 DESCRIPTION
+
+C<xrepo.json> is a small JSON recipe consumed by
+L<Alien::Xrepo::Build>. This class loads it (from a file/directory or inline
+data), validates it, and normalizes the package entries. The allowed per-package
+keys are the installer flags taken by L<Alien::Xrepo> (C<plat>, C<arch>,
+C<mode>, C<kind>, C<toolchain>, C<vs*>, C<ndk>, C<sdk>, C<mingw>, C<jobs>,
+C<force>, ..., plus C<name>, C<version>, and the nested recipe options under
+C<configs>).
+
+=head1 RECIPE FORMAT
+
+    {
+       "name" : "Alien-Zstandard",
+       "packages" : [
+          { "name" : "zstd", "kind" : "shared" }
+       ],
+       "defaults" : { "mode" : "release", "configs" : { "legacy" : 1 } },
+       "pkg_roots" : { "ZSTD" : "$ZSTD" },
+       "local_repos" : [ "vendor/recipes" ],
+       "hooks" : [ "Alien::Zstandard::Hooks" ]
+    }
+
+C<packages> is required and must not be empty; order matters (the first entry is
+the primary package). C<local_repos> are registered with xrepo during configure,
+C<hooks> are loaded by a consuming engine, and C<pkg_roots> maps a package to an
+advanced-user environment variable, mirroring Alien::Build's C<pkg_roots>.
+
+=head1 METHODS
+
+=over
+
+=item C<name()>, C<packages()>, C<package_defs()>
+
+Recipe dist name, the normalized package names in order, and the per-package defs hashref.
+
+=item C<defaults()>, C<pkg_roots()>, C<local_repos()>, C<hooks()>
+
+The remaining recipe sections (normalized to hashref/arrayref).
+
+=item C<version_for( $name )>
+
+The per-package version constraint, if any.
+
+=item C<opts_for( $name, %ambient )>
+
+Ambient options with the package's per-package def merged over them (flag keys
+override; C<configs> merge per-key).
+
+=back
+
+=head1 SEE ALSO
+
+L<Alien::Xrepo::Build>, L<Alien::Xrepo::Runtime>, L<Alien::Xrepo>
+
+=cut

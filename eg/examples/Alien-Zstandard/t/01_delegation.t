@@ -5,27 +5,27 @@ use Alien::Zstandard;
 #
 my $zstd = Alien::Zstandard->new;
 
-# Pre-install: safe defaults before the package is resolved. Only applies to a
-# source checkout with no generated ConfigData (e.g. running `prove t/` cold).
+# Not yet resolvable: Runtime accessors are lazy, so a cold checkout (no snapshot,
+# store empty or xrepo unreachable) yields safe defaults.
 SKIP: {
     my $info = $zstd->package_info;
-    skip 'ConfigData exists (built); delegation already resolves' => 9 if $info;
-    is $zstd->libpath,               undef, 'libpath is undef before install';
-    is $zstd->ffi_lib,               undef, 'ffi_lib is undef before install';
-    is $zstd->version,               undef, 'version is undef before install';
-    is $zstd->kind,                  undef, 'kind is undef before install';
-    is $zstd->cflags,                '',    'cflags is empty before install';
-    is $zstd->libs,                  '',    'libs is empty before install';
-    is $zstd->find_header('zstd.h'), undef, 'find_header is undef before install';
+    skip 'package resolved (snapshot or store); delegation already serves paths' => 9 if $info;
+    is $zstd->libpath,               undef, 'libpath is undef before resolution';
+    is $zstd->ffi_lib,               undef, 'ffi_lib is undef before resolution';
+    is $zstd->version,               undef, 'version is undef before resolution';
+    is $zstd->kind,                  undef, 'kind is undef before resolution';
+    is $zstd->cflags,                '',    'cflags is empty before resolution';
+    is $zstd->libs,                  '',    'libs is empty before resolution';
+    is $zstd->find_header('zstd.h'), undef, 'find_header is undef before resolution';
     my @bins = $zstd->bin_dir;
-    is [@bins],             [],    'bin_dir is empty before install';
-    is $zstd->package_info, undef, 'package_info is undef before install';
+    is [@bins],             [],    'bin_dir is empty before resolution';
+    is $zstd->package_info, undef, 'package_info is undef before resolution';
 }
 
-# Resolved state (post-build or already-installed) validates the real paths.
+# Resolved state (post-Build.PL snapshot, or a store that already has zstd).
 SKIP: {
     my $info = $zstd->package_info;
-    skip 'package not installed; run `perl Build` first' => 7 unless $info;
+    skip 'zstd not installed; run `perl Build.PL` first' => 7 unless $info;
     ok $zstd->libpath, 'libpath resolved';
     ok $zstd->ffi_lib, 'ffi_lib resolved';
     ok $zstd->version, 'version resolved';

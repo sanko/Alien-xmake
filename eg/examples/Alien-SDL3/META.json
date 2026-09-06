@@ -22,15 +22,15 @@
    "prereqs" : {
       "configure" : {
          "requires" : {
-            "Alien::Xrepo::Base" : "0",
+            "Alien::Xrepo::Build" : "0",
             "perl" : "v5.40.0"
          }
       },
       "runtime" : {
          "requires" : {
-            "Alien::Xrepo::Base" : "0",
+            "Alien::Xrepo::Runtime" : "0",
             "File::ShareDir" : "1.00",
-            "perl" : "v5.40.0"
+            "Path::Tiny" : "0"
          }
       }
    },

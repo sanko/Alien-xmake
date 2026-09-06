@@ -5,8 +5,8 @@ use Alien::Zstandard;
 # Instantiate the Alien module
 my $zstd_alien = Alien::Zstandard->new;
 
-# Install on first run if the dist isn't built yet (no ConfigData)
-$zstd_alien->install unless $zstd_alien->ffi_lib;
+# Runtime resolution is lazy: a build-served snapshot or an xrepo store hit
+# settles the package on demand; otherwise ffi_lib stays undef.
 
 # Get the path to the dynamic library (.so, .dll, or .dylib)
 my $lib_path = $zstd_alien->ffi_lib;

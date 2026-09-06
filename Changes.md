@@ -10,20 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `Alien::Xrepo` accepts a new `kind` constructor option that pins the package kind (`shared`/`static`) for every store-touching action; a per-call `kind` still wins.
-- `Alien::Xrepo::Base::Builder` supports a new `local_repos` install option that registers a vendored/local xmake repository tree (a directory whose `packages/...` layout shadows xmake-repo) via `add_repo`, so patched copies of upstream recipes win over the bundled xmake-repo during the resolve.
+- `Alien::Xrepo::Build` registers vendored/local xmake repository trees (a directory whose `packages/...` layout shadows xmake-repo) listed in the recipe's `local_repos` via `add_repo` during configure, so patched copies of upstream recipes win over the bundled xmake-repo during the resolve.
 - When `verbose => 1`, `Alien::Xrepo` now echoes every command it runs as `[XREPO] cmd (cwd: ...)`.
 - The Builder validates every installer it downloads against the sha256 the GitHub releases API reports for the asset (`digest: "sha256:..."`) on all platforms (the Windows `.exe` and the Unix `.run` bundle); a mismatched download dies before it is executed. When metadata is unavailable (e.g. the hardcoded-URL fallback) verification is skipped with a warning.
-- `Alien::Xrepo::Base` gained a full POD (SYNOPSIS, wrap-up of `install_opts`, accessors, `alt`, tips for the default store, shared installs, patched recipes, and the Windows scratch-project pitfall).
-- `Alien::Xrepo::Base::pkg_name` entries may now be a hashref of per-package options (`name`, `version`, and the `install_opts` flags), so one module can install packages with different versions, kinds (e.g. a shared library alongside a binary tool), and recipe `configs`. A per-package entry overrides the global `install_opts`/`install()` options and the `version_constraint` (recipe `configs` merge per key, with the per-package value winning), and the Builder resolves each package the same way. Unknown top-level keys die up front. New `package_defs()` accessor exposes the normalized defs.
-- `Alien::Xrepo::Base` accepts a `repo =>` constructor parameter (defaulting to the standard `Alien::Xrepo` engine) so tests can inject a stub and verify the per-package install dispatch offline.
-- New `t/09_package_defs.t` covers pkg_name normalization, the whitelist/no-name/configs validation, per-package version/flag/config precedence over `install_opts` and `version_constraint`, and the constructed-def dies.
 - New `t/07_argv.t` proves the flags-before-spec argv invariant, OS-path-separator handling for `includes`, and the auto-confirm behavior.
+- New `Alien::Xrepo::Build`, `Alien::Xrepo::Build::Recipe`, and `Alien::Xrepo::Runtime`: an alienfile-shaped build engine and its consumer class that replace the `Alien::Xrepo::Base` layer. A distribution ships a declarative `xrepo.json` recipe; the engine runs `configure -> probe -> install -> gather -> export` (each stage hookable, `register_hook`) with the three `*_prop` buckets and checkpoint/resume as plain JSON. `Alien::Xrepo::Runtime` provides the Alien::Base-style accessor surface and resolves paths lazily through xrepo with no generated `::ConfigData`, serving a hermetic snapshot written by the engine when present.
+- The `eg/examples/Alien-Zstandard`, `eg/examples/Alien-SDL3`, and `eg/examples/Alien-Lsquic` examples all use the new stack: an `xrepo.json` recipe, a `Build.PL` that drives `Alien::Xrepo::Build`, and a module subclassing `Alien::Xrepo::Runtime` (hermetic snapshot autodetected after a build).
+- New tests: `t/10_recipe.t` (xrepo.json loading/validation), `t/11_engine.t` (stage flow, hooks, per-package merge, error isolation, snapshot/checkpoint/resume via an injected spy engine), `t/12_runtime.t` (lazy cached resolution, `alt` delegation, hermetic snapshot mode).
 
 ### Changed
 
 - `Alien::Xrepo` no longer emits `-k shared` by default: `kind` is only passed to xrepo when a consumer explicitly asks for one, so a bare install now behaves exactly like `xrepo install` and resolves the package's own default kind. The SDL3 example (`eg/examples/Alien-SDL3`) and its tests hand `kind => 'shared'` only where the FFI binder needs it.
 - The `includes` (rc file) value is now split/rejoined on the OS path separator (`$Config{path_sep}`) instead of a comma, and each path is normalized to an absolute path before being passed through.
-- `Alien::Xrepo::Base::Builder` now installs into xrepo's default global store instead of redirecting to a wrapper-local cache; a redirected store forces xmake to re-exec with `system=false` and rebuild the whole dependency tree from source, which broke shared libsdl3_ttf links on Linux/macOS. The shallow per-package copy into the subclass's share dir is unchanged.
 - `Alien::Xmake::exe` and `Alien::Xmake::xrepo` return the bare executable path without embedded quotes; the quote-on-demand sites now do their own quoting, and every list-form `system @cmd` / `Capture::Tiny` spawn avoids quote characters that made `CreateProcess` fail for paths with spaces on Windows.
 - Xmake's `Builder` no longer requires `git` to build from source; `git` was dropped from the tool check and from the package-manager install commands.
 
@@ -32,7 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - xrepo's option parser treated any flag that followed the first positional package (e.g. `--includes=...` after the package spec) as another package name, silently corrupting the install list. Every xrepo invocation now goes through a new `_argv` helper that enforces flags-before-spec ordering so the package spec is always the trailing argument.
 - On MSWin32, xrepo's scratch project at `%TEMP%\.xmake\<yymmdd>\xrepo\working\` could be left with a read-only, unexpanded `xmake.lua` template (`${TARGET_NAME}`, a bare `${FAQ}`) after a failed `xmake create`, making every later xrepo action die parsing `.\xmake.lua: unexpected symbol near '$'`. `Alien::Xrepo` now pre-sows and repairs that directory so actions keep working.
 - Captured installs no longer hang on an interactive xrepo/xmake prompt: the mutating actions (`install`, `remove`, `download`, `import`, `export`) auto-confirm (`-y`) by default unless the caller explicitly opts out with `yes =>`/`confirm =>`.
-- A per-package install failure in `Alien::Xrepo::Base::Builder` no longer aborts the whole resolve; it is recorded as an `error` in ConfigData (and surfaced by the package-info resolution) while the remaining packages proceed.
+- A per-package install failure no longer aborts a whole resolve; it is recorded under `runtime_prop->{errors}` (and surfaced by the package-info resolution) while the remaining packages proceed.
+
+### Removed
+
+- `Alien::Xrepo::Base` (with its `::Builder`, `::Build`, `::Build_PL`, and `::Alt` classes) and its POD are gone, along with the `t/05_xrepo_base.t` and `t/09_package_defs.t` suites and all per-distribution `::ConfigData` generation. Consumers subclass `Alien::Xrepo::Runtime`; installs run on `Alien::Xrepo::Build` from an `xrepo.json` recipe.
 
 ## [v0.9.4] - 2026-09-04
 

@@ -5,25 +5,25 @@ use Alien::SDL3;
 #
 my $sdl3 = Alien::SDL3->new;
 
-# Pre-install: safe defaults before the packages are resolved. Only applies to
-# a source checkout with no generated ConfigData (e.g. running `prove t/` cold).
+# Not yet resolvable: Runtime accessors are lazy, so a cold checkout (no
+# snapshot, store empty or xrepo unreachable) yields safe defaults.
 SKIP: {
     my $info = $sdl3->package_info;
-    skip 'ConfigData exists (built); delegation already resolves' => 12 if $info;
+    skip 'packages resolved (snapshot or store); delegation already serves paths' => 21 if $info;
     for my $pkg ( $sdl3->package_names ) {
-        is $sdl3->libpath($pkg),      undef, "$pkg libpath is undef before install";
-        is $sdl3->version($pkg),      undef, "$pkg version is undef before install";
-        is $sdl3->kind($pkg),         undef, "$pkg kind is undef before install";
-        is $sdl3->cflags($pkg),       '',    "$pkg cflags is empty before install";
-        is $sdl3->package_info($pkg), undef, "$pkg package_info is undef before install";
+        is $sdl3->libpath($pkg),      undef, "$pkg libpath is undef before resolution";
+        is $sdl3->version($pkg),      undef, "$pkg version is undef before resolution";
+        is $sdl3->kind($pkg),         undef, "$pkg kind is undef before resolution";
+        is $sdl3->cflags($pkg),       '',    "$pkg cflags is empty before resolution";
+        is $sdl3->package_info($pkg), undef, "$pkg package_info is undef before resolution";
     }
-    is [ $sdl3->bin_dir ], [], 'bin_dir is empty before install';
+    is [ $sdl3->bin_dir ], [], 'bin_dir is empty before resolution';
 }
 
-# Resolved state (post-build or already-installed) validates the real paths.
+# Resolved state (post-Build.PL snapshot, or a store that already has the family).
 SKIP: {
     my $info = $sdl3->package_info;
-    skip 'packages not installed; run `perl Build` first' => 19 unless $info;
+    skip 'packages not installed; run `perl Build.PL` first' => 19 unless $info;
     for my $pkg ( $sdl3->package_names ) {
         my $alt = $sdl3->alt($pkg);
         ok $alt->libpath, "$pkg alt libpath resolved";

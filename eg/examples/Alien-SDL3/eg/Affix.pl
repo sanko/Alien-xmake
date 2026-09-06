@@ -5,8 +5,8 @@ use Alien::SDL3;
 # Bind the SDL3 core library (the primary package) with Affix.
 my $sdl3 = Alien::SDL3->new;
 
-# Install on first run if the dist isn't built yet (no ConfigData)
-$sdl3->install unless $sdl3->ffi_lib;
+# Runtime resolution is lazy: a build-served snapshot or an xrepo store hit
+# settles the package on demand; otherwise ffi_lib stays undef.
 my $lib_path = $sdl3->ffi_lib;
 die 'Could not find SDL3 library path' unless $lib_path;
 say 'Loaded SDL3 from: ' . $lib_path;

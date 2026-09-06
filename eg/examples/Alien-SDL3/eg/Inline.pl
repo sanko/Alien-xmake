@@ -7,8 +7,8 @@ use Inline ();    # Requires Inline::C
 # linker flags that Alien::SDL3 reports for the primary (libsdl3) package.
 my $sdl3 = Alien::SDL3->new;
 
-# Install on first run if the dist isn't built yet (no ConfigData)
-$sdl3->install unless $sdl3->ffi_lib;
+# Runtime resolution is lazy: a build-served snapshot or an xrepo store hit
+# settles the package on demand; otherwise ffi_lib stays undef.
 my $incs = $sdl3->cflags;    # -I<include dir>
 my $libs = $sdl3->libs;      # -L<link dir> -lSDL3
 

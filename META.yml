@@ -64,8 +64,14 @@ provides:
   Alien::Xrepo:
     file: lib/Alien/Xrepo.pm
     version: v0.9.5
-  Alien::Xrepo::Base:
-    file: lib/Alien/Xrepo/Base.pm
+  Alien::Xrepo::Build:
+    file: lib/Alien/Xrepo/Build.pm
+    version: v0.9.5
+  Alien::Xrepo::Build::Recipe:
+    file: lib/Alien/Xrepo/Build/Recipe.pm
+    version: v0.9.5
+  Alien::Xrepo::Runtime:
+    file: lib/Alien/Xrepo/Runtime.pm
     version: v0.9.5
 requires:
   Capture::Tiny: '0'

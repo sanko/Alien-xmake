@@ -5,8 +5,8 @@ use Alien::Zstandard;
 # Instantiate the Alien module
 my $alien = Alien::Zstandard->new;
 
-# Install on first run if the dist isn't built yet (no ConfigData)
-$alien->install unless $alien->ffi_lib;
+# Runtime resolution is lazy: a build-served snapshot or an xrepo store hit
+# settles the package on demand; otherwise ffi_lib stays undef.
 
 # Initialize Platypus using api version 2
 my $lib_path = $alien->ffi_lib;

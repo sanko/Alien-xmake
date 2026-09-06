@@ -1,23 +1,17 @@
 use v5.40;
-use experimental 'class';
+use feature 'class';
+no warnings 'experimental::class';
 
-# Ensure the base class is loaded
-use Alien::Xrepo::Base;
+use Alien::Xrepo::Runtime;
 
-class Alien::Zstandard : isa(Alien::Xrepo::Base) {
-    method pkg_name {'zstd'}
+class Alien::Zstandard : isa(Alien::Xrepo::Runtime) {
 
-    method install_opts {
-        return (
-            kind => 'shared',
-
-            #configs => { legacy => 1 }
-        );
+    # The xrepo package (and its per-package install profile). Declared here so
+    # the consumer resolves without any build step; the xrepo.json recipe next
+    # door carries the same declaration for the Alien::Xrepo::Build engine.
+    method pkg_name {
+        return [ { name => 'zstd', kind => 'shared' } ];
     }
 }
-
-#~ # Quick Test
-#~ my $zstd = Alien::Zstandard->new;
-#~ say "Package: " . $zstd->package_name;
-#~ say "Version: " . $zstd->version;
-#~ say "CFlags:  " . $zstd->cflags;
+#
+1;

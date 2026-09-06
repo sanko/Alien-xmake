@@ -140,7 +140,8 @@ Boolean. If true, prints command output and status messages to C<STDOUT>. Defaul
 Optional default installation root (package store) for this instance. Every store-touching method (C<install>,
 C<fetch>, C<scan>, C<uninstall>, ...) uses C<installdir =E<gt> $root> unless a per-call C<installdir> is given, so the
 instance is confined to its own project-local directory instead of the shared per-user store. Used by
-L<Alien::Xrepo::Base> and the dist builder to keep a distribution's native dependencies inside its C<share> directory.
+alien consumers such as L<Alien::Xrepo::Runtime> and the L<Alien::Xrepo::Build> engine to keep a distribution's
+native dependencies inside its C<share> directory.
 
 =item B<theme>
 
@@ -754,8 +755,8 @@ C<uninstall> frees space in the store you manage yourself.
 
 L<https://xrepo.xmake.io>, L<https://packages.xmake.io/>
 
-L<Affix>, L<Affix::Wrap>, L<Alien::Xmake>, L<FFI::Platypus>, L<Inline::C>; subclass the base class with
-L<Alien::Xrepo::Base>
+L<Affix>, L<Affix::Wrap>, L<Alien::Xmake>, L<Alien::Xrepo::Build>, L<Alien::Xrepo::Runtime>, L<FFI::Platypus>,
+L<Inline::C>
 
 =head1 LICENSE
 

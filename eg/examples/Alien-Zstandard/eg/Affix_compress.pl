@@ -4,8 +4,8 @@ use Alien::Zstandard;
 $|++;
 my $zstd = Alien::Zstandard->new;
 
-# Install on first run if the dist isn't built yet (no ConfigData)
-$zstd->install unless $zstd->ffi_lib;
+# Runtime resolution is lazy: a build-served snapshot or an xrepo store hit
+# settles the package on demand; otherwise ffi_lib stays undef.
 my $lib = $zstd->ffi_lib;
 die "Could not find Zstd library path" unless $lib;
 say "Loaded Zstd from: $lib";

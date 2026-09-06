@@ -1,11 +1,12 @@
 requires 'perl', '5.40.0';
-requires 'File::ShareDir', '1.00';
+requires 'Path::Tiny';
+requires 'JSON::PP';
 
 on 'configure' => sub {
-    requires 'Alien::Xmake::Base', '0';
+    requires 'Alien::Xrepo::Build', '0';
 };
 
-on 'build' => sub {
-    requires 'ExtUtils::InstallPaths', '0.002';
-    requires 'ExtUtils::Install', '2.00';
+on 'runtime' => sub {
+    requires 'Alien::Xrepo::Runtime', '0';
+    requires 'File::ShareDir', '1.00';
 };

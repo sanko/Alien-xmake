@@ -1,0 +1,141 @@
+=pod
+
+=encoding utf-8
+
+=head1 NAME
+
+Alien::Xrepo::Build - alienfile-shaped build engine where every stage is xrepo
+
+=head1 SYNOPSIS
+
+A distribution ships a declarative recipe (C<xrepo.json>) and lets the engine
+drive installs through xrepo:
+
+    {
+       "name" : "Alien-Zstandard",
+       "packages" : [
+          { "name" : "zstd", "kind" : "shared" }
+       ]
+    }
+
+    # Build.PL
+    use Alien::Xrepo::Build;
+
+    my $snapshot = path('blib/lib/auto/share/dist/Alien-Zstandard/xrepo-snapshot.json');
+    Alien::Xrepo::Build->new( recipe => '.' )->run( snapshot => $snapshot );
+
+=head1 DESCRIPTION
+
+C<Alien::Xrepo::Build> is a build engine in the spirit of L<Alien::Build>: a
+stage pipeline with hooks and three property buckets, all serialized as plain
+JSON. Unlike alienfile, there are no download/extract/compile stages of our own
+-- xrepo (via L<Alien::Xrepo>) is the performant docker/kbuild behind every step.
+What remains is the essential orchestration an xrepo wrapper is missing:
+
+=over
+
+=item * probe: ask xrepo whether a package already satisfies the recipe and skip the install if it does
+
+=item * install: one xrepo install per package, per-package version/flags/configs merged over the ambient profile, failures isolated
+
+=item * gather: ensure every package has consumer-facing paths (C<xrepo fetch --json> data) recorded
+
+=item * export: optionally export packages and/or write the runtime snapshot for hermetic consumers
+
+=item * checkpoint/resume: a failed run can be resumed without reinstalling what already happened
+
+=back
+
+=head2 Pipeline stages
+
+The pipeline runs C<configure>, C<probe>, C<install>, C<gather>, C<export>,
+C<test> in order. Each stage method is idempotent per run (a checkpointed stage is
+skipped). Hooks run immediately before their stage body:
+
+    $build->register_hook( install => sub ($build) { ... } );
+
+=head2 Properties
+
+The three buckets mirror L<Alien::Build>'s meta/install/runtime split:
+
+=over
+
+=item C<meta_prop> -- recipe facts (name, packages, package defs, defaults, pkg_roots, local_repos, hooks)
+
+=item C<install_prop> -- this run (store root, ambient profile, probe results)
+
+=item C<runtime_prop> -- what consumers need (per-package include/lib/link data and an C<errors> map)
+
+=back
+
+=head2 The recipe
+
+C<xrepo.json> is loaded and validated by L<Alien::Xrepo::Build::Recipe>. Its
+C<packages> array mirrors an L<Alien::Xrepo::Runtime> C<pkg_name> declaration:
+
+=over
+
+=item * a plain string is a bare xrepo package name
+
+=item * a hashref adds install flags, e.g. C<< { "name" => "zstd", "version" => "1.5.6", "kind" => "shared", "configs" => { "legacy" => 1 } } >>
+
+=back
+
+C<defaults> holds ambient flags applied under every package (same key set, plus
+C<configs>). C<pkg_roots>, C<local_repos>, C<hooks> and C<name> are the remaining
+top-level keys.
+
+=head1 METHODS
+
+=head2 run( %opts )
+
+Run the full pipeline: C<configure>, C<probe>, C<install>, C<gather>, C<export>,
+C<test>. Ambient options (C<kind>, C<mode>, C<plat>, C<arch>, C<configs>, ...) are
+folded over the recipe defaults into the install profile.
+
+=head2 configure( %opts ), probe(), install(), gather(), export(), test()
+
+The individual stages. Idempotent (already-run stages are skipped, including
+after a resume).
+
+=head2 register_hook( $stage, $code ), has_hook( $stage )
+
+Attach/query a hook. Hooks are invoked as C<< $code->($build) >> before the stage body.
+
+=head2 meta_prop(), install_prop(), runtime_prop()
+
+The three property buckets (hashrefs).
+
+=head2 install_type()
+
+C<'share'> once any package resolved, C<'system'> before that.
+
+=head2 packages(), package_defs()
+
+Recipe package names in order, and the normalized per-package defs.
+
+=head2 engine()
+
+The underlying L<Alien::Xrepo> instance (injectable via C<repo =E<gt>> for tests
+or alternate engines).
+
+=head1 CONSTRUCTOR
+
+    Alien::Xrepo::Build->new(
+        recipe       => $path_or_recipe,   # xrepo.json path/dir or a Recipe object
+        root         => $store_root,       # XMAKE_PKG_INSTALLDIR
+        repo         => $alien_xrepo,      # injectable engine
+        verbose      => 1,
+        checkpoint   => $state_file,       # enables resume
+        snapshot     => $snapshot_file,    # write runtime data here during export
+        export_dir   => $dir,              # xrepo-export each package here
+        probe_policy => 'skip',            # skip|always|off
+        resume       => 1,                 # load checkpoint on construction
+    )
+
+=head1 SEE ALSO
+
+L<Alien::Xrepo::Runtime>, L<Alien::Xrepo::Build::Recipe>, L<Alien::Xrepo>,
+L<Alien::Build>, L<alienfile>
+
+=cut
