@@ -1,6 +1,3 @@
-# Based on Module::Build::Tiny which is copyright (c) 2011 by Leon Timmermans, David Golden.
-# Module::Build::Tiny is free software; you can redistribute it and/or modify it under
-# the same terms as the Perl 5 programming language system itself.
 use v5.40;
 use feature 'class';
 no warnings 'experimental::class';
@@ -15,6 +12,9 @@ class    #
     use HTTP::Tiny;
     use Path::Tiny        qw[path cwd];
     use ExtUtils::Helpers qw[make_executable split_like_shell detildefy];
+    use Capture::Tiny     qw[capture];
+    use Symbol            qw[gensym];
+    use IPC::Open3;
 
     # Configuration
     field $target_version : param : reader //= '';    # empty means "latest release" (resolved from the GitHub API)
@@ -51,7 +51,7 @@ class    #
     }
 
     method Build_PL() {
-        die "Pure perl Affix? Ha! You wish.\n" if $pureperl;
+        say "Pure perl Alien? Ha! You wish." if $pureperl;
         say sprintf 'Creating new Build script for %s %s', $meta->name, $meta->version;
 
         # We must capture the current INC to ensure the builder finds itself
@@ -80,7 +80,7 @@ use %s;
 
     # Actions
     method ACTION_build ( ) {
-        say 'Building Alien-Xmake...';
+        say 'Building Alien-Xmake...' if $verbose;
 
         # Prepare blib
         path('blib/lib')->mkpath;
@@ -102,7 +102,7 @@ use %s;
 
         # Generate ConfigData.pm
         $self->_write_config_data($config_data);
-        say 'Build complete';
+        say 'Build complete' if $verbose;
     }
 
     method _stage_sharedir () {
@@ -117,20 +117,28 @@ use %s;
             next unless $target->is_file;
             $target->chmod( $s->stat->mode | 0600 );
         }
-        say "Staged bundled xmake to $auto";
+        say "Staged bundled xmake to $auto" if $verbose;
     }
 
     method ACTION_install ( ) {
-        say 'Installing...';
-        ExtUtils::Install::install( { 'blib/lib' => $Config{installprivlib}, 'blib/arch' => $Config{installarchlib} }, 1, 0, 0 );
+        say 'Installing...' if $verbose;
+        my %install_results;
+        ExtUtils::Install::install(
+            [   from_to           => { 'blib/lib' => $Config{installprivlib}, 'blib/arch' => $Config{installarchlib} },
+                verbose           => $verbose,
+                dry_run           => 0,
+                uninstall_shadows => 1,
+                skip              => undef,
+                always_copy       => 1,
+                result            => \%install_results
+            ]
+        );
 
-        # The bundled xmake was staged into blib/lib/auto/share/dist/Alien-Xmake during
-        # build, so the standard install of blib/lib above already ships it to
-        # <installprivlib>/auto/share/dist/Alien-Xmake. No extra sharedir copy needed.
+        # XXX: Should I bother with the $install_results{install_fail}?
     }
 
     method ACTION_clean () {
-        say 'Cleaning...';
+        say 'Cleaning...' if $verbose;
         path('blib')->remove_tree;
         path('_build_xmake')->remove_tree;
         path('config.log')->remove;
@@ -139,11 +147,11 @@ use %s;
     }
 
     method ACTION_test ( ) {
-        $self->ACTION_build();
-        say 'Running tests...';
-        use Test::Harness;
+        die "Run `./Build build` first.\n" unless -d 'blib';
+        say 'Running tests...' if $verbose;
+        require Test::Harness;
         my @tests = glob('t/*.t');
-        runtests(@tests) if @tests;
+        Test::Harness::runtests(@tests) if @tests;
     }
 
     method _copy_libs ( ) {
@@ -188,19 +196,20 @@ use %s;
             }
         }
     }
+    method _run_cmd (@args) { system(@args) == 0 }
 
-    method _run_cmd (@args) {
-        system(@args) == 0;
+    method _cmd_exists (@cmd) {
+        my ( undef, undef, $exit ) = capture { system @cmd };
+        return $exit == 0;
     }
 
     # Query the GitHub releases API for the target release (latest unless a
-    # --target_version was pinned). Returns the decoded release hashref, caching
-    # it so a single build performs only one API call.
+    # --target_version was pinned).
     method _github_release () {
         return $gh_release if defined $gh_release;
         my $tag = $self->target_version;
         my $url = $tag ? "https://api.github.com/repos/$owner/$repo/releases/tags/$tag" : "https://api.github.com/repos/$owner/$repo/releases/latest";
-        say 'Resolving Xmake release info from the GitHub API...';
+        say 'Resolving Xmake release info from the GitHub API...' if $verbose;
         my $res = $self->http->get($url);
         my %rl  = map { $_ => $res->{headers}{$_} // '' } qw[x-ratelimit-remaining x-ratelimit-limit x-ratelimit-reset retry-after];
         if ( $res->{status} == 403 || $res->{status} == 429 ) {
@@ -236,9 +245,7 @@ use %s;
         return undef;
     }
 
-    method _resolve_xmake ( ) {
-
-        # Check for system install
+    method _resolve_xmake ( ) {    # Check for system install
         unless ($force) {
             my $sys_path = $self->_find_system_xmake();
             if ($sys_path) {
@@ -288,13 +295,8 @@ use %s;
         }
 
         # Download and Install
-        say 'Installing a private copy of Xmake...';
-        if ( $^O eq 'MSWin32' ) {
-            $self->_install_windows($install_dir);
-        }
-        else {
-            $self->_install_unix($install_dir);
-        }
+        say 'Installing a private copy of Xmake...' if $verbose;
+        $^O eq 'MSWin32' ? $self->_install_windows($install_dir) : $self->_install_unix($install_dir);
 
         # Verify Install
         my $bin_path = $install_dir->child( 'bin', $bin_name );
@@ -302,12 +304,10 @@ use %s;
             my $fallback = $install_dir->child($bin_name);
             $bin_path = $fallback if -x $fallback;
         }
-        if ( !-x $bin_path ) {
-            die "Installation finished, but binary not found at $bin_path";
-        }
+        die "Installation finished, but binary not found at $bin_path" unless -x $bin_path;
         my $ver = $self->_get_xmake_version($bin_path);
-        say "Private install successful: $ver";
-        return $self->_generate_share_config( $bin_path, $ver );
+        say 'Private install successful: ' . $ver if $verbose;
+        $self->_generate_share_config( $bin_path, $ver );
     }
 
     method _generate_share_config( $bin_path, $version ) {
@@ -315,9 +315,7 @@ use %s;
         # Calculate relative path from Alien/xmake/ConfigData.pm to the binary
         # ConfigData is in lib/Alien/xmake/
         # Bin is in      lib/Alien/xmake/share/bin/
-        my $lib_base = path('blib/lib/Alien/Xmake')->absolute;
-        my $rel_bin  = $bin_path->relative($lib_base)->stringify;
-        return { install_type => 'share', version => $version, bin => $rel_bin };
+        { install_type => 'share', version => $version, bin => $bin_path->relative( path('blib/lib/Alien/Xmake')->absolute )->stringify };
     }
 
     method _check_existing_share() {
@@ -329,11 +327,8 @@ use %s;
         my $ver      = $self->_get_xmake_version($bin);
         my $bin_path = path($bin);
         my $dir      = $bin_path->parent;
-
-        if ( $dir->basename eq 'bin' ) {
-            $dir = $dir->parent;
-        }
-        return { version => $ver, bin => $bin, install_dir => $dir };
+        $dir = $dir->parent if $dir->basename eq 'bin';
+        { version => $ver, bin => $bin, install_dir => $dir };
     }
 
     method _find_system_xmake ( ) {
@@ -355,11 +350,8 @@ use %s;
     }
 
     method _get_xmake_version ($cmd) {
-        my $safe_cmd = ( $^O eq 'MSWin32' ) ? qq{"$cmd"} : "$cmd";
-        my $out      = `$safe_cmd --version`;
-        if ( $out =~ /xmake\s+v?(\d+\.\d+\.\d+)/i ) {
-            return "v$1";
-        }
+        my ( $out, undef, $exit ) = capture { system $cmd, '--version' };
+        return "v$1" if $exit == 0 && $out =~ /xmake\s+v?(\d+\.\d+\.\d+)/i;
         return 'v0.0.0';
     }
 
@@ -449,21 +441,13 @@ use %s;
         my $arch64_env = $ENV{PROCESSOR_ARCHITEW6432} // '';
         my $target     = $self->_desired_version;
         my $filename;
-
-        # Check for ARM64
-        if ( $arch_env eq 'ARM64' || $arch64_env eq 'ARM64' ) {
-
-            # ARM64 releases use the 'bundle' naming convention
-            $filename = "xmake-bundle-$target.arm64.exe";
+        if ( $arch_env eq 'ARM64' || $arch64_env eq 'ARM64' ) {    # Check for ARM64
+            $filename = "xmake-bundle-$target.arm64.exe";          # ARM64 releases use the 'bundle' naming convention
         }
-
-        # Check for x64 (AMD64/IA64)
-        elsif ( $arch_env eq 'AMD64' || $arch_env eq 'IA64' || $arch64_env eq 'AMD64' || $arch64_env eq 'IA64' ) {
+        elsif ( $arch_env eq 'AMD64' || $arch_env eq 'IA64' || $arch64_env eq 'AMD64' || $arch64_env eq 'IA64' ) {    # Check for x64 (AMD64/IA64)
             $filename = "xmake-$target.win64.exe";
         }
-
-        # Fallback to x86
-        else {
+        else {                                                                                                        # Fallback to x86
             $filename = "xmake-$target.win32.exe";
         }
 
@@ -480,13 +464,12 @@ use %s;
         $install_str =~ s{/}{\\}g;
         my $outfile_str = $outfile->stringify;
         $outfile_str =~ s{/}{\\}g;
-        say "Installing to $install_str...";
+        say "Installing to $install_str..." if $verbose;
 
         # /NOADMIN: Avoid UAC prompt if possible (installs to local user path if allowed)
         # /S: Silent
         # /D: Destination directory
-        my $cmd = qq{"$outfile_str" /NOADMIN /S /D=$install_str};
-        my $ret = system($cmd);
+        my $ret = system( $outfile_str, '/NOADMIN', '/S', "/D=$install_str" );
         die "Installer failed with code $ret" if $ret != 0;
 
         # Ensure all extracted files/templates are writable (NSIS on Windows may set read-only attributes)
@@ -505,14 +488,14 @@ use %s;
         $build_dir->remove_tree;
         $build_dir->mkpath;
         my $sudo = '';
-        if ( $> != 0 && $self->_run_cmd('sudo -n --version >/dev/null 2>&1') ) {
+        if ( $> != 0 && $self->_cmd_exists( 'sudo', '-n', '--version' ) ) {
             $sudo = 'sudo';
         }
         unless ( $self->_test_tools() ) {
 
             # Do not auto-install system tools unless requested.
             if ( $ENV{ALIEN_INSTALL_SYSTEM_TOOLS} ) {
-                say 'Attempting to install system tools via package manager...';
+                say 'Attempting to install system tools via package manager...' if $verbose;
                 if ( $self->_install_tools($sudo) ) {
                     $self->_test_tools() or $self->_raise_dep_error();
                 }
@@ -532,23 +515,21 @@ use %s;
         my $asset   = $self->_find_asset(qr/\Q$filename\E\z/i);
         my $gh_url  = $asset ? $asset->{browser_download_url} : "https://github.com/$owner/$repo/releases/download/$version/$filename";
         my $outfile = $build_dir->child('xmake.run');
-        say "Attempting download from $gh_url...";
-        if ( !$self->_download_file( $gh_url, $outfile ) ) {
-            die "Download failed for $gh_url";
-        }
+        say "Attempting download from $gh_url..." if $verbose;
+        die 'Download failed for ' . $gh_url unless $self->_download_file( $gh_url, $outfile );
         $self->_verify_download( $outfile, $asset );
-        say 'Extracting source bundle...';
+        say 'Extracting source bundle...' if $verbose;
         $self->_run_cmd( 'sh', $outfile, '--noexec', '--quiet', '--target', $build_dir ) or die 'Failed to extract .run file';
         my $cwd = cwd();
         chdir $build_dir or die 'Cannot chdir to build dir';
-        say 'Building Xmake...';
+        say 'Building Xmake...' if $verbose;
 
         # DETERMINE MAKE
         # On FreeBSD/NetBSD/OpenBSD/DragonFly, 'make' is BSD make.
         # Xmake generates GNU makefiles. We MUST use gmake.
         my $make_cmd = 'make';
         if ( $^O =~ /bsd/i || $^O eq 'dragonfly' ) {
-            if ( $self->_run_cmd('gmake --version >/dev/null 2>&1') ) {
+            if ( $self->_cmd_exists( 'gmake', '--version' ) ) {
                 $make_cmd = 'gmake';
             }
             else {
@@ -556,11 +537,11 @@ use %s;
                 die 'gmake is required on BSD systems to build Xmake.';
             }
         }
-        elsif ( $self->_run_cmd('gmake --version >/dev/null 2>&1') ) {
+        elsif ( $self->_cmd_exists( 'gmake', '--version' ) ) {
             $make_cmd = 'gmake';
         }
         if ( -f 'configure' ) {
-            say "Configuring with make=$make_cmd...";
+            say "Configuring with make=$make_cmd..." if $verbose;
             system( './configure', "--make=$make_cmd" ) == 0 or die 'Configure failed';
             system( $make_cmd,     '-j4' ) == 0              or die 'Make failed';
             say "Installing to $installdir...";
@@ -575,48 +556,32 @@ use %s;
 
     method _download_file ( $url, $dest ) {
         my $dest_str = "$dest";
-
-        # Try HTTP::Tiny + IO::Socket::SSL
-        if ( eval { require IO::Socket::SSL; 1 } ) {
-            say 'Downloading with HTTP::Tiny...';
-            my $http = HTTP::Tiny->new( verify_SSL => 1 );
-            my $res  = $http->mirror( $url, $dest_str );
-            if ( $res->{success} ) {
-                return 1;
-            }
-            say "HTTP::Tiny failed: $res->{status} $res->{reason}";
+        try {
+            require IO::Socket::SSL;
+            say 'Downloading with HTTP::Tiny...' if $verbose;
+            CORE::state $http //= HTTP::Tiny->new( verify_SSL => 1 );
+            my $res = $http->mirror( $url, $dest_str );
+            return                                                 if $res->{success};
+            say "HTTP::Tiny failed: $res->{status} $res->{reason}" if $verbose;
         }
-        else {
-            say 'HTTP::Tiny skipped: IO::Socket::SSL not installed.';
+        catch ($e) {
+            say 'HTTP::Tiny error: ' . $e;
         }
-
-        # Try curl
-        if ( $self->_run_cmd('curl --version >/dev/null 2>&1') ) {
-            say 'Downloading with curl...';
+        if ( $self->_cmd_exists( 'curl', '--version' ) ) {
+            say 'Downloading with curl...' if $verbose;
 
             # -L: Follow redirects, -f: Fail on error, -o: Output
-            if ( $self->_run_cmd( 'curl', '-L', '-f', '-o', $dest_str, $url ) ) {
-                return 1;
-            }
+            return 1 if $self->_run_cmd( 'curl', '-L', '-f', '-o', $dest_str, $url );
             say 'curl failed.';
         }
-
-        # Try wget
-        if ( $self->_run_cmd('wget --version >/dev/null 2>&1') ) {
-            say 'Downloading with wget...';
-            if ( $self->_run_cmd( 'wget', '--quiet', '-O', $dest_str, $url ) ) {
-                return 1;
-            }
+        if ( $self->_cmd_exists( 'wget', '--version' ) ) {
+            say 'Downloading with wget...' if $verbose;
+            return 1                       if $self->_run_cmd( 'wget', '--quiet', '-O', $dest_str, $url );
             say 'wget failed.';
         }
         return 0;
     }
 
-    # Verify a downloaded installer against the sha256 GitHub reports for its
-    # release asset (the API's `digest` field, e.g. "sha256:<hex>"). Dies on
-    # mismatch so a corrupted or tampered download never gets executed; skips
-    # (with a warning) when the asset carries no sha256 digest -- e.g. the
-    # hardcoded-URL fallback where release metadata is unavailable.
     method _verify_download ( $file, $asset ) {
         my $digest = $asset && $asset->{digest};
         unless ( defined $digest && length $digest ) {
@@ -628,36 +593,38 @@ use %s;
             say "Unsupported digest scheme '$digest'; skipping verification.";
             return;
         }
-        say "Verifying sha256 of $file...";
+        say "Verifying sha256 of $file..." if $verbose;
         my $got = Digest::SHA->new(256)->addfile( "$file", 'b' )->hexdigest;
-        if ( lc $got ne lc $expected ) {
-            die "Checksum mismatch for $file:\n" . "  expected sha256:$expected\n" . "  got      sha256:$got\n";
-        }
-        say 'sha256 OK.';
+        die <<~"" unless lc $got eq lc $expected;
+        Checksum mismatch for $file:
+            expected sha256:$expected
+            got      sha256:$got
+
+        say 'sha256 OK.' if $verbose;
         return;
     }
 
     method _test_tools ( ) {
-        say 'Checking build tools...';
+        say 'Checking build tools...' if $verbose;
         my $ok = 1;
 
         # GNU or BSD make
         my $found_make = 0;
-        if ( $self->_run_cmd('gmake --version >/dev/null 2>&1') ) {
-            say ' - make: Found (gmake)';
+        if ( $self->_cmd_exists( 'gmake', '--version' ) ) {
+            say ' - make: Found (gmake)' if $verbose;
             $found_make = 1;
         }
-        elsif ( $self->_run_cmd('make --version >/dev/null 2>&1') ) {
-            say ' - make: Found (make - likely GNU compatible)';
+        elsif ( $self->_cmd_exists( 'make', '--version' ) ) {
+            say ' - make: Found (make - likely GNU compatible)' if $verbose;
             $found_make = 1;
         }
-        elsif ( $self->_run_cmd('make -V MACHINE >/dev/null 2>&1') ) {
-            say ' - make: Found (make - BSD)';
+        elsif ( $self->_cmd_exists( 'make', '-V', 'MACHINE' ) ) {
+            say ' - make: Found (make - BSD)' if $verbose;
 
             # If we are on BSD, this is technically 'found', but we know it won't work for Xmake.
             # We must fail here to trigger the installer if we are on BSD.
             if ( $^O =~ /bsd/i || $^O eq 'dragonfly' ) {
-                say '   ! Note: BSD make is not compatible with Xmake build (needs gmake).';
+                say '   ! Note: BSD make is not compatible with Xmake build (needs gmake).' if $verbose;
             }
             else {
                 $found_make = 1;    # On non-BSD systems, maybe they have a different make setup.
@@ -666,8 +633,8 @@ use %s;
 
         # STRICT CHECK for BSDs
         if ( $^O =~ /bsd/i || $^O eq 'dragonfly' ) {
-            unless ( $self->_run_cmd('gmake --version >/dev/null 2>&1') ) {
-                say ' - make: Missing gmake (Required on FreeBSD/BSD for Xmake build)';
+            unless ( $self->_cmd_exists( 'gmake', '--version' ) ) {
+                say ' - make: Missing gmake (Required on FreeBSD/BSD for Xmake build)' if $verbose;
                 $found_make = 0;
                 $ok         = 0;
             }
@@ -676,31 +643,31 @@ use %s;
             }
         }
         unless ($found_make) {
-            say ' - make: Missing';
+            say ' - make: Missing' if $verbose;
             $ok = 0;
         }
 
         # Compiler
-        my $found_cc = 0;
-        my $prog     = "#include <stdio.h>\nint main(){return 0;}";
-        my @compilers
-            = ( [ 'cc', '-xc', '-', '-o', '/dev/null' ], [ 'gcc', '-xc', '-', '-o', '/dev/null' ], [ 'clang', '-xc', '-', '-o', '/dev/null' ] );
+        my $found_cc  = 0;
+        my $prog      = "#include <stdio.h>\nint main(){return 0;}";
+        my @compilers = ( [qw[cc -xc - -o /dev/null]], [qw[gcc -xc - -o /dev/null]], [qw[clang -xc - -o /dev/null]] );
         for my $cmd_ref (@compilers) {
-            my $name    = $cmd_ref->[0];
-            my $cmd_str = join( ' ', @$cmd_ref );
-            my $pid     = open( my $ph, '|-', "$cmd_str >/dev/null 2>&1" );
+            my $name = $cmd_ref->[0];
+            my $err  = gensym;
+            my $pid  = open3( my $in, my $out, $err, @$cmd_ref );
             if ($pid) {
-                print $ph $prog;
-                close $ph;
+                print $in $prog;
+                close $in;
+                waitpid( $pid, 0 );
                 if ( $? == 0 ) {
-                    say " - compiler: Found ($name)";
+                    say " - compiler: Found ($name)" if $verbose;
                     $found_cc = 1;
                     last;
                 }
             }
         }
         unless ($found_cc) {
-            say ' - compiler: Missing (checked cc, gcc, clang)';
+            say ' - compiler: Missing (checked cc, gcc, clang)' if $verbose;
             $ok = 0;
         }
         return $ok;
@@ -723,17 +690,18 @@ use %s;
         );
         for my $pair (@installers) {
             my ( $check, $install ) = @$pair;
-            if ( $self->_run_cmd( $check . ' >/dev/null 2>&1' ) ) {
-                say "Detected package manager via: $check";
-                say 'Attempting to install dependencies...';
-                return $self->_run_cmd( $sudo . ' ' . $install );
+            my @check_args = split /\s+/, $check;
+            if ( $self->_cmd_exists(@check_args) ) {
+                say 'Detected package manager via: ' . $check if $verbose;
+                say 'Attempting to install dependencies...'   if $verbose;
+                my @install_cmd = ( '/bin/sh', '-c', $sudo . ' ' . $install );
+                my ( undef, undef, $exit ) = capture { system @install_cmd };
+                return $exit == 0;
             }
         }
         return 0;
     }
-
-    method _raise_dep_error () {
-        die <<~'MSG';
+    method _raise_dep_error () { die <<~'MSG' }
     Dependencies Installation Failed or Skipped.
 
     We could not find the necessary tools (make, compiler) to build Xmake from source.
@@ -751,16 +719,13 @@ use %s;
     3. Allow this builder to try installing system tools:
        Set ENV ALIEN_INSTALL_SYSTEM_TOOLS=1
     MSG
-    }
-
-    method write_file( $filename, $content ) {
-        path($filename)->spew_raw($content);
-    }
+    method write_file( $filename, $content ) { path($filename)->spew_raw($content) }
 
     method Build(@args) {
         my $method = $self->can( 'ACTION_' . $action );
         $method // die "No such action '$action'\n";
         exit !$method->($self);
     }
-}
+    };
+#
 1;

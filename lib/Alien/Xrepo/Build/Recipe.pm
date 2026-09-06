@@ -2,60 +2,42 @@ use v5.40;
 use feature 'class';
 no warnings 'experimental::class';
 #
-# Installer flags a package entry (or the recipe defaults) may carry. These are
-# exactly the options Alien::Xrepo::_build_args consumes, which are the flags
-# xrepo install/fetch accepts. Recipe options that configure the package itself
-# (e.g. wayland for SDL) belong under `configs => { ... }`.
-our %DEF_KEYS = map { $_ => 1 } qw[
-    name version
-    plat arch mode kind no_kind toolchain toolchain_host
-    vs vs_toolset vs_sdkver ndk sdk mingw
-    jobs linkjobs force shallow build debugdir
-    yes confirm theme cachedir installdir
-    configs includes
-];
-#
 class Alien::Xrepo::Build::Recipe v0.9.5 {
     use JSON::PP qw[decode_json];
     use Path::Tiny;
     use Scalar::Util qw[looks_like_number];
     #
-    field $name        : param //= undef;
+    field $name        : reader : param //= undef;
     field $file        : param //= undef;
     field $dir         : param //= undef;
     field $packages    : param //= undef;
-    field $defaults    : param //= undef;
-    field $pkg_roots   : param //= undef;
-    field $local_repos : param //= undef;
-    field $hooks       : param //= undef;
+    field $defaults    : reader : param //= undef;
+    field $pkg_roots   : reader : param //= undef;
+    field $local_repos : reader : param //= undef;
+    field $hooks       : reader : param //= undef;
     #
-    field $defs  = {};    # package name => normalized per-package hashref def
-    field $order = [];    # package names in recipe order (first = primary)
-
+    field @order : reader(packages);    # package names in recipe order (first = primary)
+    field %defs;                        # package name => normalized per-package hashref def
+    method package_defs { \%defs }
     #
     ADJUST {
         if ( defined $file || defined $dir ) {
-            die "Recipe: pass exactly one of file / dir / inline data"      if defined $file && defined $dir;
-            die "Recipe: inline 'packages' is ignored when a file is given" if defined $packages;
+            die 'Recipe: pass exactly one of file / dir / inline data'       if defined $file && defined $dir;
+            die q[Recipe: inline 'packages' is ignored when a file is given] if defined $packages;
             my $path = $file // path($dir)->child('xrepo.json');
-            die "Recipe file not found: $path" unless -e $path;
+            die 'Recipe file not found: ' . $path unless -e $path;
             my $data = eval { decode_json( path($path)->slurp_utf8 ) };
             die "Recipe '$path' is not valid JSON: $@" if !defined $data || ref $data ne 'HASH';
-            $name      //= $data->{name};
-            $packages  //= $data->{packages};
-            $defaults  //= $data->{defaults};
-            $pkg_roots //= $data->{pkg_roots};
-
-            if ( defined $data->{local_repos} ) {
-                $local_repos //= $data->{local_repos};
-            }
-            if ( defined $data->{hooks} ) {
-                $hooks //= $data->{hooks};
-            }
+            $name        //= $data->{name};
+            $packages    //= $data->{packages};
+            $defaults    //= $data->{defaults};
+            $pkg_roots   //= $data->{pkg_roots};
+            $local_repos //= $data->{local_repos} // [];
+            $hooks       //= $data->{hooks}       // [];
         }
-        die "Recipe: packages is required" unless defined $packages;
-        $order = [ $self->_normalize_defs($packages) ];
-        die "Recipe: at least one package is required" unless @$order;
+        die 'Recipe: packages is required' unless defined $packages;
+        @order = ( $self->_normalize_defs($packages) );
+        die 'Recipe: at least one package is required' unless @order;
         $defaults    //= {};
         $pkg_roots   //= {};
         $local_repos //= [] if !defined $local_repos;
@@ -70,27 +52,18 @@ class Alien::Xrepo::Build::Recipe v0.9.5 {
             die "Recipe: pkg_roots '$root' must be a plain string" if ref $v || !defined $v;
         }
     }
-    #
-    method name ()         { return $name }
-    method packages ()     { return @$order }
-    method package_defs () { return $defs }
-    method defaults ()     { return $defaults }
-    method pkg_roots ()    { return $pkg_roots }
-    method local_repos ()  { return $local_repos }
-    method hooks ()        { return $hooks }
-    #
-    # Version constraint a package installs at: its per-package `version` wins,
-    # otherwise there is none (recipe defaults carry no version by design).
-    method version_for ($name) {
-        my $def = $defs->{$name};
-        return $def->{version} if ref $def eq 'HASH' && defined $def->{version};
-        return undef;
-    }
-    #
-    # Ambient options with this package's per-package def merged over them:
-    # flag keys override; `configs` merge per-key (per-package recipe options win).
+    my %DEF_KEYS = map { $_ => 1 } qw[
+        name version
+        plat arch mode kind no_kind toolchain toolchain_host
+        vs vs_toolset vs_sdkver ndk sdk mingw
+        jobs linkjobs force shallow build debugdir
+        yes confirm theme cachedir installdir
+        configs includes
+    ];
+    method version_for ($name) { $defs{$name}{version} // undef; }
+
     method opts_for ( $name, %ambient ) {
-        my $def = $defs->{$name};
+        my $def = $defs{$name};
         return %ambient unless ref $def eq 'HASH';
         my %merged  = %ambient;
         my $g_cfg   = $merged{configs};
@@ -103,11 +76,7 @@ class Alien::Xrepo::Build::Recipe v0.9.5 {
         $merged{configs} = \%configs if ref $g_cfg eq 'HASH' || ref $def->{configs} eq 'HASH';
         return %merged;
     }
-    #
-    # Normalize recipe `packages` entries. Each entry is a plain package name or
-    # a hashref of per-package options (see Alien::Xrepo::Runtime POD). The
-    # returned list is the install order; after the first entry every hashref
-    # def is recorded in %$defs under its `name`.
+
     method _normalize_defs ($in) {
         my @raw = ref $in eq 'ARRAY' ? @$in : ($in);
         my %seen;
@@ -129,7 +98,7 @@ class Alien::Xrepo::Build::Recipe v0.9.5 {
                 }
                 die "Recipe: duplicate package name '$def{name}'" if $seen{ $def{name} };
                 $seen{ $def{name} } = 1;
-                $defs->{ $def{name} } = {%def};
+                $defs{ $def{name} } = {%def};
                 push @names, $def{name};
             }
             elsif ( ref $entry eq '' && defined $entry && length $entry && !looks_like_number($entry) ) {
@@ -163,6 +132,6 @@ class Alien::Xrepo::Build::Recipe v0.9.5 {
         }
         return;
     }
-    }
-    #
-    1;
+};
+#
+1;

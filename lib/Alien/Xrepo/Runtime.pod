@@ -110,4 +110,15 @@ constructor argument is supplied.
 
 L<Alien::Xrepo::Build>, L<Alien::Xrepo::Build::Recipe>, L<Alien::Xrepo>, L<Alien::Base>
 
+=head1 LICENSE
+
+Copyright (C) Sanko Robinson.
+
+This library is free software; you can redistribute it and/or modify it under the terms found in the Artistic License
+2. Other copyrights, terms, and conditions may apply to data transmitted through this module.
+
+=head1 AUTHOR
+
+Sanko Robinson L<https://github.com/sanko>
+
 =cut

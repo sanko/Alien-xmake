@@ -15,7 +15,7 @@ Alien::Xrepo::Build::Recipe - load and validate an xrepo.json recipe
             'zstd',
             { name => 'libsdl3', version => '3.4.12', kind => 'shared', configs => { wayland => 1 } },
         ],
-        defaults => { mode => 'release' },
+        defaults => { mode => 'release' }
     );
 
 =head1 DESCRIPTION
@@ -67,5 +67,16 @@ Ambient options with the package's per-package def merged over them (flag keys o
 =head1 SEE ALSO
 
 L<Alien::Xrepo::Build>, L<Alien::Xrepo::Runtime>, L<Alien::Xrepo>
+
+=head1 LICENSE
+
+Copyright (C) Sanko Robinson.
+
+This library is free software; you can redistribute it and/or modify it under the terms found in the Artistic License
+2. Other copyrights, terms, and conditions may apply to data transmitted through this module.
+
+=head1 AUTHOR
+
+Sanko Robinson L<https://github.com/sanko>
 
 =cut

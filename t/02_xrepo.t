@@ -11,13 +11,13 @@ ok $Alien::Xrepo::VERSION, 'Alien::Xrepo::VERSION';
 my $repo  = Alien::Xrepo->new( verbose => 0, kind => 'shared' );
 my $xmake = Alien::Xmake->new;
 my $exe   = $xmake->exe;
-qx[$exe g --theme=plain];
-diag `$exe --help`;
+qx["$exe" g --theme=plain];
+diag `"$exe" --help`;
 diag $exe;
 
 #~ diag `$exe update`;
 #~ xmake.exe lua private.xrepo install -y -k shared libpng
-diag `$exe lua private.xrepo install -y -k shared libpng`;
+diag `"$exe" lua private.xrepo install -y -k shared libpng`;
 ok my $pkg = $repo->install('libpng'), 'install libpng';
 skip_all 'Failed to install libpng', 3 unless $pkg;
 diag 'Found library at: ' . $pkg->libpath;

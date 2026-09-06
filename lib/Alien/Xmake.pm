@@ -95,11 +95,18 @@ class Alien::Xmake v0.9.5 {
     method pkg_config ($package) {
         my $xrepo = $self->xrepo;
         system( $xrepo, 'install', '-y', $package ) == 0 || die "Alien::Xmake: Could not install package '$package'\n";
-        my $cflags = qx|"$xrepo" fetch --cflags "$package"|;
+        my ( $cflags, undef, undef ) = capture_cmd( $xrepo, 'fetch', '--cflags', $package );
         chomp $cflags;
-        my $libs = qx|"$xrepo" fetch --ldflags "$package"|;
+        my ( $libs, undef, undef ) = capture_cmd( $xrepo, 'fetch', '--ldflags', $package );
         chomp $libs;
         return { cflags => $cflags, libs => $libs };
+    }
+
+    # Centralized LIST-form command capture.  Every external command spawned
+    # by this distribution should route through here or _run/_capture to
+    # avoid shell-interpretation bugs with paths that contain spaces.
+    sub capture_cmd (@cmd) {
+        return capture { system @cmd }
     }
     method version ()             { $self->install_type eq 'system' ? $self->_getver : $config->{version} }
     method buildid ()             { $self->_getbuild }
@@ -614,7 +621,10 @@ class Alien::Xmake v0.9.5 {
 
     method _getver_build() {
         my $cmd = $self->exe;
-        state $out //= qx["$cmd" --version];
+        state $out //= do {
+            my ( $stdout, undef, $exit ) = capture_cmd( $cmd, '--version' );
+            $exit == 0 ? $stdout : '';
+        };
         return ( $1, $2 ) if $out =~ /xmake\s+v?(\d+\.\d+\.\d+)(?:\+(.+),)?/i;
         ( '0.0.0', () );
     }

@@ -4,7 +4,7 @@
 
 =head1 NAME
 
-Alien::Xrepo::Build - alienfile-shaped build engine where every stage is xrepo
+Alien::Xrepo::Build - alienfile-shaped Build Engine Where Every Stage is xrepo
 
 =head1 SYNOPSIS
 
@@ -27,8 +27,7 @@ A distribution ships a declarative recipe (C<xrepo.json>) and lets the engine dr
 
 C<Alien::Xrepo::Build> is a build engine in the spirit of L<Alien::Build>: a stage pipeline with hooks and three
 property buckets, all serialized as plain JSON. Unlike alienfile, there are no download/extract/compile stages of our
-own -- xrepo (via L<Alien::Xrepo>) is the performant docker/kbuild behind every step. What remains is the essential
-orchestration an xrepo wrapper is missing:
+own, all of that is handled by xrepo via L<Alien::Xrepo>. What remains is the essential orchestration:
 
 =over
 
@@ -83,51 +82,80 @@ C<local_repos>, C<hooks> and C<name> are the remaining top-level keys.
 
 =head1 METHODS
 
-=head2 run( %opts )
-
-Run the full pipeline: C<configure>, C<probe>, C<install>, C<gather>, C<export>, C<test>. Ambient options (C<kind>,
-C<mode>, C<plat>, C<arch>, C<configs>, ...) are folded over the recipe defaults into the install profile.
-
-=head2 configure( %opts ), probe(), install(), gather(), export(), test()
-
-The individual stages. Idempotent (already-run stages are skipped, including after a resume).
-
-=head2 register_hook( $stage, $code ), has_hook( $stage )
-
-Attach/query a hook. Hooks are invoked as C<< $code->($build) >> before the stage body.
-
-=head2 meta_prop(), install_prop(), runtime_prop()
-
-The three property buckets (hashrefs).
-
-=head2 install_type()
-
-C<'share'> once any package resolved, C<'system'> before that.
-
-=head2 packages(), package_defs()
-
-Recipe package names in order, and the normalized per-package defs.
-
-=head2 engine()
-
-The underlying L<Alien::Xrepo> instance (injectable via C<repo =E<gt>> for tests or alternate engines).
-
-=head1 CONSTRUCTOR
+=head2 C<new( ... )>
 
     Alien::Xrepo::Build->new(
         recipe       => $path_or_recipe,   # xrepo.json path/dir or a Recipe object
         root         => $store_root,       # XMAKE_PKG_INSTALLDIR
         repo         => $alien_xrepo,      # injectable engine
-        verbose      => 1,
+        verbose      => true,
         checkpoint   => $state_file,       # enables resume
         snapshot     => $snapshot_file,    # write runtime data here during export
         export_dir   => $dir,              # xrepo-export each package here
         probe_policy => 'skip',            # skip|always|off
-        resume       => 1,                 # load checkpoint on construction
-    )
+        resume       => true               # load checkpoint on construction
+    );
+
+=head2 C<run( %opts )>
+
+Run the full pipeline: C<configure>, C<probe>, C<install>, C<gather>, C<export>, C<test>. Ambient options (C<kind>,
+C<mode>, C<plat>, C<arch>, C<configs>, ...) are folded over the recipe defaults into the install profile.
+
+Including after a resume, stages that have already run are skipped.
+
+=head2 C<configure( %opts )>
+
+=head2 C<probe()>
+
+=head2 C<install()>
+
+=head2 C<gather()>
+
+=head2 C<export()>
+
+=head2 C<test()>
+
+=head2 C<register_hook( $stage, $code )>
+
+Attach a hook. Hooks are invoked as C<< $code->($build) >> before the stage body.
+
+ =head2 C<has_hook( $stage )>
+
+ Query a hook.
+
+=head2 C<meta_prop()>
+
+=head2 C<install_prop()>
+
+=head2 C<runtime_prop()>
+
+=head2 install_type()
+
+C<'share'> once any package resolved, C<'system'> before that.
+
+=head2 C<packages()>
+
+=head2 C<package_defs()>
+
+Recipe package names in order, and the normalized per-package defs.
+
+=head2 C<engine()>
+
+The underlying L<Alien::Xrepo> instance (injectable via C<repo =E<gt>> for tests or alternate engines).
 
 =head1 SEE ALSO
 
 L<Alien::Xrepo::Runtime>, L<Alien::Xrepo::Build::Recipe>, L<Alien::Xrepo>, L<Alien::Build>, L<alienfile>
+
+=head1 LICENSE
+
+Copyright (C) Sanko Robinson.
+
+This library is free software; you can redistribute it and/or modify it under the terms found in the Artistic License
+2. Other copyrights, terms, and conditions may apply to data transmitted through this module.
+
+=head1 AUTHOR
+
+Sanko Robinson L<https://github.com/sanko>
 
 =cut

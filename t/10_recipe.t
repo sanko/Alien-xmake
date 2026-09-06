@@ -7,14 +7,15 @@ use JSON::PP   qw[encode_json];
 use Path::Tiny;
 use Alien::Xrepo::Build::Recipe;
 use experimental 'class';
+#
 my $dir = tempdir( CLEANUP => 1 );
 subtest 'inline defs normalize like Base pkg_name' => sub {
     my $recipe = Alien::Xrepo::Build::Recipe->new(
         packages => [
             'zstd',
             { name => 'libsdl3', version => '3.4.12', kind => 'shared', configs => { wayland => 1 } },
-            { name => 'ninja',   kind    => 'binary' },
-        ],
+            { name => 'ninja',   kind    => 'binary' }
+        ]
     );
     is [ $recipe->packages ],                              [qw[zstd libsdl3 ninja]], 'packages in recipe order';
     is $recipe->package_defs->{libsdl3}{version},          '3.4.12',                 'version captured';
@@ -42,7 +43,7 @@ subtest 'file round-trip (xrepo.json)' => sub {
                 defaults    => { mode => 'release', configs => { legacy => 1 } },
                 pkg_roots   => { ZSTD => '$ZSTD' },
                 local_repos => ['vendor/recipes'],
-                hooks       => ['Alien::Zstandard::Hooks'],
+                hooks       => ['Alien::Zstandard::Hooks']
             }
         )
     );
@@ -72,7 +73,7 @@ subtest 'validation dies loudly' => sub {
         [ 'bad defaults configs', { packages => ['zstd'], defaults => { configs => 'x=1' } }, qr/defaults configs must be a hashref/ ],
         [ 'bad pkg_roots',        { packages => ['zstd'], pkg_roots => [] },                  qr/pkg_roots must be a hashref/ ],
         [ 'bad local_repos',      { packages => ['zstd'], local_repos => 'x' },               qr/local_repos must be an arrayref/ ],
-        [ 'bad hooks',            { packages => ['zstd'], hooks => { x => 1 } },              qr/hooks must be an arrayref/ ],
+        [ 'bad hooks',            { packages => ['zstd'], hooks => { x => 1 } },              qr/hooks must be an arrayref/ ]
     ) {
         my ( $label, $data, $re ) = @$case;
         my $err = dies { Alien::Xrepo::Build::Recipe->new(%$data) };
@@ -82,4 +83,5 @@ subtest 'validation dies loudly' => sub {
 subtest 'missing file dies' => sub {
     like dies { Alien::Xrepo::Build::Recipe->new( file => path($dir)->child('nope.json') ) }, qr/not found/, 'bad file path dies';
 };
+#
 done_testing;

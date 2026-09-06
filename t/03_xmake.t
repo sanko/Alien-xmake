@@ -13,7 +13,7 @@ my $xmake = Alien::Xmake->new;
 ok $xmake->version,         'version is set';
 ok defined $xmake->buildid, 'buildid is defined-ish';
 ok my $exe = $xmake->exe,   'exe works';
-qx[$exe g --theme=plain];
+qx["$exe" g --theme=plain];
 
 # Query mode
 my @platforms = $xmake->show('platforms');

@@ -34,7 +34,7 @@ subtest cmake => sub {
                 ( $out, undef, $exit ) = Capture::Tiny::capture { system $exe->absolute, '--version' };
             }
             catch ($e) {
-                $out  = `$exe --version 2>&1`;
+                $out  = `"$exe" --version 2>&1`;
                 $exit = $? >> 8;
             }
         }

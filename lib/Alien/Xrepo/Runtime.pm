@@ -1,5 +1,5 @@
 use v5.40;
-use feature 'class';
+use feature qw[class try];
 no warnings 'experimental::class';
 #
 # Alien::Xrepo::Runtime - the post-build consumer layer. Unlike Alien::Base,
@@ -56,8 +56,8 @@ class Alien::Xrepo::Runtime v0.9.5 {
         $self->_load_snapshot;
     }
     #
-    method package_names () { return $recipe_obj->packages }
-    method package_defs  () { return $recipe_obj->package_defs }
+    method package_names () {   $recipe_obj->packages }
+    method package_defs  () {   $recipe_obj->package_defs }
     #
     # Hermetic mode: a snapshot file wins entirely (no xrepo subprocess).
     method _load_snapshot () {
@@ -102,9 +102,9 @@ class Alien::Xrepo::Runtime v0.9.5 {
         my $version = $recipe_obj->version_for($pkg);
         my %opts    = $recipe_obj->opts_for( $pkg, %$install_opts );
         my $resolved;
-        eval { $resolved = $r->fetch( $pkg, $version, %opts ) };
-        if ($@) {
-            warn "[!] could not resolve $pkg: $@\n" if $verbose;
+        try { $resolved = $r->fetch( $pkg, $version, %opts ) }
+        catch ($e) {
+            warn "[!] could not resolve $pkg: $e\n" if $verbose;
             $resolved = undef;
         }
         $infos->{$pkg} = $resolved;

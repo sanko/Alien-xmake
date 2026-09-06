@@ -97,7 +97,6 @@
             "Capture::Tiny" : "0",
             "ExtUtils::Helpers" : "0.028",
             "ExtUtils::InstallPaths" : "0.002",
-            "File::Which" : "0",
             "Path::Tiny" : "0",
             "perl" : "v5.40.0"
          }
@@ -110,12 +109,16 @@
          "requires" : {
             "Capture::Tiny" : "0",
             "File::Temp" : "0",
-            "Test::Alien::Build" : "0",
-            "Test2::V0" : "0"
+            "Test2::V0" : "0",
+            "Test::Alien::Build" : "0"
          }
       }
    },
    "provides" : {
+      "Alien::Build::Plugin::Build::Xrepo" : {
+         "file" : "lib/Alien/Build/Plugin/Build/Xrepo.pm",
+         "version" : "v0.9.5"
+      },
       "Alien::Xmake" : {
          "file" : "lib/Alien/Xmake.pm",
          "version" : "v0.9.5"
@@ -132,19 +135,19 @@
          "file" : "lib/Alien/Xrepo/Build/Recipe.pm",
          "version" : "v0.9.5"
       },
+      "Alien::Xrepo::PackageInfo" : {
+         "file" : "lib/Alien/Xrepo.pm",
+         "version" : "v0.9.5"
+      },
       "Alien::Xrepo::Runtime" : {
          "file" : "lib/Alien/Xrepo/Runtime.pm",
          "version" : "v0.9.5"
       },
-"Alien::Xrepo::Runtime::Alt" : {
-          "file" : "lib/Alien/Xrepo/Runtime.pm",
-          "version" : "v0.9.5"
-       },
-       "Alien::Build::Plugin::Build::Xrepo" : {
-          "file" : "lib/Alien/Build/Plugin/Build/Xrepo.pm",
-          "version" : "v0.9.5"
-       }
-    },
+      "Alien::Xrepo::Runtime::Alt" : {
+         "file" : "lib/Alien/Xrepo/Runtime.pm",
+         "version" : "v0.9.5"
+      }
+   },
    "release_status" : "testing",
    "resources" : {
       "bugtracker" : {

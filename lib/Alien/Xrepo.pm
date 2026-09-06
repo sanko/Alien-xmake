@@ -41,8 +41,7 @@ class Alien::Xrepo v0.9.5 {
         return;
     }
     #
-    class    #
-        Alien::Xrepo::PackageInfo v0.9.5 {
+    class Alien::Xrepo::PackageInfo v0.9.5 {
         use Path::Tiny;
         field $includedirs : param : reader;
         field $libfiles    : param : reader;

@@ -1,3 +1,4 @@
+requires 'Alien::Build', '2.84';
 requires 'Capture::Tiny';
 requires 'ExtUtils::Helpers',      '0.028';
 requires 'ExtUtils::InstallPaths', '0.002';
@@ -43,6 +44,7 @@ on test => sub {
     requires 'Capture::Tiny';
     requires 'File::Temp';
     requires 'Test2::V0';
+    requires 'Test::Alien::Build';
     recommends 'Affix';
     recommends 'FFI::Platypus';
 };

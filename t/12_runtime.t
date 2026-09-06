@@ -12,7 +12,7 @@ use experimental 'class';
 # A spy engine whose fetch serves canned PackageInfo and counts calls, so the
 # laziness/caching of the runtime layer can be verified without xrepo.
 class Alien::Xrepo::Runtime::TestSpy {
-    field $calls = 0;
+    field $calls : reader = 0;
 
     method fetch ( $name, $version, %opts ) {
         $calls++;
@@ -28,10 +28,9 @@ class Alien::Xrepo::Runtime::TestSpy {
             libpath     => "C:/store/$name/bin/$name.dll",
             bindirs     => ["C:/store/$name/bin"],
             installdir  => "C:/store/$name",
-            kind        => 'library',
+            kind        => 'library'
         );
     }
-    method calls () { return $calls }
 }
 
 class Alien::Xrepo::Runtime::TestDyn : isa(Alien::Xrepo::Runtime) {
@@ -93,9 +92,9 @@ subtest 'hermetic snapshot: no xrepo call at all' => sub {
                         libpath     => 'C:/snap/zstd/bin/zstd.dll',
                         bindirs     => ['C:/snap/zstd/bin'],
                         installdir  => 'C:/snap/zstd',
-                        kind        => 'library',
-                    },
-                },
+                        kind        => 'library'
+                    }
+                }
             }
         )
     );
@@ -117,4 +116,5 @@ subtest 'snapshot autodetect keys to the Alien-<tail> share dir' => sub {
     is scalar(@cand), 1, 'one candidate when no installed share dir';
     like $cand[0], qr/Alien-Xrepo-Runtime-Nope[\\\/]xrepo-snapshot\.json$/, 'candidate keys to Alien-<tail> share dir';
 };
+#
 done_testing;

@@ -2,13 +2,6 @@ use v5.40;
 use feature 'class';
 no warnings 'experimental::class';
 #
-# Alien::Xrepo::Build - the build engine (mirrors the stage/hook shape of alienfile /
-# Alien::Build, but every download/extract/build/gather stage is delegated to xrepo).
-#
-# Pipeline: configure -> probe -> install -> gather -> export (all hookable).
-# Three property buckets mirror Alien::Build's meta_prop / install_prop / runtime_prop,
-# all serialized as plain JSON so a run can be checkpointed and resumed.
-#
 class Alien::Xrepo::Build v0.9.5 {
     use Alien::Xrepo;
     use Alien::Xrepo::Build::Recipe;
@@ -27,14 +20,17 @@ class Alien::Xrepo::Build v0.9.5 {
     field $probe_policy : param //= 'skip';    # skip|always|off
     field $resume       : param //= 0;
     #
-    field $hooks        = {};                  # stage => [ coderef, ... ]
-    field $meta_prop    = {};
-    field $install_prop = {};
-    field $runtime_prop = {};
-    field $stage_done   = {};
-    field $install_type = 'system';
-    field $r            = undef;               # resolved Alien::Xrepo engine
+    field $hooks = {};                                 # stage => [ coderef, ... ]
+    field $meta_prop    : reader         = {};
+    field $install_prop : reader         = {};
+    field $runtime_prop : reader         = {};
+    field $stage_done   : reader         = {};
+    field $install_type : reader         = 'system';
+    field $r            : reader(engine) = undef;      # resolved Alien::Xrepo engine
 
+    #
+    method packages ()     { return $recipe->packages }
+    method package_defs () { return $recipe->package_defs }
     #
     ADJUST {
         unless ( ref $recipe ) {
@@ -48,14 +44,6 @@ class Alien::Xrepo::Build v0.9.5 {
         }
     }
     #
-    method meta_prop ()    { return $meta_prop }
-    method install_prop () { return $install_prop }
-    method runtime_prop () { return $runtime_prop }
-    method install_type () { return $install_type }
-    method packages ()     { return $recipe->packages }
-    method package_defs () { return $recipe->package_defs }
-    method stage_done ()   { return $stage_done }
-    method engine ()       { return $r }
     #
     # Hooks. A hook is invoked with ($self) immediately before its stage body.
     method register_hook ( $stage, $hook ) {
@@ -70,8 +58,7 @@ class Alien::Xrepo::Build v0.9.5 {
         $self->$_($self) for @{ $hooks->{$stage} // [] };
         return;
     }
-    #
-    # Run the full pipeline.
+
     method run (%opts) {
         $self->configure(%opts);
         $self->probe;
@@ -79,11 +66,9 @@ class Alien::Xrepo::Build v0.9.5 {
         $self->gather;
         $self->export;
         $self->test;
-        return $self;
+        $self;
     }
-    #
-    # configure: freeze the recipe into meta_prop, fold ambient options over the
-    # recipe defaults into install_prop->{profile}, register local recipe repos.
+
     method configure (%opts) {
         return if $stage_done->{configure};
         $self->run_hooks('configure');
@@ -94,7 +79,7 @@ class Alien::Xrepo::Build v0.9.5 {
             defaults     => $recipe->defaults,
             pkg_roots    => $recipe->pkg_roots,
             local_repos  => [ @{ $recipe->local_repos } ],
-            hooks        => [ @{ $recipe->hooks } ],
+            hooks        => [ @{ $recipe->hooks } ]
         };
         my %profile = ( %{ $recipe->defaults }, %opts );
         $profile{configs} = { %{ $recipe->defaults->{configs} // {} }, %{ $opts{configs} // {} } }
@@ -114,12 +99,9 @@ class Alien::Xrepo::Build v0.9.5 {
         $install_type = 'system';
         $self->_checkpoint;
         $stage_done->{configure} = 1;
-        return $self;
+        $self;
     }
-    #
-    # probe: for each package ask xrepo what version is already available in the
-    # store. Results land in install_prop->{probed}. Under probe_policy 'skip' the
-    # install stage treats a satisfied probe as a reason to skip reinstalling.
+
     method probe () {
         return if $stage_done->{probe};
         $self->run_hooks('probe');
@@ -138,12 +120,9 @@ class Alien::Xrepo::Build v0.9.5 {
         }
         $self->_checkpoint;
         $stage_done->{probe} = 1;
-        return $self;
+        $self;
     }
-    #
-    # install: install each package in recipe order with its own version and
-    # flags merged over the ambient profile. A failed package records an error
-    # and the remaining packages still proceed (error isolation).
+
     method install () {
         return if $stage_done->{install};
         $self->run_hooks('install');
@@ -172,12 +151,9 @@ class Alien::Xrepo::Build v0.9.5 {
         }
         $self->_checkpoint;
         $stage_done->{install} = 1;
-        return $self;
+        $self;
     }
-    #
-    # gather: ensure every installable package has consumer-facing data in
-    # runtime_prop, re-fetching anything missing (or marked binary) so the
-    # runtime layer needs no other state.
+
     method gather () {
         return if $stage_done->{gather};
         $self->run_hooks('gather');
@@ -200,11 +176,9 @@ class Alien::Xrepo::Build v0.9.5 {
         }
         $self->_checkpoint;
         $stage_done->{gather} = 1;
-        return $self;
+        $self;
     }
-    #
-    # export: write the gathered runtime data as a hermetic-able snapshot (JSON)
-    # and/or xrepo-export each package into a directory of choice.
+
     method export () {
         return if $stage_done->{export};
         $self->run_hooks('export');
@@ -223,6 +197,7 @@ class Alien::Xrepo::Build v0.9.5 {
                 pkg_roots    => $recipe->pkg_roots,
                 packages     => $runtime_prop->{packages} // {},
                 errors       => $runtime_prop->{errors}   // {},
+                digest       => $self->_config_digest
             };
             path($snapshot)->parent->mkpath if defined $snapshot;
             path($snapshot)->spew_utf8( encode_json($data) . "\n" );
@@ -230,36 +205,44 @@ class Alien::Xrepo::Build v0.9.5 {
         }
         $self->_checkpoint;
         $stage_done->{export} = 1;
-        return $self;
+        $self;
     }
-    #
-    # test: only hooks (the engine performs no compile smoke test of its own).
+
     method test () {
         return if $stage_done->{test};
         $self->run_hooks('test');
         $stage_done->{test} = 1;
-        return $self;
+        $self;
     }
-    #
     method _version_for_pkg ($name)          { $recipe->version_for($name) }
     method _opts_for_pkg    ( $name, %opts ) { $recipe->opts_for( $name, %opts ) }
-    #
+
+    method _config_digest () {
+        require Digest::SHA;
+        my @parts;
+        for my $name ( $recipe->packages ) {
+            my $version = $recipe->version_for($name);
+            my %opts    = $recipe->opts_for( $name, %{ $install_prop->{profile} // {} } );
+            push @parts, $name, ( defined $version ? $version : '' );
+            push @parts, map { $_ . '=' . ( defined $opts{$_} ? $opts{$_} : '' ) } sort keys %opts;
+        }
+        Digest::SHA::sha256_hex( join "\x1f", @parts );
+    }
+
     method _probe_satisfied ( $found, $expected ) {
         return 0 unless defined $found    && length $found;
         return 1 unless defined $expected && length $expected;
         return $found eq $expected;
     }
-    #
+
     method _can_skip_install ($name) {
         return 0 unless $probe_policy eq 'skip';
         my $probe = $install_prop->{probed}{$name} // {};
         return 0 unless $probe->{satisfied};
         my %opts = $self->_opts_for_pkg( $name, %{ $install_prop->{profile} // {} } );
-        return !$opts{force};
+        !$opts{force};
     }
-    #
-    # Persist stage state + props so a later `resume => 1` constructor can pick
-    # up where an interrupted run left off.
+
     method _checkpoint () {
         return unless defined $checkpoint;
         path($checkpoint)->parent->mkpath;
@@ -268,7 +251,7 @@ class Alien::Xrepo::Build v0.9.5 {
             stage_done   => $stage_done,
             meta_prop    => $meta_prop,
             install_prop => $install_prop,
-            runtime_prop => $runtime_prop,
+            runtime_prop => $runtime_prop
         };
         path($checkpoint)->spew_utf8( encode_json($data) . "\n" );
         return;
@@ -285,6 +268,6 @@ class Alien::Xrepo::Build v0.9.5 {
         $runtime_prop = $data->{runtime_prop} // {};
         return 1;
     }
-    }
-    #
-    1;
+};
+#
+1;
