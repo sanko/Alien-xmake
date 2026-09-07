@@ -42,6 +42,20 @@ subtest 'cache get bumps LRU order and rejects dead install dirs' => sub {
     ok $repo->_cache_get( 'b',   $meta ), 'present install dir is a hit';
     is [ @{ $meta->{order} } ], [qw[b a]], 'hit promoted b to the front';
 };
+subtest 'cache liveness requires the recorded lib file itself' => sub {
+    my $tmp  = Path::Tiny->tempdir;
+    my $lib  = $tmp->child( 'pkgs', 'webui', 'hash', 'lib', 'webui.dll' );
+    my $dir  = $lib->parent->parent;
+    $lib->parent->mkpath;
+    $lib->spew('x');
+    my $meta = { order => [], entries => {} };
+    $repo->_cache_put( 'liby', $meta, { installdir => "$dir", libpath => "$lib", last_used => time }, 10 );
+    ok $repo->_cache_get( 'liby', $meta ), 'recorded lib on disk is a hit';
+    $lib->remove;
+    ok !$repo->_cache_get( 'liby', $meta ), 'lib file removed is a miss even though its install dir still exists';
+    $repo->_cache_put( 'dironly', $meta, { installdir => "$dir", last_used => time }, 10 );
+    ok $repo->_cache_get( 'dironly', $meta ), 'installdir-only entry still trusts the dir';
+};
 subtest 'cache save/load round-trips and prunes stale entries' => sub {
     my $store = Path::Tiny->tempdir;
     my $live  = $store->child( 'pkgs', 'webui', 'bin' );

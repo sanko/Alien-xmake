@@ -108,7 +108,7 @@ class Alien::Xrepo v0.9.5 {
 
         # Warm path: a prior successful install+fetch is replayed straight from disk, so a
         # repeat launch (eg/webui.pl) skips xrepo entirely. The LRU is validated against the
-        # recorded install dir before an entry is trusted.
+        # recorded files (install dir and, when recorded, the first lib) before an entry is trusted.
         my $use_cache = defined $opts{cache} ? $opts{cache}                                                    : $cache;
         my $key       = $use_cache           ? $self->_cache_key( $full_spec, \%opts )                         : undef;
         my $meta      = $use_cache           ? ( $self->_cache_load(%opts) || { order => [], entries => {} } ) : undef;
@@ -207,13 +207,14 @@ class Alien::Xrepo v0.9.5 {
         move( "$tmp", "$file" );
     }
 
-    # A cached entry is trustworthy only while its recorded install dir (or first lib) still
-    # exists; uninstalled packages disqualify themselves and are pruned on the next save.
+    # A cached entry is trustworthy only while its recorded files actually exist. When a lib
+    # file was recorded it is the decisive proof: the package is dead if that file is gone, even
+    # when its install dir (or the hashed export tree above it) lingers. Entries without a lib
+    # file (header-only or binary tools) fall back to the install dir.
     method _entry_alive ($e) {
         return () unless ref $e eq 'HASH';
-        if ( defined $e->{installdir} && length $e->{installdir} ) { return 1 if -d $e->{installdir}; }
-        if ( defined $e->{libpath}    && length $e->{libpath} )    { return 1 if -f $e->{libpath}; }
-        ();
+        return -f $e->{libpath} if defined $e->{libpath} && length $e->{libpath};
+        defined $e->{installdir} && length $e->{installdir} && -d $e->{installdir};
     }
 
     method _cache_get ( $key, $meta ) {
