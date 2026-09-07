@@ -70,9 +70,7 @@ class Alien::Xmake v0.9.5 {
     # the literal image name, so quotes make CreateProcess fail even for paths
     # with spaces. Only single-string/`qx` call sites quote, and they do it
     # themselves (see _getver_build and pkg_config).
-    method exe () {
-        return $self->_resolve_path;
-    }
+    method exe () { $self->_resolve_path }
 
     method xrepo () {    # xrepo is usually in the same folder as Xmake; bare path, see exe()
         my $exe_path   = $self->_resolve_path;
@@ -104,9 +102,6 @@ class Alien::Xmake v0.9.5 {
         return { cflags => $cflags, libs => $libs };
     }
 
-    # Centralized LIST-form command capture.  Every external command spawned
-    # by this distribution should route through here or _run/_capture to
-    # avoid shell-interpretation bugs with paths that contain spaces.
     sub capture_cmd (@cmd) {
         return capture { system @cmd }
     }
@@ -158,14 +153,8 @@ class Alien::Xmake v0.9.5 {
         ref $value eq 'ARRAY' ? join( $sep, map { _bool_str($_) } @$value ) : _bool_str($value);
     }
 
-    # Map a Perl built-in boolean scalar (`use feature 'true'/'false'`, enabled by `use v5.36+`)
-    # to the literal string xmake/xrepo expect. Ordinary stringification renders them as 1 / "",
-    # which gets misread downstream, so genuine built-in booleans become 'true'/'false'; every
-    # other value (IVs, strings, references) passes through untouched.
     sub _bool_str ($value) {
-        if ( is_bool($value) ) {
-            return $value ? 'true' : 'false';
-        }
+        return $value ? 'true' : 'false' if is_bool($value);
         return $value;
     }
 

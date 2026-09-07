@@ -9,55 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Split the `Alien::Xrepo` stack and the `Alien::Build::Plugin::Build::Xrepo` alienfile plugin
-  out into their own distributions and repositories: `Alien-Xrepo` (engine, runtime, and author
-  layers) and `Alien-Build-Plugin-Build-Xrepo`. This distribution (`Alien-Xmake`) now requires
-  neither `Alien::Build` nor `Alien::Base`; it only installs and wraps the `xmake` binary.
-  History for the split modules remains here in `Changes.md`.
-
-### Added
-
-- `Alien::Xrepo` accepts a new `kind` constructor option that pins the package kind (`shared`/`static`) for every store-touching action; a per-call `kind` still wins.
-- `Alien::Xrepo::Build` registers vendored/local xmake repository trees (a directory whose `packages/...` layout shadows xmake-repo) listed in the recipe's `local_repos` via `add_repo` during configure, so patched copies of upstream recipes win over the bundled xmake-repo during the resolve.
-- When `verbose => 1`, `Alien::Xrepo` now echoes every command it runs as `[XREPO] cmd (cwd: ...)`.
-- The Builder validates every installer it downloads against the sha256 the GitHub releases API reports for the asset (`digest: "sha256:..."`) on all platforms (the Windows `.exe` and the Unix `.run` bundle); a mismatched download dies before it is executed. When metadata is unavailable (e.g. the hardcoded-URL fallback) verification is skipped with a warning.
-- New `t/07_argv.t` proves the flags-before-spec argv invariant, OS-path-separator handling for `includes`, and the auto-confirm behavior.
-- New `Alien::Xrepo::Build`, `Alien::Xrepo::Build::Recipe`, and `Alien::Xrepo::Runtime`: an alienfile-shaped build engine and its consumer class that replace the `Alien::Xrepo::Base` layer. A distribution ships a declarative `xrepo.json` recipe; the engine runs `configure -> probe -> install -> gather -> export` (each stage hookable, `register_hook`) with the three `*_prop` buckets and checkpoint/resume as plain JSON. `Alien::Xrepo::Runtime` provides the Alien::Base-style accessor surface and resolves paths lazily through xrepo with no generated `::ConfigData`, serving a hermetic snapshot written by the engine when present.
-- The `eg/examples/Alien-Zstandard`, `eg/examples/Alien-SDL3`, and `eg/examples/Alien-Lsquic` examples all use the new stack: an `xrepo.json` recipe, a `Build.PL` that drives `Alien::Xrepo::Build`, and a module subclassing `Alien::Xrepo::Runtime` (hermetic snapshot autodetected after a build).
-- New tests: `t/10_recipe.t` (xrepo.json loading/validation), `t/11_engine.t` (stage flow, hooks, per-package merge, error isolation, snapshot/checkpoint/resume via an injected spy engine), `t/12_runtime.t` (lazy cached resolution, `alt` delegation, hermetic snapshot mode).
-- New `Alien::Build::Plugin::Build::Xrepo`, an alienfile plugin wrapping `Alien::Xrepo::Build` for `Alien::Build`/`Alien::Base` distributions: a `packages` property drives the recipe, the download hook installs and exports each package (per-package failures isolated and recorded), build assembles them into the staging prefix (merging `bin` dirs), and `gather_share`/`gather_ffi` translate the results into `cflags`/`libs`/`version`/`bin_dir`/`alt`/`ffi_name`/`dynamic_libs` runtime props with `%{xrepo_*}` interpolate helpers. The engine can be injected as an object or a package name via the `repo` property.
-- New test `t/14_build_plugin.t` drives the alienfile through probe/download/build/gather with an injected spy engine, covering a single package, multi-package `alt` with the ambient profile, failure isolation, FFI gathering, and the `packages`-required compile check.
-- The `Build::Xrepo` plugin's `probe` hook now queries the engine for each package and records per-package store satisfaction into `install_prop->{xrepo}{probed}`; the build no longer depends on the probe being a bare `'share'` constant.
-- The `Build::Xrepo` plugin exposes a `local_repos` property and registers those repo trees (directories with a `packages/` child) with the engine's `add_repo` during the download stage.
-- The `Build::Xrepo` plugin flattens the store-mirroring nested path xrepo's `export -o` produces (e.g. `<pkg>/z/<name>/<version>/<hash>/`) into the staging prefix so consumers see a normal `include/ lib/ bin/` layout, and re-roots gathered `dynamic_libs` from the staging prefix to the final runtime prefix (matching `_reroot_bins`).
-- A partial install failure now produces a grouped error summary listing the failed and successful packages.
-- `Alien::Xmake` gains a `capture_cmd` helper and every external spawn now routes through LIST-form `system`/`Capture::Tiny`, so `pkg_config` and the version probe no longer shell-quote paths (paths containing spaces work).
-- The Builder's command/existence probes (`_cmd_exists`), version capture, NSIS silent install, and compiler smoke test all use LIST-form or core `IPC::Open3` instead of shell pipes with `>/dev/null`.
-- The engine's exported snapshot now includes a `digest` field: a SHA-256 fingerprint of the resolved package names, versions, and options for caching/reproducibility checks.
-- New end-to-end test `t/15_e2e.t` drives the plugin with the real `Alien::Xrepo` engine against a real xrepo install and consumes it through an `Alien::Base` facade, verifying the consumer flags and loading/calling a shared-library symbol via FFI::Platypus.
-- Two new examples under `eg/examples/` demonstrate the alienfile plugin flow (as opposed to the json-recipe stack used by the other three): `Alien-Zlib` installs the `zlib` shared library via `plugin 'Build::Xrepo'` with `ffi => 1` and ships consumer tests plus a FFI::Platypus demo script; `Alien-Ninja` installs the `ninja` binary via the same plugin, then locates and runs it through the gathered `bin_dir`. Both are conventional CPAN-shape dists (`Makefile.PL` driven by `Alien::Build::MM`, `alienfile`, `lib/` Alien::Base subclasses, SKIP-guarded tests).
-- `Alien::Xrepo::install` gains a warm-start resolution cache plus fetch-first probing: an already-installed package resolves with a single `fetch --json` (no mutating `xrepo install`), and each successful resolution is memorized on disk under the store keyed by spec/kind/plat/arch/mode/configs, so repeat launches (e.g. `eg/webui.pl`) skip xrepo entirely. The on-disk cache is LRU-bounded (64 entries), validated against the recorded files (install dir and, when recorded, the first lib) before trust, self-prunes stale entries on save, and can be disabled with `cache => 0`. `Alien::Xrepo::Runtime` and `Alien::Xrepo::Build` accept the same constructor flag and forward it to the engine they create; an injected `repo` keeps its own setting.
-
-### Changed
-
-- `Alien::Xrepo` no longer emits `-k shared` by default: `kind` is only passed to xrepo when a consumer explicitly asks for one, so a bare install now behaves exactly like `xrepo install` and resolves the package's own default kind. The SDL3 example (`eg/examples/Alien-SDL3`) and its tests hand `kind => 'shared'` only where the FFI binder needs it.
-- The `includes` (rc file) value is now split/rejoined on the OS path separator (`$Config{path_sep}`) instead of a comma, and each path is normalized to an absolute path before being passed through.
-- `Alien::Xmake::exe` and `Alien::Xmake::xrepo` return the bare executable path without embedded quotes; the quote-on-demand sites now do their own quoting, and every list-form `system @cmd` / `Capture::Tiny` spawn avoids quote characters that made `CreateProcess` fail for paths with spaces on Windows.
-- Xmake's `Builder` no longer requires `git` to build from source; `git` was dropped from the tool check and from the package-manager install commands.
-- A pinned store is now enforced end to end: `install`/`fetch` with a constructor `root` or per-call `installdir` reject any resolution whose files land outside that store with a `die` instead of silently returning a system package (e.g. a Homebrew/apt `pcre2` when `brew::` extsource matches on a macOS runner). Pinned-store layouts stay self-contained; `cache => 0` unaffected.
-
-### Fixed
-
-- xrepo's option parser treated any flag that followed the first positional package (e.g. `--includes=...` after the package spec) as another package name, silently corrupting the install list. Every xrepo invocation now goes through a new `_argv` helper that enforces flags-before-spec ordering so the package spec is always the trailing argument.
-- On MSWin32, xrepo's scratch project at `%TEMP%\.xmake\<yymmdd>\xrepo\working\` could be left with a read-only, unexpanded `xmake.lua` template (`${TARGET_NAME}`, a bare `${FAQ}`) after a failed `xmake create`, making every later xrepo action die parsing `.\xmake.lua: unexpected symbol near '$'`. `Alien::Xrepo` now pre-sows and repairs that directory so actions keep working.
-- Captured installs no longer hang on an interactive xrepo/xmake prompt: the mutating actions (`install`, `remove`, `download`, `import`, `export`) auto-confirm (`-y`) by default unless the caller explicitly opts out with `yes =>`/`confirm =>`.
-- A per-package install failure no longer aborts a whole resolve; it is recorded under `runtime_prop->{errors}` (and surfaced by the package-info resolution) while the remaining packages proceed.
-- The `Build::Xrepo` plugin's content-root detection now treats a `bin` directory as a layout marker in addition to `include`/`lib`, so binary packages whose executables sit under xrepo's hashed export path (e.g. `n/&lt;name&gt;/&lt;version&gt;/&lt;hash&gt;/bin/`) get flattened into the staging prefix and surfaced through `bin_dir` instead of being missed.
-- A warm-start cache hit is no longer trusted merely because its recorded install dir still exists: when the package recorded a lib file, that file itself must still be on disk, so a cleared xrepo store/build dir (`xrepo clean`, a wiped `~/.xmake`) can no longer replay a dead resolution. Header-only/binary entries without a lib file still fall back to the install dir.
-
-### Removed
-
-- `Alien::Xrepo::Base` (with its `::Builder`, `::Build`, `::Build_PL`, and `::Alt` classes) and its POD are gone, along with the `t/05_xrepo_base.t` and `t/09_package_defs.t` suites and all per-distribution `::ConfigData` generation. Consumers subclass `Alien::Xrepo::Runtime`; installs run on `Alien::Xrepo::Build` from an `xrepo.json` recipe.
+- Split the `Alien::Xrepo` out into its own distributions and repo
+- `Alien::Xmake::exe` returns the bare executable path without embedded quotes; the quote-on-demand sites now do their own quoting, and every list-form `system @cmd` / `Capture::Tiny` spawn avoids quote characters that made `CreateProcess` fail for paths with spaces on Windows.
 
 ## [v0.9.4] - 2026-09-04
 
