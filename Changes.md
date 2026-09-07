@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Split the `Alien::Xrepo` stack and the `Alien::Build::Plugin::Build::Xrepo` alienfile plugin
+  out into their own distributions and repositories: `Alien-Xrepo` (engine, runtime, and author
+  layers) and `Alien-Build-Plugin-Build-Xrepo`. This distribution (`Alien-Xmake`) now requires
+  neither `Alien::Build` nor `Alien::Base`; it only installs and wraps the `xmake` binary.
+  History for the split modules remains here in `Changes.md`.
+
 ### Added
 
 - `Alien::Xrepo` accepts a new `kind` constructor option that pins the package kind (`shared`/`static`) for every store-touching action; a per-call `kind` still wins.

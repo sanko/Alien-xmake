@@ -93,7 +93,6 @@
       },
       "runtime" : {
          "requires" : {
-            "Alien::Build" : "2.84",
             "Capture::Tiny" : "0",
             "ExtUtils::Helpers" : "0.028",
             "ExtUtils::InstallPaths" : "0.002",
@@ -102,49 +101,16 @@
          }
       },
       "test" : {
-         "recommends" : {
-            "Affix" : "0",
-            "FFI::Platypus" : "0"
-         },
          "requires" : {
             "Capture::Tiny" : "0",
             "File::Temp" : "0",
-            "Test2::V0" : "0",
-            "Test::Alien::Build" : "0"
+            "Test2::V0" : "0"
          }
       }
    },
    "provides" : {
-      "Alien::Build::Plugin::Build::Xrepo" : {
-         "file" : "lib/Alien/Build/Plugin/Build/Xrepo.pm",
-         "version" : "v0.9.5"
-      },
       "Alien::Xmake" : {
          "file" : "lib/Alien/Xmake.pm",
-         "version" : "v0.9.5"
-      },
-      "Alien::Xrepo" : {
-         "file" : "lib/Alien/Xrepo.pm",
-         "version" : "v0.9.5"
-      },
-      "Alien::Xrepo::Build" : {
-         "file" : "lib/Alien/Xrepo/Build.pm",
-         "version" : "v0.9.5"
-      },
-      "Alien::Xrepo::Build::Recipe" : {
-         "file" : "lib/Alien/Xrepo/Build/Recipe.pm",
-         "version" : "v0.9.5"
-      },
-      "Alien::Xrepo::PackageInfo" : {
-         "file" : "lib/Alien/Xrepo.pm",
-         "version" : "v0.9.5"
-      },
-      "Alien::Xrepo::Runtime" : {
-         "file" : "lib/Alien/Xrepo/Runtime.pm",
-         "version" : "v0.9.5"
-      },
-      "Alien::Xrepo::Runtime::Alt" : {
-         "file" : "lib/Alien/Xrepo/Runtime.pm",
          "version" : "v0.9.5"
       }
    },
