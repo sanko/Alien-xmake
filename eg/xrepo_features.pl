@@ -74,12 +74,12 @@ if ($show_3p) {
     $repo->install( 'brew::zlib',         undef ) if $^O ne 'MSWin32';
 }
 else {
-    say "";
-    say "# Enabled with  --third-party  (requires vcpkg/conan/brew on PATH):";
-    say "#   \$repo->install('vcpkg::zlib');";
-    say "#   \$repo->install('conan::zlib/1.2.11');";
-    say "#   \$repo->install('brew::zlib');";
-    say "#   \$repo->search('vcpkg::pcre');";
+    say '';
+    say '# Enabled with  --third-party  (requires vcpkg/conan/brew on PATH):';
+    say '#   $repo->install("vcpkg::zlib");';
+    say '#   $repo->install("conan::zlib/1.2.11");';
+    say '#   $repo->install("brew::zlib");';
+    say '#   $repo->search("vcpkg::pcre");';
 }
 
 # Offline distribution: download / import / export

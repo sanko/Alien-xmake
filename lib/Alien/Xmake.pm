@@ -662,9 +662,9 @@ class Alien::Xmake v0.9.5 {
 
     # Safely quote arguments for Windows cmd.exe
     method _escape_args (@args) { return @args }
-    }
-    #
-    1;
+};
+#
+1;
 __END__
 Copyright (C) Sanko Robinson.
 
