@@ -1,7 +1,7 @@
 use v5.40;
 use Test2::V0 '!subtest', -no_srand => 1;
 use Test2::Util::Importer 'Test2::Tools::Subtest' => ( subtest_streamed => { -as => 'subtest' } );
-use lib 'lib', '../lib', 'blib/lib', '../blib/lib';
+use blib;
 use Cwd;
 use File::Temp    qw[tempdir];
 use Capture::Tiny qw[capture];
@@ -13,7 +13,7 @@ my $xmake = Alien::Xmake->new;
 ok $xmake->version,         'version is set';
 ok defined $xmake->buildid, 'buildid is defined-ish';
 ok my $exe = $xmake->exe,   'exe works';
-qx[$exe g --theme=plain];
+qx["$exe" g --theme=plain];
 
 # Query mode
 my @platforms = $xmake->show('platforms');
@@ -87,4 +87,5 @@ subtest 'drive a Perl-generated build file via file=>' => sub {
     ok $g->clean, 'clean from the generated build file';
     chdir $old or die "chdir $old: $!";
 };
+#
 done_testing;

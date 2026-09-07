@@ -43,8 +43,6 @@ on test => sub {
     requires 'Capture::Tiny';
     requires 'File::Temp';
     requires 'Test2::V0';
-    recommends 'Affix';
-    recommends 'FFI::Platypus';
 };
 on develop => sub {
     requires 'CPAN::Uploader';
