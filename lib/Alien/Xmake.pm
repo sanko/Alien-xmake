@@ -3,7 +3,7 @@ use experimental 'class';
 use builtin 'is_bool';
 no warnings 'experimental::builtin';
 #
-class Alien::Xmake v0.9.5 {
+class Alien::Xmake v1.0.0 {
     use File::Spec;
     use File::Basename qw[dirname];
     use File::Temp     qw[tempdir];
