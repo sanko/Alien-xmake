@@ -51,7 +51,7 @@ my ( $iso_lib, $iso_rel ) = map { ( $_ // '' ) =~ s{\\}{/}gr } ( $iso->libpath, 
 ok index( $iso_lib, $iso_rel ) == 0, 'isolated libpath lives under the forced dir';
 ok my $iso_fetched = $repo->fetch( 'zlib', undef, installdir => $iso_root ), 'fetch from isolated store';
 ( $iso_lib, $iso_rel ) = map { ( $_ // '' ) =~ s{\\}{/}gr } ( $iso_fetched->libpath, $iso_root );
-ok index( $iso_lib, $iso_rel ) == 0,                                         'isolated fetch stays in the forced dir';
+ok index( $iso_lib, $iso_rel ) == 0,                                       'isolated fetch stays in the forced dir';
 ok scalar( grep {/zlib/} $repo->scan( 'zlib', installdir => $iso_root ) ), 'scan finds zlib in isolated store';
 #
 done_testing;

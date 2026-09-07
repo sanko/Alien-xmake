@@ -109,39 +109,75 @@ Including after a resume, stages that have already run are skipped.
 
 =head2 C<configure( %opts )>
 
+Prepares the run: records the recipe facts into C<meta_prop>, folds the ambient C<%opts> over the recipe
+C<defaults> into C<< install_prop->{profile} >>, resolves C<< install_prop->{store} >> (falling back to C<root>),
+and registers every C<local_repos> entry with the engine. C<install_type> is reset to C<'system'> and the state is
+checkpointed. Safe to call more than once: a stage that already ran is skipped.
+
 =head2 C<probe()>
+
+Asks the engine whether each package already satisfies the recipe and records the result as C<<
+install_prop->{probed}{<name>} >> = C<< { version =E<gt> ..., satisfied =E<gt> 0|1 } >>. Skipped entirely when
+C<probe_policy =E<gt> 'off'>>.
 
 =head2 C<install()>
 
+Runs one C<xrepo install> per package (per-package options merged over the profile). A package the probe found
+satisfied is skipped when C<probe_policy =E<gt> 'skip'>> (the default) unless C<force> is set. A failing package is
+warned about, recorded in C<< runtime_prop->{errors} >>, and does not abort the remaining packages. Each successful
+install is recorded in C<< runtime_prop->{packages} >> and bumps C<install_type> to C<'share'>.
+
 =head2 C<gather()>
+
+Ensures every package not already recorded (installed or failed) has consumer-facing paths: it fetches each one
+through the engine and stores the resolution data in C<< runtime_prop->{packages} >>. A failed fetch is recorded in
+C<< runtime_prop->{errors} >>.
 
 =head2 C<export()>
 
+Optionally exports each successfully installed package into C<export_dir> (C<xrepo export>, one C<< <name> >>
+subdirectory per package), and writes the hermetic snapshot JSON to C<snapshot>: the C<install_type>, per-package
+resolution data, any C<errors>, and a C<digest> of the configured recipe. The snapshot is what
+L<Alien::Xrepo::Runtime> serves to resolve absolute paths with no xrepo process.
+
 =head2 C<test()>
+
+Runs the C<test> hooks. There is no built-in test body; attach your own with C<register_hook>.
 
 =head2 C<register_hook( $stage, $code )>
 
 Attach a hook. Hooks are invoked as C<< $code->($build) >> before the stage body.
 
- =head2 C<has_hook( $stage )>
+=head2 C<has_hook( $stage )>
 
- Query a hook.
+True when at least one hook is registered for the stage.
 
 =head2 C<meta_prop()>
 
+Recipe facts: C<name>, C<packages>, C<package_defs>, C<defaults>, C<pkg_roots>, C<local_repos>, and C<hooks>.
+Filled by the configure stage.
+
 =head2 C<install_prop()>
+
+This run's state: the C<root>, the merged ambient C<profile>, the resolved C<store>, and the per-package C<probed>
+results.
 
 =head2 C<runtime_prop()>
 
-=head2 install_type()
+What consumers need: per-package resolution data under C<packages> and a failure map under C<errors>. This is what
+the export stage serializes into the snapshot.
 
-C<'share'> once any package resolved, C<'system'> before that.
+=head2 C<install_type()>
+
+C<'share'> once any package resolved, C<'system'> before that. Restored from the checkpoint on a resume.
 
 =head2 C<packages()>
 
+Recipe package names in order.
+
 =head2 C<package_defs()>
 
-Recipe package names in order, and the normalized per-package defs.
+The normalized per-package defs from the recipe.
 
 =head2 C<engine()>
 

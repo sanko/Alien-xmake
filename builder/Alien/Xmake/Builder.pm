@@ -118,7 +118,7 @@ use %s;
             $s->copy($target) or die "Copy failed: $!";
             $target->chmod( $s->stat->mode | 0600 );
         }
-        say 'Staged bundled xmake to '.$auto if $verbose;
+        say 'Staged bundled xmake to ' . $auto if $verbose;
     }
 
     method ACTION_install ( ) {
@@ -596,7 +596,7 @@ use %s;
             return;
         }
         say "Verifying sha256 of $file..." if $verbose;
-        my $got = path($file)->digest; #Digest::SHA->new(256)->addfile( "$file", 'b' )->hexdigest;
+        my $got = path($file)->digest;    #Digest::SHA->new(256)->addfile( "$file", 'b' )->hexdigest;
         die <<~"" unless lc $got eq lc $expected;
         Checksum mismatch for $file:
             expected sha256:$expected

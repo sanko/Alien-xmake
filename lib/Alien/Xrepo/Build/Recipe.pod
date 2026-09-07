@@ -13,7 +13,7 @@ Alien::Xrepo::Build::Recipe - load and validate an xrepo.json recipe
     my $recipe = Alien::Xrepo::Build::Recipe->new(
         packages => [
             'zstd',
-            { name => 'libsdl3', version => '3.4.12', kind => 'shared', configs => { wayland => 1 } },
+            { name => 'libsdl3', version => '3.4.12', kind => 'shared', configs => { wayland => 1 } }
         ],
         defaults => { mode => 'release' }
     );
@@ -39,24 +39,50 @@ C<force>, ..., plus C<name>, C<version>, and the nested recipe options under C<c
     }
 
 C<packages> is required and must not be empty; order matters (the first entry is the primary package). C<local_repos>
-are registered with xrepo during configure, C<hooks> are loaded by a consuming engine, and C<pkg_roots> maps a package
-to an advanced-user environment variable, mirroring Alien::Build's C<pkg_roots>.
+are registered with xrepo during the configure stage, C<pkg_roots> maps a package name to an advanced-user environment
+variable (mirroring Alien::Build's C<pkg_roots>), and C<hooks> names hook modules that are recorded in the recipe
+metadata.
 
 =head1 METHODS
 
 =over
 
-=item C<name()>, C<packages()>, C<package_defs()>
+=item C<name()>
 
-Recipe dist name, the normalized package names in order, and the per-package defs hashref.
+The recipe's C<name>, or C<undef> when the recipe does not set one.
 
-=item C<defaults()>, C<pkg_roots()>, C<local_repos()>, C<hooks()>
+=item C<packages()>
 
-The remaining recipe sections (normalized to hashref/arrayref).
+The normalized package names in declaration order (the first entry is the primary package).
+
+=item C<package_defs()>
+
+A hashref of the normalized per-package definitions, keyed by package name.
+
+=item C<defaults()>
+
+The ambient options applied under every package: the same key set a package def accepts (C<plat>, C<arch>, C<mode>,
+C<kind>, C<jobs>, ...), plus the nested C<configs> hashref.
+
+=item C<pkg_roots()>
+
+A hashref mapping a package name to an advanced-user environment variable name, mirroring L<Alien::Build>'s
+C<pkg_roots>.
+
+=item C<local_repos()>
+
+An arrayref of directory paths to local xmake-repo trees (each containing a C<packages/> subdirectory).
+L<Alien::Xrepo::Build> registers each of them with xrepo during the configure stage, so packages that are not in the
+central xmake-repo can be installed.
+
+=item C<hooks()>
+
+An arrayref of hook module names declared in the recipe. They are recorded in the recipe metadata; the
+L<Alien::Xrepo::Build> configure stage copies them into C<meta_prop>.
 
 =item C<version_for( $name )>
 
-The per-package version constraint, if any.
+The per-package version constraint, or C<undef> when the recipe does not pin one.
 
 =item C<opts_for( $name, %ambient )>
 

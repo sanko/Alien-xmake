@@ -43,9 +43,9 @@ subtest 'cache get bumps LRU order and rejects dead install dirs' => sub {
     is [ @{ $meta->{order} } ], [qw[b a]], 'hit promoted b to the front';
 };
 subtest 'cache liveness requires the recorded lib file itself' => sub {
-    my $tmp  = Path::Tiny->tempdir;
-    my $lib  = $tmp->child( 'pkgs', 'webui', 'hash', 'lib', 'webui.dll' );
-    my $dir  = $lib->parent->parent;
+    my $tmp = Path::Tiny->tempdir;
+    my $lib = $tmp->child( 'pkgs', 'webui', 'hash', 'lib', 'webui.dll' );
+    my $dir = $lib->parent->parent;
     $lib->parent->mkpath;
     $lib->spew('x');
     my $meta = { order => [], entries => {} };
@@ -100,26 +100,32 @@ subtest '_guard_store enforces a pinned store' => sub {
     my $in_root = $store->child( 'p', 'pkg', 'v1', 'hash' );
     $in_root->mkpath;
     my $in_lib    = $in_root->child( 'lib', 'libpkg.so' );
-    my $in_inst   = $in_root->child( 'inst' );
+    my $in_inst   = $in_root->child('inst');
     my $out_lib   = $outside->child( 'lib', 'libpkg.so' );
     my $pinfo_for = sub {
         my ( $installdir, $libpath ) = @_;
         return Alien::Xrepo::PackageInfo->new(
-            includedirs => [], libfiles => [], license => undef, linkdirs => [], links => [],
-            shared => 1, static => 0, version => undef, kind => 'library', installdir => $installdir,
+            includedirs => [],
+            libfiles    => [],
+            license     => undef,
+            linkdirs    => [],
+            links       => [],
+            shared      => 1,
+            static      => 0,
+            version     => undef,
+            kind        => 'library',
+            installdir  => $installdir,
             ( defined $libpath ? ( libpath => $libpath ) : () ),
         );
     };
-
     ok $repo->_guard_store( { artifacts => { installdir => "$in_root" } }, installdir => $store ), 'installdir under the store is accepted';
-    ok $repo->_guard_store( { libfiles   => ["$in_lib"] },                 installdir => $store ), 'libfile under the store is accepted';
+    ok $repo->_guard_store( { libfiles  => ["$in_lib"] },                  installdir => $store ), 'libfile under the store is accepted';
     eval { $repo->_guard_store( { artifacts => { installdir => "$outside" } }, installdir => $store ) };
     like $@, qr/outside the requested store/, 'installdir outside the store dies with a clear message';
     ok dies { $repo->_guard_store( { libfiles => ["$out_lib"] }, installdir => $store ) }, 'libfile outside the store dies';
-    ok $repo->_guard_store( { artefacts_typo => { installdir => "$outside" } } ), 'no pinned store accepts anything';
-
-    ok $repo->_guard_store( $pinfo_for->("$in_root"),      installdir => $store ), 'PackageInfo under the store is accepted';
-    ok dies { $repo->_guard_store( $pinfo_for->("$outside"), installdir => $store ) }, 'PackageInfo outside the store dies';
+    ok $repo->_guard_store( { artefacts_typo => { installdir => "$outside" } } ),          'no pinned store accepts anything';
+    ok $repo->_guard_store( $pinfo_for->("$in_root"), installdir => $store ),              'PackageInfo under the store is accepted';
+    ok dies { $repo->_guard_store( $pinfo_for->("$outside"), installdir => $store ) },     'PackageInfo outside the store dies';
 };
 subtest '_finalize guards and processes' => sub {
     my $store   = Path::Tiny->tempdir;

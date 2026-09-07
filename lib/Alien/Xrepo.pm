@@ -146,7 +146,7 @@ class Alien::Xrepo v0.9.5 {
             $self->_cache_put( $key, $meta, $self->_cache_entry($fresh) );
             $self->_cache_save( $meta, %opts );
         }
-        $self->_finalize($fresh, %opts);
+        $self->_finalize( $fresh, %opts );
     }
 
     # --- install-result cache -------------------------------------------------
@@ -290,14 +290,14 @@ class Alien::Xrepo v0.9.5 {
     # layout, but xmake can satisfy a requirement from the system (Homebrew, apt, ...) instead of
     # building into the store. Such a resolution lives OUTSIDE the pinned store, so it would
     # silently break the promise; it is rejected here rather than returned.
-    method _finalize ($data, %opts) {
+    method _finalize ( $data, %opts ) {
         return () unless defined $data;
         $data = $data->[0] if ref $data eq 'ARRAY';
         $self->_guard_store( $data, %opts );
         return $self->_process_info($data);
     }
 
-    method _guard_store ($info, %opts) {
+    method _guard_store ( $info, %opts ) {
         my $store = $self->_store_dir(%opts);
         return $info unless defined $store && length $store;
         return $info if $self->_in_store( $info, $store );
@@ -310,7 +310,7 @@ class Alien::Xrepo v0.9.5 {
 
     # True when the record's anchor (its install root, else the store layout implied by its first
     # libfile/include dir) falls under the requested store.
-    method _in_store ($info, $store) {
+    method _in_store ( $info, $store ) {
         my $anchor = $self->_anchor_of($info);
         return 1 unless defined $anchor && length $anchor;
         my ( $s, $a ) = map { path($_)->absolute->stringify } ( $store, $anchor );
@@ -329,7 +329,7 @@ class Alien::Xrepo v0.9.5 {
         return $info->libpath    if $ref eq 'Alien::Xrepo::PackageInfo' && defined $info->libpath;
         return () unless $ref eq 'HASH';
         my $art = $info->{artifacts};
-        return $art->{installdir} if ref $art eq 'HASH' && defined $art->{installdir};
+        return $art->{installdir}  if ref $art eq 'HASH' && defined $art->{installdir};
         return $info->{installdir} if defined $info->{installdir};
         if ( @{ $info->{libfiles} // [] } ) {
             return path( $info->{libfiles}[0] )->parent->parent->stringify;

@@ -39,54 +39,81 @@ to the primary (first declared) package.
 
 =over
 
-=item C<cflags>, C<cflags_static>
+=item C<cflags( [$pkg] )>
 
-Include flags (C<-I...>) for the package.
+Include flags (C<-I...>) for the package. Returns an empty string when the package cannot be resolved.
 
-=item C<libs>, C<libs_static>
+=item C<cflags_static( [$pkg] )>
 
-Link flags (C<-L... -l...>) for the package.
+Include flags for static linking. An alias of C<cflags( )> in this release.
 
-=item C<libpath>, C<ffi_lib>
+=item C<libs( [$pkg] )>
 
-Absolute path to the package's runtime library (DLL/SO/dylib).
+Link flags (C<-L... -l...>) for the package. Returns an empty string when the package cannot be resolved.
 
-=item C<dynamic_libs>
+=item C<libs_static( [$pkg] )>
 
-Absolute paths to every library file xrepo reported.
+Link flags for static linking. An alias of C<libs( )> in this release.
 
-=item C<bin_dir>
+=item C<libpath( [$pkg] )>
 
-Executable directories (a tool package's C<bin>).
+Absolute path to the package's runtime library (DLL/SO/dylib). C<undef> for a header-only package or when
+resolution failed.
 
-=item C<version>, C<kind>
+=item C<ffi_lib( [$pkg] )>
 
-Version and kind (C<library> for libraries, C<binary> for tools) as reported by xrepo.
+An alias of C<libpath( )> under the name L<Alien::Base> C<build_ffi> consumers call.
 
-=item C<dist_dir>
+=item C<dynamic_libs( [$pkg] )>
 
-The package's install root (where its files live).
+Absolute paths to every library file xrepo reported for the package.
 
-=item C<install_type>
+=item C<bin_dir( [$pkg] )>
 
-C<'share'> once any package has resolved, C<'system'> otherwise.
+Executable directories (a tool package's C<bin>). An empty list when the package has none.
+
+=item C<version( [$pkg] )>
+
+The installed version as reported by xrepo, or C<undef> before resolution.
+
+=item C<kind( [$pkg] )>
+
+The package kind -- C<library> for libraries, C<binary> for tools -- as reported by xrepo.
+
+=item C<dist_dir( [$pkg] )>
+
+The package's install root (where its files live), or C<undef> before resolution.
+
+=item C<install_type( [$pkg] )>
+
+C<'share'> once the package has resolved, C<'system'> otherwise. In hermetic snapshot mode the value recorded
+in the snapshot is returned unchanged.
 
 =item C<alt( $name )>
 
 An accessor bound to a non-primary package; C<alt> of the primary returns C<$self>. E.g. C<<
 Alien::SDL3->alt('libsdl3_ttf')->cflags >>.
 
-=item C<find_header( $file )>
+=item C<find_header( $file, [$pkg] )>
 
-Absolute path to a header within the package include directories.
+Absolute path to a header within the package include directories, or C<undef> if it is not found.
 
-=item C<package_info>
+=item C<package_info( [$pkg] )>
 
-The underlying L<Alien::Xrepo::PackageInfo>, or undef before resolution.
+The underlying L<Alien::Xrepo::PackageInfo>, or C<undef> before resolution.
 
-=item C<package_names>, C<package_defs>, C<split_flags>
+=item C<package_names()>
 
-Package metadata and a whitespace flag-splitter (Windows-safe).
+The recipe's package names in declaration order (first is the primary package).
+
+=item C<package_defs()>
+
+The recipe's normalized per-package definition hashref.
+
+=item C<split_flags( $flags, [$pkg] )>
+
+Splits a flag string on whitespace and returns the individual flags (Windows-safe list form). The package
+argument is accepted for compatibility with the other accessors but the split itself does not use it.
 
 =back
 
