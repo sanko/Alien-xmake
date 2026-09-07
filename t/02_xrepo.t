@@ -40,15 +40,18 @@ ok scalar( grep {/libpng/} $repo->scan('libpng') ),      'scan finds libpng';
 ok my $info = $repo->info( 'libpng', format => 'json' ), 'info --format=json works';
 is ref $info, 'ARRAY', 'info json is an array';
 
-# Isolated package store (reproducible builds)
+# Isolated package store (reproducible builds). zlib rather than pcre2: the GitHub macOS
+# runner images carry a Homebrew pcre2, so xmake resolves that system package instead of
+# building into the forced dir and the isolation assertions never hold there.
 my $iso_root = tempdir( CLEANUP => 1 );
-ok my $iso = $repo->install( 'pcre2', undef, installdir => $iso_root ), 'install pcre2 into an isolated store';
+ok my $iso = $repo->install( 'zlib', undef, installdir => $iso_root ), 'install zlib into an isolated store';
 ok length( $iso->libpath ), 'isolated install found a runtime lib';
+diag 'Isolated libpath: ' . ( $iso->libpath // '(undef)' );
 my ( $iso_lib, $iso_rel ) = map { ( $_ // '' ) =~ s{\\}{/}gr } ( $iso->libpath, $iso_root );
 ok index( $iso_lib, $iso_rel ) == 0, 'isolated libpath lives under the forced dir';
-ok my $iso_fetched = $repo->fetch( 'pcre2', undef, installdir => $iso_root ), 'fetch from isolated store';
+ok my $iso_fetched = $repo->fetch( 'zlib', undef, installdir => $iso_root ), 'fetch from isolated store';
 ( $iso_lib, $iso_rel ) = map { ( $_ // '' ) =~ s{\\}{/}gr } ( $iso_fetched->libpath, $iso_root );
 ok index( $iso_lib, $iso_rel ) == 0,                                         'isolated fetch stays in the forced dir';
-ok scalar( grep {/pcre2/} $repo->scan( 'pcre2', installdir => $iso_root ) ), 'scan finds pcre2 in isolated store';
+ok scalar( grep {/zlib/} $repo->scan( 'zlib', installdir => $iso_root ) ), 'scan finds zlib in isolated store';
 #
 done_testing;
