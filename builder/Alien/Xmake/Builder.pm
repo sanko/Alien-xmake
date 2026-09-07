@@ -110,15 +110,15 @@ use %s;
         my $src = path('share');
         return unless $src->is_dir;
         my $auto = path('blib/lib/auto/share/dist')->child( $meta->name );
-        ExtUtils::Install::install( { $src->stringify => $auto->stringify }, 0, 0, 0 );
         my $iter = $src->iterator( { recurse => 1 } );
         while ( my $s = $iter->() ) {
             next unless $s->is_file;
             my $target = $auto->child( $s->relative($src) );
-            next unless $target->is_file;
+            $target->parent->mkpath;
+            $s->copy($target) or die "Copy failed: $!";
             $target->chmod( $s->stat->mode | 0600 );
         }
-        say "Staged bundled xmake to $auto" if $verbose;
+        say 'Staged bundled xmake to '.$auto if $verbose;
     }
 
     method ACTION_install ( ) {
@@ -596,7 +596,7 @@ use %s;
             return;
         }
         say "Verifying sha256 of $file..." if $verbose;
-        my $got = Digest::SHA->new(256)->addfile( "$file", 'b' )->hexdigest;
+        my $got = path($file)->digest; #Digest::SHA->new(256)->addfile( "$file", 'b' )->hexdigest;
         die <<~"" unless lc $got eq lc $expected;
         Checksum mismatch for $file:
             expected sha256:$expected
