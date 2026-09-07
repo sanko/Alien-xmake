@@ -5,11 +5,13 @@ All notable changes to Alien::Xmake will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.9.5] - 2026-09-07
+
+Looking for a reason not to make this v1.0.0...
 
 ### Changed
 
-- Split the `Alien::Xrepo` out into its own distributions and repo
+- Split `Alien::Xrepo` out into its own distribution and repo
 - `Alien::Xmake::exe` returns the bare executable path without embedded quotes; the quote-on-demand sites now do their own quoting, and every list-form `system @cmd` / `Capture::Tiny` spawn avoids quote characters that made `CreateProcess` fail for paths with spaces on Windows.
 
 ## [v0.9.4] - 2026-09-04
@@ -167,7 +169,8 @@ The docs have been greatly expanded since January but the stars of this release 
 
 - It exists.
 
-[Unreleased]: https://github.com/sanko/Alien-Xmake/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/sanko/Alien-Xmake/compare/v0.9.5...HEAD
+[v0.9.5]: https://github.com/sanko/Alien-Xmake/compare/v0.9.4...v0.9.5
 [v0.9.4]: https://github.com/sanko/Alien-Xmake/compare/v0.9.3...v0.9.4
 [v0.9.3]: https://github.com/sanko/Alien-Xmake/compare/v0.9.2...v0.9.3
 [v0.9.2]: https://github.com/sanko/Alien-Xmake/compare/v0.9.1...v0.9.2
