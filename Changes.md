@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `includes` (rc file) value is now split/rejoined on the OS path separator (`$Config{path_sep}`) instead of a comma, and each path is normalized to an absolute path before being passed through.
 - `Alien::Xmake::exe` and `Alien::Xmake::xrepo` return the bare executable path without embedded quotes; the quote-on-demand sites now do their own quoting, and every list-form `system @cmd` / `Capture::Tiny` spawn avoids quote characters that made `CreateProcess` fail for paths with spaces on Windows.
 - Xmake's `Builder` no longer requires `git` to build from source; `git` was dropped from the tool check and from the package-manager install commands.
+- A pinned store is now enforced end to end: `install`/`fetch` with a constructor `root` or per-call `installdir` reject any resolution whose files land outside that store with a `die` instead of silently returning a system package (e.g. a Homebrew/apt `pcre2` when `brew::` extsource matches on a macOS runner). Pinned-store layouts stay self-contained; `cache => 0` unaffected.
 
 ### Fixed
 

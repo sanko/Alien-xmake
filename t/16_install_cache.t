@@ -80,5 +80,43 @@ subtest '_info_installed distinguishes installed vs not' => sub {
     ok !$repo->_info_installed( { artifacts => { installdir => "$tmp/nope" } } ), 'missing install root does not';
     ok !$repo->_info_installed( {} ), 'empty record is not installed';
 };
+subtest '_guard_store enforces a pinned store' => sub {
+    my $store   = Path::Tiny->tempdir;
+    my $outside = Path::Tiny->tempdir;
+    my $in_root = $store->child( 'p', 'pkg', 'v1', 'hash' );
+    $in_root->mkpath;
+    my $in_lib    = $in_root->child( 'lib', 'libpkg.so' );
+    my $in_inst   = $in_root->child( 'inst' );
+    my $out_lib   = $outside->child( 'lib', 'libpkg.so' );
+    my $pinfo_for = sub {
+        my ( $installdir, $libpath ) = @_;
+        return Alien::Xrepo::PackageInfo->new(
+            includedirs => [], libfiles => [], license => undef, linkdirs => [], links => [],
+            shared => 1, static => 0, version => undef, kind => 'library', installdir => $installdir,
+            ( defined $libpath ? ( libpath => $libpath ) : () ),
+        );
+    };
+
+    ok $repo->_guard_store( { artifacts => { installdir => "$in_root" } }, installdir => $store ), 'installdir under the store is accepted';
+    ok $repo->_guard_store( { libfiles   => ["$in_lib"] },                 installdir => $store ), 'libfile under the store is accepted';
+    eval { $repo->_guard_store( { artifacts => { installdir => "$outside" } }, installdir => $store ) };
+    like $@, qr/outside the requested store/, 'installdir outside the store dies with a clear message';
+    ok dies { $repo->_guard_store( { libfiles => ["$out_lib"] }, installdir => $store ) }, 'libfile outside the store dies';
+    ok $repo->_guard_store( { artefacts_typo => { installdir => "$outside" } } ), 'no pinned store accepts anything';
+
+    ok $repo->_guard_store( $pinfo_for->("$in_root"),      installdir => $store ), 'PackageInfo under the store is accepted';
+    ok dies { $repo->_guard_store( $pinfo_for->("$outside"), installdir => $store ) }, 'PackageInfo outside the store dies';
+};
+subtest '_finalize guards and processes' => sub {
+    my $store   = Path::Tiny->tempdir;
+    my $outside = Path::Tiny->tempdir;
+    my $root    = $store->child( 'p', 'pkg', 'inst' );
+    $root->mkpath;
+    my $pi = $repo->_finalize( { artifacts => { installdir => "$root" } }, installdir => $store );
+    isa_ok $pi, 'Alien::Xrepo::PackageInfo';
+    ok dies { $repo->_finalize( { artifacts => { installdir => "$outside" } }, installdir => $store ) }, '_finalize dies outside a pinned store';
+    my $got = $repo->_finalize( { artifacts => { installdir => "$outside" } } );
+    isa_ok $got, 'Alien::Xrepo::PackageInfo';
+};
 #
 done_testing;

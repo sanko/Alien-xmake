@@ -116,6 +116,7 @@ class Alien::Xrepo v0.9.5 {
             if ( my $hit = $self->_cache_get( $key, $meta ) ) {
                 my $info = eval { $self->_process_info( decode_json( $hit->{json} ) ) };
                 if ( ref $info ) {
+                    $self->_guard_store( $info, %opts );
                     $self->_cache_save( $meta, %opts );
                     return $info;
                 }
@@ -131,7 +132,7 @@ class Alien::Xrepo v0.9.5 {
                 $self->_cache_put( $key, $meta, $self->_cache_entry($data) );
                 $self->_cache_save( $meta, %opts );
             }
-            return $self->_process_info($data);
+            return $self->_finalize( $data, %opts );
         }
 
         # Cold path: install, then fetch (which must succeed, since it tells us where things land).
@@ -145,7 +146,7 @@ class Alien::Xrepo v0.9.5 {
             $self->_cache_put( $key, $meta, $self->_cache_entry($fresh) );
             $self->_cache_save( $meta, %opts );
         }
-        $self->_process_info($fresh);
+        $self->_finalize($fresh, %opts);
     }
 
     # --- install-result cache -------------------------------------------------
@@ -280,6 +281,61 @@ class Alien::Xrepo v0.9.5 {
         return 1 if defined $installdir && -d $installdir;
         for my $f ( @{ $info->{libfiles} // [] } ) { return 1 if -f $f; }
         for my $d ( @{ $info->{bindirs}  // [] } ) { return 1 if -d $d; }
+        ();
+    }
+
+    # --- store isolation guard -------------------------------------------------
+    # A pinned store (constructor `root` or per-call `installdir`) promises a self-contained
+    # layout, but xmake can satisfy a requirement from the system (Homebrew, apt, ...) instead of
+    # building into the store. Such a resolution lives OUTSIDE the pinned store, so it would
+    # silently break the promise; it is rejected here rather than returned.
+    method _finalize ($data, %opts) {
+        return () unless defined $data;
+        $data = $data->[0] if ref $data eq 'ARRAY';
+        $self->_guard_store( $data, %opts );
+        return $self->_process_info($data);
+    }
+
+    method _guard_store ($info, %opts) {
+        my $store = $self->_store_dir(%opts);
+        return $info unless defined $store && length $store;
+        return $info if $self->_in_store( $info, $store );
+        my $found = $self->_anchor_of($info) // 'an unknown location';
+        die "xrepo resolved a package outside the requested store (wanted '$store', found '$found'). " .
+            "xmake prefers system packages (e.g. Homebrew, apt) over building, so an isolated " .
+            "install is impossible for this package. Drop the root/installdir requirement or use " .
+            "a package the system does not provide.\n";
+    }
+
+    # True when the record's anchor (its install root, else the store layout implied by its first
+    # libfile/include dir) falls under the requested store.
+    method _in_store ($info, $store) {
+        my $anchor = $self->_anchor_of($info);
+        return 1 unless defined $anchor && length $anchor;
+        my ( $s, $a ) = map { path($_)->absolute->stringify } ( $store, $anchor );
+        ( $s, $a ) = map { ( $_ // '' ) =~ s{\\}{/}gr } ( $s, $a );
+        $s = lc($s) if $^O eq 'MSWin32';
+        $a = lc($a) if $^O eq 'MSWin32';
+        return 1 if index( $a, $s ) == 0 && ( length($a) == length($s) || substr( $a, length($s), 1 ) =~ m{[\\/]} );
+        ();
+    }
+
+    # Where a resolution reports its output: the installdir when present, otherwise the store
+    # layout implied by the first libfile (mirroring _process_info) or include dir.
+    method _anchor_of ($info) {
+        my $ref = ref $info;
+        return $info->installdir if $ref eq 'Alien::Xrepo::PackageInfo' && defined $info->installdir;
+        return $info->libpath    if $ref eq 'Alien::Xrepo::PackageInfo' && defined $info->libpath;
+        return () unless $ref eq 'HASH';
+        my $art = $info->{artifacts};
+        return $art->{installdir} if ref $art eq 'HASH' && defined $art->{installdir};
+        return $info->{installdir} if defined $info->{installdir};
+        if ( @{ $info->{libfiles} // [] } ) {
+            return path( $info->{libfiles}[0] )->parent->parent->stringify;
+        }
+        if ( @{ $info->{includedirs} // [] } ) {
+            return path( $info->{includedirs}[0] )->parent->stringify;
+        }
         ();
     }
 
@@ -488,7 +544,7 @@ class Alien::Xrepo v0.9.5 {
         my $data = $self->_decode_json_output($json_out);
 
         # xrepo might return a single object or a list.
-        return $self->_process_info( ( ref $data eq 'ARRAY' ) ? $data->[0] : $data );
+        return $self->_finalize( $data, %opts );
     }
 
     method info ( $pkg_spec, %opts ) {
