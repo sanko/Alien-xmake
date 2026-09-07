@@ -45,7 +45,7 @@ class Alien::Xrepo v0.9.5 {
         push @env, "XMAKE_PKG_INSTALLDIR=$ENV{XMAKE_PKG_INSTALLDIR}" if defined $ENV{XMAKE_PKG_INSTALLDIR};
         push @env, "XMAKE_PKG_CACHEDIR=$ENV{XMAKE_PKG_CACHEDIR}"     if defined $ENV{XMAKE_PKG_CACHEDIR};
         my $env = @env ? ' [ENV ' . join( ' ', @env ) . ']' : '';
-        print "[XREPO] $str$env (cwd: @{[ Cwd::getcwd() ]})\n";
+        say "[XREPO] $str$env (cwd: @{[ Cwd::getcwd() ]})\n" if $verbose;
         return;
     }
     #
@@ -547,7 +547,7 @@ class Alien::Xrepo v0.9.5 {
     method list_repo () {
         local $ENV{XMAKE_THEME} = $self->_theme;
         say '[*] xrepo: listing remote repositories...' if $verbose;
-        my ( $out, $err, $exit ) = capture { system( $xmake->exe, qw[lua private.xrepo], 'list-repo' ) };
+        my ( $out, $err, $exit ) = capture { system( $xmake->exe, qw[lua private.xrepo list-repo] ) };
         return () if $exit != 0;
         $self->blah($out);
         return split /\n/, $out;

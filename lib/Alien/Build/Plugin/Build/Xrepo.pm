@@ -71,7 +71,7 @@ package Alien::Build::Plugin::Build::Xrepo v0.9.5 {
                     $satisfied = ( defined $found && defined $version ) ? ( $found eq $version ) : ( defined $found ) ? 1 : 0;
                     $probed{$name} = { version => $found, satisfied => $satisfied };
                     my $status = $satisfied ? 'satisfied' : 'missing';
-                    warn "[xrepo] probe: $name " . ( $found // 'not installed' ) . " ($status)\n" if $verbose;
+                    say "[xrepo] probe: $name " . ( $found // 'not installed' ) . " ($status)\n" if $verbose;
                 }
                 $build->install_prop->{xrepo} ||= {};
                 $build->install_prop->{xrepo}{probed} = \%probed;
@@ -97,7 +97,7 @@ package Alien::Build::Plugin::Build::Xrepo v0.9.5 {
                     my $dir = Path::Tiny->new($repo_def)->absolute;
                     next unless $dir->child('packages')->is_dir;
                     my $nm = 'alien-' . $dir->basename;
-                    warn "[xrepo] no engine support for add_repo (local repo $nm ignored)\n" if !$r->can('add_repo');
+                    say "[xrepo] no engine support for add_repo (local repo $nm ignored)" if !$r->can('add_repo');
                     eval { $r->add_repo( $nm, $dir->stringify ) };
                 }
                 my %packages;
@@ -113,7 +113,7 @@ package Alien::Build::Plugin::Build::Xrepo v0.9.5 {
                     eval { $info = $r->install( $name, $version, %opts ) };
                     if ($@) {
                         $errors{$name} = "$@";
-                        warn "[xrepo] $name failed to install: $@\n";
+                        say "[xrepo] $name failed to install: $@";
                         next;
                     }
                     if ( ref $info && eval { $info->can('_data_printer') } ) {
@@ -122,7 +122,7 @@ package Alien::Build::Plugin::Build::Xrepo v0.9.5 {
                     my $target = Path::Tiny->new($src)->child($name);
                     $target->mkpath;
                     eval { $r->export( $name, $version, %opts, packagedir => $target->stringify ) };
-                    warn "[xrepo] $name could not be exported: $@\n" if $@;
+                    say "[xrepo] $name could not be exported: $@" if $@;
                 }
 
                 # share verification counts files, so write a manifest even for one package.
@@ -142,7 +142,7 @@ package Alien::Build::Plugin::Build::Xrepo v0.9.5 {
                     my $total  = scalar( keys %errors ) + scalar( keys %packages );
                     my $failed = join ', ', sort keys %errors;
                     my $ok     = join ', ', sort keys %packages;
-                    warn "[xrepo] partial failure: $failed failed, $ok succeeded ($total total)\n";
+                    say "[xrepo] partial failure: $failed failed, $ok succeeded ($total total)" if $verbose;
                 }
                 die 'Alien::Build::Plugin::Build::Xrepo: no packages installed successfully' unless %packages;
             }
